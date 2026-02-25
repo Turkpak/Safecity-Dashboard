@@ -7,6 +7,12 @@ from api.views import *
 
 router = DefaultRouter()
 
+#--------------------------------- User View ---------------------------------
+router.register(r'create-user', UserCreateView, basename='create-user')
+router.register(r'login-user', UserLoginDashboardCreateView, basename='login-user')
+router.register(r'get-user', GetUserView, basename='get-user')
+router.register(r'update-user', UserUpdateView, basename='update-user')
+
 #--------------------------------- Province View ---------------------------------
 router.register(r'create-province', ProvinceCreateView, basename='create-province')
 router.register(r'list-province', ListProvinceView, basename='list-province')
@@ -42,6 +48,12 @@ router.register(r'create-project', ProjectCreateView, basename='create-project')
 router.register(r'list-project', ListProjectView, basename='list-project')
 router.register(r'update-project', ProjectUpdateView, basename='update-project') 
 router.register(r'delete-project', ProjectDeleteView, basename='delete-project')
+
+#--------------------------------- Pictorial Archive View ---------------------------------
+router.register(r'create-pictorial-archive', PictorialArchiveCreateView, basename='create-pictorial-archive')
+router.register(r'list-pictorial-archive', ListPictorialArchiveView, basename='list-pictorial-archive')
+router.register(r'update-pictorial-archive', PictorialArchiveUpdateView, basename='update-pictorial-archive')
+router.register(r'delete-pictorial-archive', PictorialArchiveDeleteView, basename='delete-pictorial-archive')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
