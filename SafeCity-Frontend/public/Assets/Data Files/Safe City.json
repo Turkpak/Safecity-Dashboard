@@ -1,0 +1,736 @@
+
+ null,
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "Activity ID",
+  "Column2": "Activity Name",
+  "Column3": "Original \nDuration",
+  "Column4": "Start",
+  "Column5": "Finish"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "  SC.1  Project Milestone",
+  "Column3": 1,
+  "Column4": "19-Jan-26",
+  "Column5": "19-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "    A1000",
+  "Column2": "Start Date",
+  "Column3": 0,
+  "Column4": "19-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "    A1010",
+  "Column2": "Compeletion Date",
+  "Column3": 0,
+  "Column5": "19-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "  SC.2  Bahawalpur Division",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "    SC.2.1  Bahawalnagar",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "      SC.2.1.1  Chishtian",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "        SC.2.1.1.1  Camera & Field Surveillance System",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.1.1  Camera Poles & Foundations",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1020",
+  "Column2": "Survey & Marking",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1030",
+  "Column2": "Excavation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1040",
+  "Column2": "PCC",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1050",
+  "Column2": "Foundation Concrete",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1060",
+  "Column2": "Curing & Backfilling",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1070",
+  "Column2": "Pole Erection",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.1.2  ANPR Poles & Foundations",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1080",
+  "Column2": "Excavation & Foundation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1090",
+  "Column2": "Pole Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.1.3  Power Cabinets for Camera & ANPR",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1100",
+  "Column2": "Cabinet Foundation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1110",
+  "Column2": "Cabinet Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1120",
+  "Column2": "Internal Wiring",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.1.4  Camera Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1130",
+  "Column2": "Fixed Camera Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1140",
+  "Column2": "PTZ Camera Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1150",
+  "Column2": "ANPR Camera Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1160",
+  "Column2": "Strobe Light Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.1.5  Body Worn Camera System",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1170",
+  "Column2": "Body Cameras Deployment",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1180",
+  "Column2": "Dock & Storage Setup",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.1.6  Field Devices",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1240",
+  "Column2": "Panic Button Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1250",
+  "Column2": "Attendance Device Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.1.7  Field Equipment Configuration",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1190",
+  "Column2": "Camera Addressing & Labeling",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1200",
+  "Column2": "Initial Camera Testing",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "        SC.2.1.1.2  Power & Electrical Infrastructure",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.2.1  Power Supply Works",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1260",
+  "Column2": "Power Cable Laying",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1270",
+  "Column2": "Panel Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1280",
+  "Column2": "Earthing & Grounding",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.2.2  Backup Power Systems",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1290",
+  "Column2": "UPS Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1300",
+  "Column2": "Battery Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1310",
+  "Column2": "Generator Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1320",
+  "Column2": "Generator Testing & Commissioning",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.2.3  Split AC Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1330",
+  "Column2": "AC Mounting",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1340",
+  "Column2": "Electrical Connections",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1350",
+  "Column2": "Testing",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "        SC.2.1.1.3  OFC, Network & Connectivity",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.3.1  OFC Route Survey & Design",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1360",
+  "Column2": "Route Survey",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1370",
+  "Column2": "Design Approval",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.3.2  OFC Civil Works",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1380",
+  "Column2": "Trenching",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1390",
+  "Column2": "Duct \/ Pipe Laying",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1400",
+  "Column2": "Manhole Construction",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1410",
+  "Column2": "Backfilling & Restoration",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.3.3  OFC Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1420",
+  "Column2": "OFC Cable Pulling",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1430",
+  "Column2": "Splicing",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1440",
+  "Column2": "OFC Testing",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.3.4  Aerial GPON OFC",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1450",
+  "Column2": "Pole Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1460",
+  "Column2": "Aerial OFC Laying",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1470",
+  "Column2": "Termination & Testing",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.3.5  Network Connectivity",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1480",
+  "Column2": "ISP Coordination",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1490",
+  "Column2": "Site Connectivity Setup",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1500",
+  "Column2": "Bandwidth Testing",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "        SC.2.1.1.4  Control Room Development",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.4.1  Control Room Civil Works",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1510",
+  "Column2": "Renovation Works",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1520",
+  "Column2": "Flooring & Ceiling",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1530",
+  "Column2": "Painting & Finishing",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.4.2  Furniture & Fixtures",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1540",
+  "Column2": "Workstations Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1550",
+  "Column2": "Chairs Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.4.3  Network Equipment",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1560",
+  "Column2": "Core Switch Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1570",
+  "Column2": "Network Switch Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1580",
+  "Column2": "Firewall Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.4.4  Display Systems",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1590",
+  "Column2": "Video Wall Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1600",
+  "Column2": "Monitoring Screen Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "        SC.2.1.1.5  IT Systems, Servers & Software",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.5.1  Server & Storage Systems",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1610",
+  "Column2": "SAN Storage Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1620",
+  "Column2": "HDD Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1630",
+  "Column2": "GPU Server Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.5.2  VMS & AI Systems",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1640",
+  "Column2": "VMS Installation",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1650",
+  "Column2": "AI NVR Configuration",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1660",
+  "Column2": "Analytics Configuration",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.5.3  Software & Applications",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1670",
+  "Column2": "PSCA HQ Integration",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1680",
+  "Column2": "Mobile Application Deployment",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1690",
+  "Column2": "Digital Twin Customization",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "          SC.2.1.1.5.4  System Licensing",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1700",
+  "Column2": "Camera Licenses",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "            A1710",
+  "Column2": "System Licenses",
+  "Column3": 4,
+  "Column4": "19-Jan-26",
+  "Column5": "22-Jan-26"
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "      SC.2.1.2  Fort Abbas",
+  "Column3": 0
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "      SC.2.1.3  Haroon Abad",
+  "Column3": 0
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "      SC.2.1.4  Minchinabad",
+  "Column3": 0
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "    SC.2.2  Bahawalpur",
+  "Column3": 0
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "      SC.2.2.1  Ahmadpur East",
+  "Column3": 0
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "      SC.2.2.2  Hasilpur",
+  "Column3": 0
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "      SC.2.2.3  Khairpur Tamewali",
+  "Column3": 0
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "      SC.2.2.4  Yazman",
+  "Column3": 0
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "    SC.2.3  Rahim Yar Khan",
+  "Column3": 0
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "      SC.2.3.1  Khanpur",
+  "Column3": 0
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "      SC.2.3.2  Liaquatpur",
+  "Column3": 0
+ },
+ {
+  "SC  Smart Safe Cities - CM Tehsils Project (Bahawalpur Division)": "      SC.2.3.3  Sadiqabad",
+  "Column3": 0
+ }

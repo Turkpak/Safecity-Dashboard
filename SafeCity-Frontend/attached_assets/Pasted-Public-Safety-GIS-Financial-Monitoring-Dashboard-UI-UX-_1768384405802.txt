@@ -1,0 +1,234 @@
+Public Safety GIS & Financial Monitoring Dashboard UI/UX Design
+🧠 ROLE & RESPONSIBILITY
+
+You are a Senior UI/UX Engineer at Google, experienced in large-scale government platforms, GIS dashboards, real-time monitoring systems, and financial analytics interfaces.
+
+You have been assigned to design a modern, production-ready web dashboard UI for a Public Safety Monitoring System inspired by the Punjab Safe Cities Authority (PSCA) platform:
+
+🔗 https://psca.gop.pk/
+
+This system will be used by:
+
+Provincial & City Command Centers
+
+Planning & Monitoring Authorities
+
+Finance & Audit Departments
+
+Senior Government Decision-Makers
+
+The design must support real-time GIS monitoring, multi-city performance comparison, and financial & budget analytics, across desktop, tablet, mobile, and large command-center displays, following modern, AMP-friendly, responsive UI standards.
+
+🎯 CORE OBJECTIVE
+
+Design a complete, scalable, modern dashboard UI system that:
+
+Visualizes GIS-based city monitoring
+
+Tracks operational KPIs for each city
+
+Enables cross-city performance comparison
+
+Displays financial expenditure, budgeting, and forecasting
+
+Uses reusable, component-based UI
+
+Meets Google-level UX, accessibility, and clarity standards
+
+🗺️ MODULE 1: REAL-TIME GIS CITY MONITORING DASHBOARD
+Functional Requirements
+
+Design a City Operations Dashboard with the following:
+
+🗺️ Interactive GIS Map (Primary Focus)
+
+Full-width interactive map (Mapbox / Leaflet style)
+
+Supported map layers:
+
+CCTV camera locations
+
+Incident hotspots (heatmap)
+
+Emergency vehicles / patrol units
+
+Police stations & control rooms
+
+Layer toggle panel with legend
+
+City → Zone → Sector filters
+
+Map interactions:
+
+Zoom, pan, area select
+
+Click marker → open detail drawer
+
+Heatmap intensity control
+
+📊 KPI Summary Cards (Top Section)
+
+Display real-time KPIs:
+
+Active Alerts
+
+Total Incidents (Today)
+
+Average Response Time
+
+Cameras Online vs Offline
+
+Emergency Calls (Live)
+
+Each KPI card must include:
+
+Icon
+
+Metric value
+
+Trend indicator (increase/decrease)
+
+Severity-based color coding
+
+🚨 Live Incident Monitoring Panel
+
+Real-time incident feed
+
+Severity color tags
+
+Timestamp + location
+
+Click → incident detail modal
+
+Scrollable list with filters
+
+📈 Operational Analytics
+
+Line charts (hourly / daily trends)
+
+Bar charts (incident category breakdown)
+
+Area charts (traffic vs crime)
+
+Interactive tooltips
+
+Time range selector (24h / 7d / 30d)
+
+🏙️ MODULE 2: CROSS-CITY PERFORMANCE COMPARISON DASHBOARD
+Functional Requirements
+
+Design a Multi-City Comparison Dashboard with:
+
+🌆 City Selection & Comparison
+
+Multi-city selector
+
+Toggle between:
+
+Side-by-side comparison
+
+Overlay trend comparison
+
+📊 Performance Metrics
+
+KPI cards per city
+
+Incident rate per population
+
+Average response time
+
+CCTV coverage percentage
+
+📉 Comparative Visualizations
+
+Multi-line trend graphs
+
+Ranked bar charts
+
+Performance heat tables
+
+📋 Ranking Table
+
+City rankings based on:
+
+Incident resolution rate
+
+Response efficiency
+
+Budget utilization efficiency
+
+Sortable & filterable
+
+Expandable rows with mini-analytics
+
+💰 MODULE 3: FINANCIAL & BUDGET ANALYTICS DASHBOARD
+Functional Requirements
+
+Design a Financial Monitoring Dashboard for planning and finance teams:
+
+💵 Financial KPI Cards
+
+Total Budget Allocated
+
+Budget Utilized
+
+Remaining Budget
+
+Monthly Burn Rate
+
+📊 Financial Visualizations
+
+Budget vs Actual (bar + line combo)
+
+Expense distribution (donut/pie)
+
+Monthly & quarterly trend area charts
+
+Forecast vs actual projections
+
+🏙️ City & Department Drill-Down
+
+Filters by:
+
+City
+
+Department (CCTV, Operations, HR, IT, Infrastructure)
+
+Drill-down panels for expense details
+
+Expandable expense tables
+
+📤 Reporting & Export
+
+Export options:
+
+PDF
+
+CSV
+
+Excel
+
+Print-ready financial summaries
+
+📱 RESPONSIVE & DEVICE-BASED DESIGN
+Supported Devices
+
+Large command-center screens
+
+Desktop & laptops
+
+Tablets
+
+Mobile phones (field users)
+
+Responsive Behavior
+
+Collapsible sidebar navigation
+
+Mobile-first layout
+
+Touch-friendly UI
+
+AMP-compatible components
+
+Adaptive charts & maps
