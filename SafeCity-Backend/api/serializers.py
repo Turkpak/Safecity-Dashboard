@@ -124,12 +124,18 @@ class TehsilSerializer(serializers.ModelSerializer):
 
     def get_district_name(self, obj):
         return obj.district.district_name
-    
+
+# --------------------------------------------------------
+# Stakeholder
+# --------------------------------------------------------
 class StakeholderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Stakeholder
         fields = ['id', 'stakeholder_type', 'stakeholder_name', 'status']
 
+# --------------------------------------------------------
+# Project
+# --------------------------------------------------------
 class ProjectSerializer(GeoFeatureModelSerializer):
     class Meta:
         model = Project
@@ -183,6 +189,9 @@ class ProjectSerializer(GeoFeatureModelSerializer):
 
         return instance
 
+# --------------------------------------------------------
+# Pictorial Archive
+# --------------------------------------------------------
 class PictorialArchiveSerializer(serializers.ModelSerializer):
     class Meta:
         model = PictorialArchive
