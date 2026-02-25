@@ -7,3 +7,7 @@ password: admin123
 password: postgres
 "GDAL_LIBRARY_PATH": "C:/Program Files/QGIS 3.34.3/bin/gdal308.dll",
 "GEOS_LIBRARY_PATH": "C:/Program Files/QGIS 3.34.3/bin/geos_c.dll"
+
+FOR IMU
+"GDAL_LIBRARY_PATH": "C:/Program Files/QGIS 3.44.1/bin/gdal311.dll",
+"GEOS_LIBRARY_PATH": "C:/Program Files/QGIS 3.44.1/bin/geos_c.dll"
