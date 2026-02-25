@@ -25,11 +25,11 @@ class ProjectCreateView(viewsets.ViewSet):
                 tehsil=serializer.validated_data['tehsil'],
                 total_budget_allocated=serializer.validated_data['total_budget_allocated'],
                 budget_utilized=serializer.validated_data['budget_utilized'],
-                budget_variance=serializer.validated_data['budget_variance'],
-                budget_remaining=serializer.validated_data['budget_remaining'],
-                xer_file=serializer.validated_data['xer_file'],
-                boundary_file=serializer.validated_data['boundary_file'],
-                geom=serializer.validated_data['geom'],
+                # budget_variance=serializer.validated_data['budget_variance'],
+                # budget_remaining=serializer.validated_data['budget_remaining'],
+                # xer_file=serializer.validated_data['xer_file'],
+                # boundary_file=serializer.validated_data['boundary_file'],
+                # geom=serializer.validated_data['geom'],
             )
             myproject.save()
 

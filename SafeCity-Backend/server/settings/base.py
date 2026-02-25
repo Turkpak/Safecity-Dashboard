@@ -50,9 +50,9 @@ ALLOWED_HOSTS = [
     # "sdasurvey.cloud", "www.sdasurvey.cloud", "72.61.229.127",
       "localhost", "127.0.0.1" ]
 
-# AUTH_PROFILE_MODULE = "api.MyUser"
+AUTH_PROFILE_MODULE = "api.MyUser"
 # Default user model
-# AUTH_USER_MODEL = "api.MyUser"
+AUTH_USER_MODEL = "api.MyUser"
 
 # Application definition
 

@@ -58,6 +58,8 @@ router.register(r'delete-pictorial-archive', PictorialArchiveDeleteView, basenam
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
+
+    path('', include(router.urls)),
 ]
 
 if settings.DEBUG:

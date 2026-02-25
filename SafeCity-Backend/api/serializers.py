@@ -8,35 +8,32 @@ import json
 # MyUser Serializer
 # --------------------------------------------------------
 class MyUserSerializer(serializers.ModelSerializer):
-    supervisor_name = serializers.SerializerMethodField(read_only=True)
-    supervisor_code = serializers.SerializerMethodField(read_only=True)
+    full_name = serializers.SerializerMethodField()
+
     class Meta:
         model = MyUser
         fields = [
             "id",
-            "code",
+            "email",
             "full_name",
-            "role",
+            "stakeholder",
             "is_active",
-            "supervisor",
-            "supervisor_name",
-            "supervisor_code",
-            "date_joined",
-             "password", "email", "contact"
+            "password",
         ]
         extra_kwargs = {
             "password": {"write_only": True},
         }
 
-    def get_supervisor_name(self, obj):
-        return obj.supervisor.full_name if obj.supervisor else None
-    def get_supervisor_code(self, obj):
-        return obj.supervisor.code if obj.supervisor else None
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}"
+
     def create(self, validated_data):
         password = validated_data.pop("password", None)
         user = MyUser(**validated_data)
+
         if password:
             user.set_password(password)
+
         user.save()
         return user
 
@@ -44,9 +41,6 @@ class MyUserSerializer(serializers.ModelSerializer):
 class MyUserLoginDashboardSerializer(serializers.ModelSerializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
-    full_name = serializers.CharField(source='get_full_name', read_only=True)
-    stakeholder_type = serializers.SerializerMethodField()
-    stakeholder_id = serializers.SerializerMethodField()
     class Meta:
         model = MyUser
         fields = [
@@ -131,7 +125,7 @@ class TehsilSerializer(serializers.ModelSerializer):
 class StakeholderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Stakeholder
-        fields = ['id', 'stakeholder_type', 'stakeholder_name', 'status']
+        fields = ['id', 'stakeholder_type', 'stakeholder_title', 'status']
 
 # --------------------------------------------------------
 # Project
