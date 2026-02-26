@@ -155,6 +155,19 @@ export interface StakeholderUpdateInput {
 // Project (GeoFeatureModelSerializer may return geom as GeoJSON)
 // ---------------------------------------------------------------------------
 
+/** GET list-project returns a GeoJSON FeatureCollection; each feature has id + properties */
+export interface ListProjectFeature {
+  id: number;
+  type: string;
+  geometry: unknown;
+  properties: Omit<Project, "id">;
+}
+
+export interface ListProjectResponse {
+  type: "FeatureCollection";
+  features: ListProjectFeature[];
+}
+
 export interface Project {
   id: number;
   stakeholder: number;
