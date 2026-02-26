@@ -16,6 +16,7 @@ from rest_framework.pagination import PageNumberPagination
 from collections import defaultdict
 from rest_framework.pagination import PageNumberPagination
 from django.utils.text import slugify
+from datetime import datetime
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -78,15 +79,25 @@ def project_image_file_path(instance, filename):
         filename
     )
 
-
 def project_doc_file_path(instance, filename):
     ext = filename.split('.')[-1].lower()
     filename = f"{uuid.uuid4()}.{ext}"
 
-    # Unique + readable folder
-    project_folder = f"{instance.id or 'new'}-{slugify(instance.project_name)}"
+    # Format each level with the title in brackets
+    province = f"{instance.province.province_name} (Province)" if instance.province else "No Province"
+    division = f"{instance.division.division_name} (Division)" if instance.division else "No Division"
+    district = f"{instance.district.district_name} (District)" if instance.district else "No District"
+    tehsil = f"{instance.tehsil.tehsil_name} (Tehsil)" if instance.tehsil else "No Tehsil"
+    project = f"{instance.project_name} (Project)" if instance.project_name else "No Project"
 
-    # Decide subfolder based on extension
+    # Slugify to make folder names filesystem-friendly
+    province = slugify(province)
+    division = slugify(division)
+    district = slugify(district)
+    tehsil = slugify(tehsil)
+    project = slugify(project)[:50]  # limit project folder length
+
+    # Decide subfolder based on file type
     if ext == "xer":
         subfolder = "xer"
     elif ext in ["geojson", "json"]:
@@ -94,11 +105,18 @@ def project_doc_file_path(instance, filename):
     else:
         subfolder = "others"
 
+    # Use created_at date if available, else today
+    date_folder = instance.created_at.strftime("%Y-%m-%d") if instance.created_at else datetime.now().strftime("%Y-%m-%d")
+
     return os.path.join(
         "projects",
-        project_folder,
-        "documents",
+        province,
+        division,
+        district,
+        tehsil,
+        project,
         subfolder,
+        date_folder,
         filename
     )
 
