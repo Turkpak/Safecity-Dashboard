@@ -15,6 +15,8 @@ from rest_framework.permissions import BasePermission
 from rest_framework.pagination import PageNumberPagination
 from collections import defaultdict
 from rest_framework.pagination import PageNumberPagination
+from django.utils.text import slugify
+from datetime import datetime
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -69,17 +71,54 @@ def project_image_file_path(instance, filename):
     else:
         date_folder = "undated"
 
+    # 🔥 Use project name instead of ID
+    project_name = slugify(instance.project.project_name)
+
     return os.path.join(
-        f"projects/{instance.project.id}/daily_logs/{date_folder}/",
+        f"projects/{project_name}/daily_logs/{date_folder}/",
         filename
     )
 
-
 def project_doc_file_path(instance, filename):
-    """Generate file path for new project image using UUID"""
-    ext = filename.split('.')[-1]  # Get the file extension
-    filename = f'{uuid.uuid4()}.{ext}'  # Generate a new filename using UUID
-    return os.path.join('docs/', filename)
+    ext = filename.split('.')[-1].lower()
+    filename = f"{uuid.uuid4()}.{ext}"
+
+    # Format each level with the title in brackets
+    province = f"{instance.province.province_name} (Province)" if instance.province else "No Province"
+    division = f"{instance.division.division_name} (Division)" if instance.division else "No Division"
+    district = f"{instance.district.district_name} (District)" if instance.district else "No District"
+    tehsil = f"{instance.tehsil.tehsil_name} (Tehsil)" if instance.tehsil else "No Tehsil"
+    project = f"{instance.project_name} (Project)" if instance.project_name else "No Project"
+
+    # Slugify to make folder names filesystem-friendly
+    province = slugify(province)
+    division = slugify(division)
+    district = slugify(district)
+    tehsil = slugify(tehsil)
+    project = slugify(project)[:50]  # limit project folder length
+
+    # Decide subfolder based on file type
+    if ext == "xer":
+        subfolder = "xer"
+    elif ext in ["geojson", "json"]:
+        subfolder = "geojson"
+    else:
+        subfolder = "others"
+
+    # Use created_at date if available, else today
+    date_folder = instance.created_at.strftime("%Y-%m-%d") if instance.created_at else datetime.now().strftime("%Y-%m-%d")
+
+    return os.path.join(
+        "projects",
+        province,
+        division,
+        district,
+        tehsil,
+        project,
+        subfolder,
+        date_folder,
+        filename
+    )
 
 passkey = get_random_string(length=8)
 
