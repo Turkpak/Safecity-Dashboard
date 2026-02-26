@@ -131,16 +131,40 @@ class StakeholderSerializer(serializers.ModelSerializer):
 # Project
 # --------------------------------------------------------
 class ProjectSerializer(GeoFeatureModelSerializer):
+    province_name = serializers.SerializerMethodField()
+    division_name = serializers.SerializerMethodField()
+    district_name = serializers.SerializerMethodField()
+    tehsil_name = serializers.SerializerMethodField()
+    stakeholder_type = serializers.SerializerMethodField()
+    stakeholder_title = serializers.SerializerMethodField()
     class Meta:
         model = Project
         geo_field = "geom"  # required for GeoFeatureModelSerializer
         fields = [
-            'id', 'stakeholder', 'project_name', 'project_description',
-            'project_starting_date', 'project_reference_no', 'province',
-            'division', 'district', 'tehsil', 'total_budget_allocated',
+            'id', 'stakeholder', 'stakeholder_type', 'stakeholder_title', 'project_name', 'project_description',
+            'project_starting_date', 'project_reference_no', 'province', 'province_name',
+            'division', 'division_name', 'district', 'district_name', 'tehsil', 'tehsil_name', 'total_budget_allocated',
             'budget_utilized', 'budget_variance', 'budget_remaining',
             'xer_file', 'boundary_file', 'geom', 'created_at', 'updated_at'
         ]
+
+    def get_province_name(self, obj):
+        return obj.province.province_name
+
+    def get_division_name(self, obj):
+        return obj.division.division_name
+
+    def get_district_name(self, obj):
+        return obj.district.district_name
+
+    def get_tehsil_name(self, obj):
+        return obj.tehsil.tehsil_name
+    
+    def get_stakeholder_type(self, obj):
+        return obj.stakeholder.stakeholder_type
+
+    def get_stakeholder_title(self, obj):
+        return obj.stakeholder.stakeholder_title
 
     def create(self, validated_data):
         boundary_file = validated_data.pop("boundary_file", None)
@@ -187,6 +211,10 @@ class ProjectSerializer(GeoFeatureModelSerializer):
 # Pictorial Archive
 # --------------------------------------------------------
 class PictorialArchiveSerializer(serializers.ModelSerializer):
+    project_name = serializers.SerializerMethodField()
     class Meta:
         model = PictorialArchive
-        fields = ['id', 'project', 'image', 'image_date', 'description', 'created_at', 'updated_at' ]
+        fields = ['id', 'project', 'project_name', 'image', 'image_date', 'description', 'created_at', 'updated_at' ]
+
+    def get_project_name(self, obj):
+        return obj.project.project_name

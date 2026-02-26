@@ -1,24 +1,17 @@
 from ..common_imports import *
 
 class PictorialArchiveCreateView(viewsets.ViewSet):
+    parser_classes = [MultiPartParser, FormParser]
     queryset = PictorialArchive.objects.all()
     serializer_class = PictorialArchiveSerializer
     permission_classes = [AllowAny]
 
     def create(self, request, *args, **kwargs):
-        data = request.data
-
         try:
-            serializer = PictorialArchiveSerializer(data=data)
+            serializer = PictorialArchiveSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
 
-            pictorial = PictorialArchive(
-                project=serializer.validated_data['project'],
-                # image=serializer.validated_data['image'],
-                image_date=serializer.validated_data['image_date'],
-                description=serializer.validated_data.get('description')
-            )
-            pictorial.save()
+            pictorial = serializer.save()   # 🔥 THIS handles image automatically
 
             return ApiResponse(
                 status=status.HTTP_201_CREATED,
@@ -42,4 +35,3 @@ class PictorialArchiveCreateView(viewsets.ViewSet):
                 data=str(e),
                 http_status=status.HTTP_400_BAD_REQUEST
             ).create_response()
-            
