@@ -16,7 +16,7 @@ DATABASES = {
         'ENGINE': 'django.contrib.gis.db.backends.postgis', 
         'NAME': get_secret("DB_NAME", "safecity"),
         'USER': get_secret("DB_USER", "postgres"),
-        'PASSWORD': get_secret("DB_PASSWORD", "admin123"),
+        'PASSWORD': get_secret("DB_PASSWORD", "postgres"),
         'HOST': 'localhost',
         'PORT': '5432',
     }
