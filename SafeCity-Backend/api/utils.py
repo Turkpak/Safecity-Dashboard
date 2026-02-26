@@ -15,6 +15,7 @@ from rest_framework.permissions import BasePermission
 from rest_framework.pagination import PageNumberPagination
 from collections import defaultdict
 from rest_framework.pagination import PageNumberPagination
+from django.utils.text import slugify
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -69,17 +70,37 @@ def project_image_file_path(instance, filename):
     else:
         date_folder = "undated"
 
+    # 🔥 Use project name instead of ID
+    project_name = slugify(instance.project.project_name)
+
     return os.path.join(
-        f"projects/{instance.project.id}/daily_logs/{date_folder}/",
+        f"projects/{project_name}/daily_logs/{date_folder}/",
         filename
     )
 
 
 def project_doc_file_path(instance, filename):
-    """Generate file path for new project image using UUID"""
-    ext = filename.split('.')[-1]  # Get the file extension
-    filename = f'{uuid.uuid4()}.{ext}'  # Generate a new filename using UUID
-    return os.path.join('docs/', filename)
+    ext = filename.split('.')[-1].lower()
+    filename = f"{uuid.uuid4()}.{ext}"
+
+    # Unique + readable folder
+    project_folder = f"{instance.id or 'new'}-{slugify(instance.project_name)}"
+
+    # Decide subfolder based on extension
+    if ext == "xer":
+        subfolder = "xer"
+    elif ext in ["geojson", "json"]:
+        subfolder = "geojson"
+    else:
+        subfolder = "others"
+
+    return os.path.join(
+        "projects",
+        project_folder,
+        "documents",
+        subfolder,
+        filename
+    )
 
 passkey = get_random_string(length=8)
 
