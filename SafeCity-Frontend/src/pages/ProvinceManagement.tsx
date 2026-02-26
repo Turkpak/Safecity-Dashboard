@@ -116,11 +116,11 @@ export default function ProvinceManagement() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
               <div className="space-y-2">
                 <Label htmlFor="province-name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Province Name
+                  Province Name <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="province-name"
-                  placeholder="Enter province name"
+                  placeholder="e.g. Punjab"
                   value={provinceName}
                   onChange={(e) => setProvinceName(e.target.value)}
                   className="h-10"
@@ -168,7 +168,8 @@ export default function ProvinceManagement() {
               <Table>
                 <TableHeader className="bg-muted/50">
                   <TableRow>
-                    <TableHead className="w-20">#</TableHead>
+                    <TableHead className="w-16">#</TableHead>
+                    <TableHead className="w-24">ID</TableHead>
                     <TableHead>Province</TableHead>
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
@@ -176,14 +177,21 @@ export default function ProvinceManagement() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                         Loading…
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredProvinces.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                        No provinces found. Create one above.
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredProvinces.map((province, index) => (
                       <TableRow key={province.id}>
                         <TableCell className="font-medium">{index + 1}</TableCell>
+                        <TableCell className="text-muted-foreground font-mono text-sm">{province.id}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <div className="h-8 w-8 rounded-full bg-secondary/10 text-secondary flex items-center justify-center font-bold text-xs shrink-0">

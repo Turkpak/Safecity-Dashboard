@@ -131,14 +131,16 @@ export default function DivisionManagement() {
           <CardContent className="pt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-end">
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Province</Label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Province <span className="text-destructive">*</span>
+                </Label>
                 <Select
                   onValueChange={(v) => setFormData({ ...formData, provinceId: v })}
                   value={formData.provinceId}
                   disabled={provincesLoading}
                 >
                   <SelectTrigger className="h-10">
-                    <SelectValue placeholder="Select province" />
+                    <SelectValue placeholder={provinces.length === 0 ? "No provinces—add in Province Management" : "Select province"} />
                   </SelectTrigger>
                   <SelectContent>
                     {provinces.map((p: Province) => (
@@ -148,9 +150,14 @@ export default function DivisionManagement() {
                     ))}
                   </SelectContent>
                 </Select>
+                {!provincesLoading && provinces.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Add provinces in Province Management first, then select one here.</p>
+                )}
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Division Name</Label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Division Name <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   placeholder="Enter division name"
                   value={formData.division_name}

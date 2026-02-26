@@ -1,6 +1,7 @@
 import { get, post, put, del } from "./client";
 import type { Division, DivisionCreateInput, DivisionUpdateInput } from "./types";
 
+/** POST /api/create-division/ — body: { division_name: string, province: number } (province = id from list-province) */
 const CREATE = "create-division/";
 const LIST = "list-division/";
 const UPDATE = "update-division/";
