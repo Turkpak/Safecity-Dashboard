@@ -172,7 +172,7 @@ export default function TehsilManagement() {
       <div className="flex flex-col gap-8 max-w-[1400px] mx-auto pb-20">
         <div>
           <h1 className="text-2xl font-bold text-primary">Tehsil — Add / Edit</h1>
-          <p className="text-muted-foreground text-sm">Create a new tehsil or edit an existing one.</p>
+          <p className="text-muted-foreground text-sm">Select Province → Division → District, then enter tehsil name and click Create Tehsil.</p>
         </div>
 
         <Card className="border-none shadow-sm overflow-hidden">
@@ -185,14 +185,14 @@ export default function TehsilManagement() {
           <CardContent className="pt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Province</Label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Province <span className="text-destructive">*</span></Label>
                 <Select
                   onValueChange={(v) => setFormData({ ...formData, provinceId: v, divisionId: "", districtId: "" })}
                   value={formData.provinceId}
                   disabled={provincesLoading}
                 >
                   <SelectTrigger className="h-10 text-xs text-foreground">
-                    <SelectValue placeholder="Select province" />
+                    <SelectValue placeholder={provinces.length === 0 ? "Add provinces first" : "Select province"} />
                   </SelectTrigger>
                   <SelectContent>
                     {provinces.map((p: Province) => (
@@ -204,14 +204,14 @@ export default function TehsilManagement() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Division</Label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Division <span className="text-destructive">*</span></Label>
                 <Select
                   onValueChange={(v) => setFormData({ ...formData, divisionId: v, districtId: "" })}
                   value={formData.divisionId}
                   disabled={!formData.provinceId}
                 >
                   <SelectTrigger className="h-10 text-xs text-foreground">
-                    <SelectValue placeholder="Select division" />
+                    <SelectValue placeholder={!formData.provinceId ? "Select province first" : "Select division"} />
                   </SelectTrigger>
                   <SelectContent>
                     {divisionsByProvince.map((d: Division) => (
@@ -223,14 +223,14 @@ export default function TehsilManagement() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">District</Label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">District <span className="text-destructive">*</span></Label>
                 <Select
                   onValueChange={(v) => setFormData({ ...formData, districtId: v })}
                   value={formData.districtId}
                   disabled={!formData.divisionId}
                 >
                   <SelectTrigger className="h-10 text-xs text-foreground">
-                    <SelectValue placeholder="Select district" />
+                    <SelectValue placeholder={!formData.divisionId ? "Select division first" : "Select district"} />
                   </SelectTrigger>
                   <SelectContent>
                     {districtsByDivision.map((d: District) => (
@@ -242,7 +242,7 @@ export default function TehsilManagement() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tehsil Name</Label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tehsil Name <span className="text-destructive">*</span></Label>
                 <Input
                   placeholder="Enter tehsil name"
                   value={formData.tehsil_name}

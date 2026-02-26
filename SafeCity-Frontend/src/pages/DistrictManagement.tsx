@@ -147,7 +147,7 @@ export default function DistrictManagement() {
       <div className="flex flex-col gap-8 max-w-[1400px] mx-auto pb-20">
         <div>
           <h1 className="text-2xl font-bold text-primary">District — Add / Edit</h1>
-          <p className="text-muted-foreground text-sm">Create a new district or edit an existing one.</p>
+          <p className="text-muted-foreground text-sm">Select Province → Division, then add the district against that hierarchy.</p>
         </div>
 
         <Card className="border-none shadow-sm overflow-hidden">
@@ -160,14 +160,16 @@ export default function DistrictManagement() {
           <CardContent className="pt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Province</Label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Province <span className="text-destructive">*</span>
+                </Label>
                 <Select
                   onValueChange={(v) => setFormData({ ...formData, provinceId: v, divisionId: "" })}
                   value={formData.provinceId}
                   disabled={provincesLoading}
                 >
                   <SelectTrigger className="h-10">
-                    <SelectValue placeholder="Select province" />
+                    <SelectValue placeholder={provinces.length === 0 ? "Add provinces first" : "Select province"} />
                   </SelectTrigger>
                   <SelectContent>
                     {provinces.map((p: Province) => (
@@ -179,14 +181,16 @@ export default function DistrictManagement() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Division</Label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Division <span className="text-destructive">*</span>
+                </Label>
                 <Select
                   onValueChange={(v) => setFormData({ ...formData, divisionId: v })}
                   value={formData.divisionId}
                   disabled={!formData.provinceId}
                 >
                   <SelectTrigger className="h-10">
-                    <SelectValue placeholder="Select division" />
+                    <SelectValue placeholder={!formData.provinceId ? "Select province first" : "Select division"} />
                   </SelectTrigger>
                   <SelectContent>
                     {divisionsByProvince.map((d: Division) => (
@@ -198,7 +202,9 @@ export default function DistrictManagement() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">District Name</Label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  District Name <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   placeholder="Enter district name"
                   value={formData.district_name}
@@ -226,7 +232,10 @@ export default function DistrictManagement() {
 
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h2 className="text-xl font-bold text-primary">District List</h2>
+            <div>
+              <h2 className="text-xl font-bold text-primary">District List</h2>
+              <p className="text-muted-foreground text-sm mt-0.5">All added districts (Province → Division → District) from list-district API.</p>
+            </div>
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input

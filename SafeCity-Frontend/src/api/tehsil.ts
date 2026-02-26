@@ -1,6 +1,7 @@
 import { get, post, put, del } from "./client";
 import type { Tehsil, TehsilCreateInput, TehsilUpdateInput } from "./types";
 
+/** POST /api/create-tehsil/ — body: { tehsil_name: string, province: number, division: number, district: number } (ids from list-province / list-division / list-district) */
 const CREATE = "create-tehsil/";
 const LIST = "list-tehsil/";
 const UPDATE = "update-tehsil/";
