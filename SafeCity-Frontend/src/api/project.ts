@@ -1,6 +1,7 @@
 import { get, post, put, del } from "./client";
 import type { Project, ProjectCreateInput, ProjectUpdateInput } from "./types";
 
+/** POST /api/create-project/ — body: stakeholder, project_name, project_description, project_starting_date, project_reference_no, province, division, district, tehsil, total_budget_allocated, budget_utilized */
 const CREATE = "create-project/";
 const LIST = "list-project/";
 const UPDATE = "update-project/";

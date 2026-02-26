@@ -187,8 +187,8 @@ export interface ProjectCreateInput {
   division: number;
   district: number;
   tehsil: number;
-  total_budget_allocated?: string | null;
-  budget_utilized?: string | null;
+  total_budget_allocated?: number | string | null;
+  budget_utilized?: number | string | null;
 }
 
 export interface ProjectUpdateInput {

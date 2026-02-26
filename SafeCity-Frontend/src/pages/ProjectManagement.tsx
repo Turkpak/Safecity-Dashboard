@@ -167,9 +167,10 @@ export default function ProjectManagement() {
   const [projectDescription, setProjectDescription] = useState("");
   const [startingDate, setStartingDate] = useState("");
   const [referenceNumber, setReferenceNumber] = useState("");
-  const [saNumber, setSaNumber] = useState("");
   const [stakeholderId, setStakeholderId] = useState<string>("");
   const [selectedTehsilId, setSelectedTehsilId] = useState<string>("");
+  const [totalBudgetAllocated, setTotalBudgetAllocated] = useState<string>("");
+  const [budgetUtilized, setBudgetUtilized] = useState<string>("");
   const [xerFile, setXerFile] = useState<File | null>(null);
   const [areaFile, setAreaFile] = useState<File | null>(null);
   const [geoData, setGeoData] = useState<any>(null);
@@ -277,12 +278,13 @@ export default function ProjectManagement() {
     setProjectDescription("");
     setStartingDate("");
     setReferenceNumber("");
-    setSaNumber("");
     setStakeholderId("");
     setSelectedProvinceId("");
     setSelectedDivisionId("");
     setSelectedDistrictId("");
     setSelectedTehsilId("");
+    setTotalBudgetAllocated("");
+    setBudgetUtilized("");
     setXerFile(null);
     setAreaFile(null);
     setGeoData(null);
@@ -348,9 +350,11 @@ export default function ProjectManagement() {
     }
     if (currentStep === 2) {
       if (!validateStep2()) return;
+      const totalBudget = totalBudgetAllocated.trim() ? Number(totalBudgetAllocated) : 0;
+      const utilized = budgetUtilized.trim() ? Number(budgetUtilized) : 0;
       createProjectMutation.mutate({
         stakeholder: Number(stakeholderId),
-        project_name: projectName.trim(),
+        project_name: projectName.trim() || null,
         project_description: projectDescription.trim() || null,
         project_starting_date: startingDate || null,
         project_reference_no: referenceNumber.trim() || null,
@@ -358,6 +362,8 @@ export default function ProjectManagement() {
         division: Number(selectedDivisionId),
         district: Number(selectedDistrictId),
         tehsil: Number(selectedTehsilId),
+        total_budget_allocated: totalBudget,
+        budget_utilized: utilized,
       });
     }
   };
@@ -583,7 +589,7 @@ export default function ProjectManagement() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="referenceNumber">Reference Number *</Label>
+                    <Label htmlFor="referenceNumber">Project Reference No *</Label>
                     <Input
                       id="referenceNumber"
                       placeholder="Enter reference number"
@@ -594,16 +600,32 @@ export default function ProjectManagement() {
                   </div>
                 </div>
 
-                {/* SA Number */}
-                <div className="space-y-2">
-                  <Label htmlFor="saNumber">SA Number *</Label>
-                  <Input
-                    id="saNumber"
-                    placeholder="Enter SA number"
-                    value={saNumber}
-                    onChange={(e) => setSaNumber(e.target.value)}
-                    required
-                  />
+                {/* Total Budget Allocated & Budget Utilized */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="totalBudgetAllocated">Total Budget Allocated</Label>
+                    <Input
+                      id="totalBudgetAllocated"
+                      type="number"
+                      min={0}
+                      step={1}
+                      placeholder="e.g. 100000"
+                      value={totalBudgetAllocated}
+                      onChange={(e) => setTotalBudgetAllocated(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="budgetUtilized">Budget Utilized</Label>
+                    <Input
+                      id="budgetUtilized"
+                      type="number"
+                      min={0}
+                      step={1}
+                      placeholder="e.g. 60000"
+                      value={budgetUtilized}
+                      onChange={(e) => setBudgetUtilized(e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 {/* Stakeholder */}
