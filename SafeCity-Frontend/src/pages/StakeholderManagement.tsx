@@ -53,9 +53,7 @@ export default function StakeholderManagement() {
     mutationFn: createStakeholder,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stakeholders"] });
-      setFormData({ type: "", title: "", status: "active" });
-      setEditingStakeholder(null);
-      setIsAddDialogOpen(false);
+      closeDialog();
       toast({ title: "Success", description: "Stakeholder added successfully" });
     },
     onError: (e: Error) => {
@@ -68,9 +66,7 @@ export default function StakeholderManagement() {
       updateStakeholder(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stakeholders"] });
-      setFormData({ type: "", title: "", status: "active" });
-      setEditingStakeholder(null);
-      setIsAddDialogOpen(false);
+      closeDialog();
       toast({ title: "Success", description: "Stakeholder updated successfully" });
     },
     onError: (e: Error) => {
@@ -151,6 +147,12 @@ export default function StakeholderManagement() {
     setIsAddDialogOpen(true);
   };
 
+  const closeDialog = () => {
+    setIsAddDialogOpen(false);
+    setEditingStakeholder(null);
+    setFormData({ type: "", title: "", status: "active" });
+  };
+
   const filteredStakeholders = stakeholders.filter(
     (s) =>
       s.stakeholder_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -169,10 +171,7 @@ export default function StakeholderManagement() {
             open={isAddDialogOpen}
             onOpenChange={(open) => {
               setIsAddDialogOpen(open);
-              if (!open) {
-                setEditingStakeholder(null);
-                setFormData({ type: "", title: "", status: "active" });
-              }
+              if (!open) closeDialog();
             }}
           >
             <DialogTrigger asChild>
@@ -183,11 +182,15 @@ export default function StakeholderManagement() {
             <DialogContent className="sm:max-w-[600px] p-0 border-none rounded-xl max-h-[90vh] overflow-y-auto">
               <div className="bg-primary px-6 py-4 flex items-center justify-between border-b-4 border-secondary">
                 <DialogTitle className="text-white text-lg font-bold">
-                  {editingStakeholder ? "Edit Stakeholder" : "Add Stakeholder"}
+                  {editingStakeholder
+                    ? `Edit Stakeholder${editingStakeholder.id ? ` (ID: ${editingStakeholder.id})` : ""}`
+                    : "Add Stakeholder"}
                 </DialogTitle>
                 <button
-                  onClick={() => setIsAddDialogOpen(false)}
+                  type="button"
+                  onClick={closeDialog}
                   className="text-white/70 hover:text-white transition-colors"
+                  aria-label="Close"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -257,7 +260,7 @@ export default function StakeholderManagement() {
                   <Button
                     type="button"
                     variant="secondary"
-                    onClick={() => setIsAddDialogOpen(false)}
+                    onClick={closeDialog}
                     className="bg-slate-500 hover:bg-slate-600 text-white px-8 h-10 shadow-lg border-none font-bold"
                   >
                     Cancel
@@ -347,9 +350,11 @@ export default function StakeholderManagement() {
                           <Button
                             size="sm"
                             onClick={() => openEditDialog(stakeholder)}
-                            className="bg-primary hover:bg-primary/90 h-8 w-8 p-0 border-none shadow-sm"
+                            disabled={updateMutation.isPending}
+                            className="bg-primary hover:bg-primary/90 h-8 px-3 border-none shadow-sm gap-1.5"
                           >
                             <Edit2 className="h-3.5 w-3.5 text-white" />
+                            Edit
                           </Button>
                           <Button
                             size="sm"

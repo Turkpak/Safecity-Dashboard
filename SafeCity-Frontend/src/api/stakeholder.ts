@@ -33,8 +33,17 @@ export async function createStakeholder(payload: StakeholderCreateInput): Promis
   return post<Stakeholder>(CREATE_PATH, body);
 }
 
+/**
+ * PUT request to update a stakeholder.
+ * URL: http://127.0.0.1:8000/api/update-stakeholder/{id}/
+ * Body: { stakeholder_type?, stakeholder_title?, status? }
+ */
 export async function updateStakeholder(id: number, payload: StakeholderUpdateInput): Promise<Stakeholder> {
-  return put<Stakeholder>(`${UPDATE}${id}/`, payload);
+  const body: Record<string, string> = {};
+  if (payload.stakeholder_type !== undefined) body.stakeholder_type = String(payload.stakeholder_type).trim();
+  if (payload.stakeholder_title !== undefined) body.stakeholder_title = String(payload.stakeholder_title).trim();
+  if (payload.status !== undefined) body.status = payload.status;
+  return put<Stakeholder>(`${UPDATE}${id}/`, body);
 }
 
 export async function deleteStakeholder(id: number): Promise<void> {
