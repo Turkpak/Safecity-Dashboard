@@ -14,7 +14,7 @@ class PictorialArchiveCreateView(viewsets.ViewSet):
 
             pictorial = PictorialArchive(
                 project=serializer.validated_data['project'],
-                image=serializer.validated_data['image'],
+                # image=serializer.validated_data['image'],
                 image_date=serializer.validated_data['image_date'],
                 description=serializer.validated_data.get('description')
             )

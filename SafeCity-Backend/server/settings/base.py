@@ -50,9 +50,9 @@ ALLOWED_HOSTS = [
     # "sdasurvey.cloud", "www.sdasurvey.cloud", "72.61.229.127",
       "localhost", "127.0.0.1" ]
 
-# AUTH_PROFILE_MODULE = "api.MyUser"
+AUTH_PROFILE_MODULE = "api.MyUser"
 # Default user model
-# AUTH_USER_MODEL = "api.MyUser"
+AUTH_USER_MODEL = "api.MyUser"
 
 # Application definition
 
@@ -84,6 +84,8 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite default
     "http://127.0.0.1:5173",
+    "http://localhost:5000",  # Frontend dev (package.json dev port)
+    "http://127.0.0.1:5000",
     # "https://sdasurvey.cloud",
     # "https://www.sdasurvey.cloud/",
 ]

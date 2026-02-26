@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SplashScreen } from "@/components/layout/SplashScreen";
 import { SidebarProvider } from "@/contexts/SidebarContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Comparison from "@/pages/Comparison";
@@ -95,9 +96,11 @@ function AppContent() {
     <>
       {/* Router is always mounted to detect route changes */}
       <div style={{ visibility: showSplash ? 'hidden' : 'visible' }}>
-        <SidebarProvider>
-          <Router />
-        </SidebarProvider>
+        <AuthProvider>
+          <SidebarProvider>
+            <Router />
+          </SidebarProvider>
+        </AuthProvider>
       </div>
       {/* Splash screen overlays on top */}
       {showSplash && <SplashScreen onComplete={handleSplashComplete} />}

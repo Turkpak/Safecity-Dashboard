@@ -9,8 +9,19 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useState, useMemo, useEffect } from "react";
-import { getAllDivisions, getDistrictsByDivision, getTehsilsByDivisionAndDistrict } from "@/data/punjabHierarchy";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import {
+  listProjects,
+  listStakeholders,
+  listProvinces,
+  listDivisions,
+  listDistricts,
+  listTehsils,
+  createProject,
+  deleteProject,
+} from "@/api";
+import type { Project as ApiProject } from "@/api/types";
 import { MapContainer, TileLayer, GeoJSON, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -86,70 +97,96 @@ function ProjectAreaMap({ geoData }: { geoData: any }) {
   );
 }
 
-interface Project {
-  id: string;
-  name: string;
-  description: string;
-  startingDate: string;
-  referenceNumber: string;
-  saNumber: string;
-  stakeholderType: string;
-  division: string;
-  district: string;
-  tehsil: string;
-  xerFileName: string;
-  areaFileName: string;
-  createdAt: Date;
-  status: "Active" | "Completed" | "On Hold";
-}
-
 export default function ProjectManagement() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [showXERDialog, setShowXERDialog] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [projects, setProjects] = useState<Project[]>([]);
-  
+
+  const { data: projectsData = [], isLoading: projectsLoading } = useQuery({
+    queryKey: ["projects"],
+    queryFn: listProjects,
+  });
+  const { data: stakeholdersList = [] } = useQuery({
+    queryKey: ["stakeholders"],
+    queryFn: listStakeholders,
+  });
+  const { data: provincesList = [] } = useQuery({
+    queryKey: ["provinces"],
+    queryFn: listProvinces,
+  });
+  const [selectedProvinceId, setSelectedProvinceId] = useState<string>("");
+  const provinceIdNum = selectedProvinceId ? Number(selectedProvinceId) : undefined;
+  const { data: divisionsList = [] } = useQuery({
+    queryKey: ["divisions", provinceIdNum],
+    queryFn: () => listDivisions(provinceIdNum),
+    enabled: !!provinceIdNum,
+  });
+  const [selectedDivisionId, setSelectedDivisionId] = useState<string>("");
+  const divisionIdNum = selectedDivisionId ? Number(selectedDivisionId) : undefined;
+  const { data: districtsList = [] } = useQuery({
+    queryKey: ["districts", divisionIdNum],
+    queryFn: () => listDistricts(divisionIdNum),
+    enabled: !!divisionIdNum,
+  });
+  const [selectedDistrictId, setSelectedDistrictId] = useState<string>("");
+  const districtIdNum = selectedDistrictId ? Number(selectedDistrictId) : undefined;
+  const { data: tehsilsList = [] } = useQuery({
+    queryKey: ["tehsils", districtIdNum],
+    queryFn: () => listTehsils(districtIdNum),
+    enabled: !!districtIdNum,
+  });
+
+  const createProjectMutation = useMutation({
+    mutationFn: createProject,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast({ title: "Success", description: "Project created successfully." });
+      resetForm();
+      setShowAddProjectDialog(false);
+      setShowXERDialog(false);
+    },
+    onError: (e: Error) => {
+      toast({ title: "Error", description: e.message || "Failed to create project", variant: "destructive" });
+    },
+  });
+  const deleteProjectMutation = useMutation({
+    mutationFn: deleteProject,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast({ title: "Project Deleted", description: "Project has been deleted successfully." });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Error", description: e.message || "Failed to delete project", variant: "destructive" });
+    },
+  });
+
   // Form state
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
   const [startingDate, setStartingDate] = useState("");
   const [referenceNumber, setReferenceNumber] = useState("");
   const [saNumber, setSaNumber] = useState("");
-  const [stakeholderType, setStakeholderType] = useState<string>("");
-  const [selectedDivision, setSelectedDivision] = useState<string>("");
-  const [selectedDistrict, setSelectedDistrict] = useState<string>("");
-  const [selectedTehsil, setSelectedTehsil] = useState<string>("");
+  const [stakeholderId, setStakeholderId] = useState<string>("");
+  const [selectedTehsilId, setSelectedTehsilId] = useState<string>("");
   const [xerFile, setXerFile] = useState<File | null>(null);
   const [areaFile, setAreaFile] = useState<File | null>(null);
   const [geoData, setGeoData] = useState<any>(null);
   const [isLoadingGeoData, setIsLoadingGeoData] = useState(false);
 
-  // Get divisions
-  const divisions = useMemo(() => getAllDivisions(), []);
-
-  // Get districts based on selected division
-  const districts = useMemo(() => {
-    if (!selectedDivision) return [];
-    return getDistrictsByDivision(selectedDivision);
-  }, [selectedDivision]);
-
-  // Get tehsils based on selected division and district
-  const tehsils = useMemo(() => {
-    if (!selectedDivision || !selectedDistrict) return [];
-    return getTehsilsByDivisionAndDistrict(selectedDivision, selectedDistrict);
-  }, [selectedDivision, selectedDistrict]);
-
-  // Reset district and tehsil when division changes
   useEffect(() => {
-    setSelectedDistrict("");
-    setSelectedTehsil("");
-  }, [selectedDivision]);
-
-  // Reset tehsil when district changes
+    setSelectedDivisionId("");
+    setSelectedDistrictId("");
+    setSelectedTehsilId("");
+  }, [selectedProvinceId]);
   useEffect(() => {
-    setSelectedTehsil("");
-  }, [selectedDistrict]);
+    setSelectedDistrictId("");
+    setSelectedTehsilId("");
+  }, [selectedDivisionId]);
+  useEffect(() => {
+    setSelectedTehsilId("");
+  }, [selectedDistrictId]);
 
   // Handle XER file upload
   const handleXERFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -241,10 +278,11 @@ export default function ProjectManagement() {
     setStartingDate("");
     setReferenceNumber("");
     setSaNumber("");
-    setStakeholderType("");
-    setSelectedDivision("");
-    setSelectedDistrict("");
-    setSelectedTehsil("");
+    setStakeholderId("");
+    setSelectedProvinceId("");
+    setSelectedDivisionId("");
+    setSelectedDistrictId("");
+    setSelectedTehsilId("");
     setXerFile(null);
     setAreaFile(null);
     setGeoData(null);
@@ -254,43 +292,19 @@ export default function ProjectManagement() {
   // Validate step 1
   const validateStep1 = () => {
     if (!projectName.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter a project name",
-        variant: "destructive",
-      });
+      toast({ title: "Validation Error", description: "Please enter a project name", variant: "destructive" });
       return false;
     }
-    if (!selectedDivision) {
-      toast({
-        title: "Validation Error",
-        description: "Please select a division",
-        variant: "destructive",
-      });
+    if (!selectedProvinceId || !selectedDivisionId || !selectedDistrictId || !selectedTehsilId) {
+      toast({ title: "Validation Error", description: "Please select province, division, district and tehsil", variant: "destructive" });
       return false;
     }
-    if (!selectedDistrict) {
-      toast({
-        title: "Validation Error",
-        description: "Please select a district",
-        variant: "destructive",
-      });
-      return false;
-    }
-    if (!selectedTehsil) {
-      toast({
-        title: "Validation Error",
-        description: "Please select a tehsil",
-        variant: "destructive",
-      });
+    if (!stakeholderId) {
+      toast({ title: "Validation Error", description: "Please select a stakeholder", variant: "destructive" });
       return false;
     }
     if (!xerFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please upload an XER file",
-        variant: "destructive",
-      });
+      toast({ title: "Validation Error", description: "Please upload an XER file", variant: "destructive" });
       return false;
     }
     return true;
@@ -328,73 +342,30 @@ export default function ProjectManagement() {
   // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (currentStep === 1) {
       handleNext();
       return;
     }
-
     if (currentStep === 2) {
-      if (!validateStep2()) {
-        return;
-      }
-
-      // Create new project
-      const newProject: Project = {
-        id: Date.now().toString(),
-        name: projectName,
-        description: projectDescription,
-        startingDate: startingDate,
-        referenceNumber: referenceNumber,
-        saNumber: saNumber,
-        stakeholderType: stakeholderType,
-        division: selectedDivision,
-        district: selectedDistrict,
-        tehsil: selectedTehsil,
-        xerFileName: xerFile?.name || "",
-        areaFileName: areaFile?.name || "",
-        createdAt: new Date(),
-        status: "Active"
-      };
-
-      // Add project to the list
-      setProjects([...projects, newProject]);
-
-      // Here you would typically send the data to your backend
-      console.log("Project Data:", {
-        projectName,
-        projectDescription,
-        startingDate,
-        referenceNumber,
-        saNumber,
-        stakeholderType,
-        division: selectedDivision,
-        district: selectedDistrict,
-        tehsil: selectedTehsil,
-        xerFile,
-        areaFile,
-        geoData
+      if (!validateStep2()) return;
+      createProjectMutation.mutate({
+        stakeholder: Number(stakeholderId),
+        project_name: projectName.trim(),
+        project_description: projectDescription.trim() || null,
+        project_starting_date: startingDate || null,
+        project_reference_no: referenceNumber.trim() || null,
+        province: Number(selectedProvinceId),
+        division: Number(selectedDivisionId),
+        district: Number(selectedDistrictId),
+        tehsil: Number(selectedTehsilId),
       });
-
-      toast({
-        title: "Success!",
-        description: "Project created successfully!",
-      });
-      resetForm();
-      setShowAddProjectDialog(false);
-      setShowXERDialog(false);
     }
   };
 
-  // Handle delete project
-  const handleDeleteProject = (id: string) => {
-    const project = projects.find(p => p.id === id);
-    if (window.confirm(`Are you sure you want to delete "${project?.name}"?`)) {
-      setProjects(projects.filter(p => p.id !== id));
-      toast({
-        title: "Project Deleted",
-        description: `"${project?.name}" has been deleted successfully.`,
-      });
+  const handleDeleteProject = (id: number) => {
+    const project = projectsData.find((p) => p.id === id);
+    if (window.confirm(`Are you sure you want to delete "${project?.project_name}"?`)) {
+      deleteProjectMutation.mutate(id);
     }
   };
 
@@ -414,88 +385,58 @@ export default function ProjectManagement() {
         </div>
 
         {/* Projects Grid */}
-        {projects.length === 0 ? (
+        {projectsLoading ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <p className="text-muted-foreground">Loading projects…</p>
+            </CardContent>
+          </Card>
+        ) : projectsData.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16">
               <FolderKanban className="h-16 w-16 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No projects yet</h3>
               <p className="text-sm text-muted-foreground mb-4">Get started by creating a new project</p>
-              
             </CardContent>
           </Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {projects.map((project) => (
+            {projectsData.map((project: ApiProject) => (
               <Card key={project.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="text-lg mb-1">{project.name}</CardTitle>
+                      <CardTitle className="text-lg mb-1">{project.project_name || "Unnamed"}</CardTitle>
                       <CardDescription className="text-xs">
-                        Created {project.createdAt.toLocaleDateString()}
+                        Updated {project.updated_at ? new Date(project.updated_at).toLocaleDateString() : "—"}
                       </CardDescription>
                     </div>
-                    <Badge
-                      variant="outline"
-                      className={`${
-                        project.status === "Active"
-                          ? "bg-blue-500 text-white border-blue-500"
-                          : project.status === "Completed"
-                          ? "bg-green-500 text-white border-green-500"
-                          : "bg-gray-500 text-white border-gray-500"
-                      }`}
-                    >
-                      {project.status}
+                    <Badge variant="outline" className="bg-blue-500 text-white border-blue-500">
+                      Active
                     </Badge>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {project.description && (
+                    {project.project_description && (
                       <div className="text-sm">
-                        <p className="text-muted-foreground line-clamp-2">{project.description}</p>
+                        <p className="text-muted-foreground line-clamp-2">{project.project_description}</p>
                       </div>
                     )}
                     <div className="flex items-center gap-2 text-sm">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       <span className="text-muted-foreground">
-                        Start: {project.startingDate ? new Date(project.startingDate).toLocaleDateString() : "N/A"}
+                        Start: {project.project_starting_date ? new Date(project.project_starting_date).toLocaleDateString() : "N/A"}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <FileText className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">
-                        Ref: {project.referenceNumber || "N/A"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">
-                        SA: {project.saNumber || "N/A"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">
-                        Stakeholder: {project.stakeholderType || "N/A"}
-                      </span>
+                      <span className="text-muted-foreground">Ref: {project.project_reference_no || "N/A"}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       <span className="text-muted-foreground">
-                        {project.division} → {project.district} → {project.tehsil}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground truncate" title={project.xerFileName}>
-                        XER: {project.xerFileName}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground truncate" title={project.areaFileName}>
-                        Area: {project.areaFileName}
+                        Province/District/Tehsil IDs: {project.province} / {project.district} / {project.tehsil}
                       </span>
                     </div>
                     <div className="flex items-center justify-between pt-2 border-t">
@@ -503,14 +444,17 @@ export default function ProjectManagement() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDeleteProject(project.id)}
+                        disabled={deleteProjectMutation.isPending}
                         className="text-destructive hover:text-destructive"
                       >
                         <Trash2 className="h-4 w-4 mr-1" />
                         Delete
                       </Button>
-                      <Button variant="ghost" size="sm">
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
+                      <Button variant="ghost" size="sm" asChild>
+                        <a href={`/project/${project.tehsil}/${project.id}`}>
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </a>
                       </Button>
                     </div>
                   </div>
@@ -662,77 +606,78 @@ export default function ProjectManagement() {
                   />
                 </div>
 
-                {/* Stakeholder Type */}
+                {/* Stakeholder */}
                 <div className="space-y-2">
-                  <Label htmlFor="stakeholderType">Stakeholder Type *</Label>
-                  <Select value={stakeholderType} onValueChange={setStakeholderType} required>
-                    <SelectTrigger id="stakeholderType">
-                      <SelectValue placeholder="Select stakeholder type" />
+                  <Label htmlFor="stakeholderId">Stakeholder *</Label>
+                  <Select value={stakeholderId} onValueChange={setStakeholderId} required>
+                    <SelectTrigger id="stakeholderId">
+                      <SelectValue placeholder="Select stakeholder" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Consultant">Consultant</SelectItem>
-                      <SelectItem value="Client">Client</SelectItem>
-                      <SelectItem value="Contractor">Contractor</SelectItem>
+                      {stakeholdersList.map((s) => (
+                        <SelectItem key={s.id} value={String(s.id)}>
+                          {s.stakeholder_title} ({s.stakeholder_type})
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Division Select */}
+                {/* Province */}
+                <div className="space-y-2">
+                  <Label htmlFor="province">Province *</Label>
+                  <Select value={selectedProvinceId} onValueChange={setSelectedProvinceId} required>
+                    <SelectTrigger id="province">
+                      <SelectValue placeholder="Select province" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {provincesList.map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)}>{p.province_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Division */}
                 <div className="space-y-2">
                   <Label htmlFor="division">Division *</Label>
-                  <Select value={selectedDivision} onValueChange={setSelectedDivision} required>
+                  <Select value={selectedDivisionId} onValueChange={setSelectedDivisionId} disabled={!selectedProvinceId} required>
                     <SelectTrigger id="division">
-                      <SelectValue placeholder="Select division" />
+                      <SelectValue placeholder={selectedProvinceId ? "Select division" : "Select province first"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {divisions.map((division) => (
-                        <SelectItem key={division} value={division}>
-                          {division}
-                        </SelectItem>
+                      {divisionsList.map((d) => (
+                        <SelectItem key={d.id} value={String(d.id)}>{d.division_name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* District Select */}
+                {/* District */}
                 <div className="space-y-2">
                   <Label htmlFor="district">District *</Label>
-                  <Select
-                    value={selectedDistrict}
-                    onValueChange={setSelectedDistrict}
-                    disabled={!selectedDivision}
-                    required
-                  >
+                  <Select value={selectedDistrictId} onValueChange={setSelectedDistrictId} disabled={!selectedDivisionId} required>
                     <SelectTrigger id="district">
-                      <SelectValue placeholder={selectedDivision ? "Select district" : "Select division first"} />
+                      <SelectValue placeholder={selectedDivisionId ? "Select district" : "Select division first"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {districts.map((district) => (
-                        <SelectItem key={district} value={district}>
-                          {district}
-                        </SelectItem>
+                      {districtsList.map((d) => (
+                        <SelectItem key={d.id} value={String(d.id)}>{d.district_name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Tehsil Select */}
+                {/* Tehsil */}
                 <div className="space-y-2">
                   <Label htmlFor="tehsil">Tehsil *</Label>
-                  <Select
-                    value={selectedTehsil}
-                    onValueChange={setSelectedTehsil}
-                    disabled={!selectedDistrict}
-                    required
-                  >
+                  <Select value={selectedTehsilId} onValueChange={setSelectedTehsilId} disabled={!selectedDistrictId} required>
                     <SelectTrigger id="tehsil">
-                      <SelectValue placeholder={selectedDistrict ? "Select tehsil" : "Select district first"} />
+                      <SelectValue placeholder={selectedDistrictId ? "Select tehsil" : "Select district first"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {tehsils.map((tehsil) => (
-                        <SelectItem key={tehsil} value={tehsil}>
-                          {tehsil}
-                        </SelectItem>
+                      {tehsilsList.map((t) => (
+                        <SelectItem key={t.id} value={String(t.id)}>{t.tehsil_name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

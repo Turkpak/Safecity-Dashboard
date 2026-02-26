@@ -211,6 +211,20 @@ class Project(models.Model):
     def __str__(self):
         return self.project_name
 
+    def save(self, *args, **kwargs):
+        try:
+            total = float(self.total_budget_allocated or 0)
+            utilized = float(self.budget_utilized or 0)
+        except ValueError:
+            total = 0
+            utilized = 0
+
+        self.budget_variance = total - utilized
+        self.budget_remaining = max(total - utilized, 0)
+
+        super().save(*args, **kwargs)
+
+
     
 # --------------------------------------------------------
 # Pictorial Archive
