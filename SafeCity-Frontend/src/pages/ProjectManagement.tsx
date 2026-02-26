@@ -364,6 +364,8 @@ export default function ProjectManagement() {
         tehsil: Number(selectedTehsilId),
         total_budget_allocated: totalBudget,
         budget_utilized: utilized,
+        xer_file: xerFile ?? undefined,
+        boundary_file: areaFile ?? undefined,
       });
     }
   };

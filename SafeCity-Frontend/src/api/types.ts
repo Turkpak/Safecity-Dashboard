@@ -202,6 +202,10 @@ export interface ProjectCreateInput {
   tehsil: number;
   total_budget_allocated?: number | string | null;
   budget_utilized?: number | string | null;
+  /** .xer file for project schedule */
+  xer_file?: File | null;
+  /** Boundary: .geojson (sent as-is) or .kml/.kmz/.zip/.shp (converted to GeoJSON on frontend) */
+  boundary_file?: File | null;
 }
 
 export interface ProjectUpdateInput {

@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@tmcw/togeojson": "^7.1.2",
+    "shpjs": "^6.2.0"
+  }
+}
