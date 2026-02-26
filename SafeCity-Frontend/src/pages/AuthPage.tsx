@@ -5,16 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-    Shield,
     Lock,
     Mail,
     User,
     ArrowRight,
     Eye,
     EyeOff,
-    Camera,
-    Activity,
-    ShieldCheck,
     Map as MapIcon,
     ChevronRight,
     TrendingUp,
@@ -30,23 +26,49 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { login as apiLogin } from "@/api/auth";
 
 export default function AuthPage() {
     const [, setLocation] = useLocation();
+    const { setUser } = useAuth();
+    const { toast } = useToast();
     const [isLogin, setIsLogin] = useState(true);
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [stakeholderType, setStakeholderType] = useState<string>("Client");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
-        // Persist role for sidebar visibility
-        localStorage.setItem("userRole", stakeholderType);
-        setTimeout(() => {
-            setIsLoading(false);
-            setLocation("/");
-        }, 1500);
+        if (isLogin) {
+            try {
+                const data = await apiLogin({ email, password });
+                setUser(data);
+                localStorage.setItem("userRole", data.stakeholder_type || stakeholderType);
+                setLocation("/");
+                toast({ title: "Welcome", description: "Login successful." });
+            } catch (err) {
+                toast({
+                    title: "Login failed",
+                    description: err instanceof Error ? err.message : "Invalid credentials",
+                    variant: "destructive",
+                });
+            } finally {
+                setIsLoading(false);
+            }
+        } else {
+            // Register: optional future wire to create-user API
+            localStorage.setItem("userRole", stakeholderType);
+            setTimeout(() => {
+                setIsLoading(false);
+                setLocation("/");
+                toast({ title: "Request submitted", description: "Registration requests are processed within 24-48 hours." });
+            }, 1500);
+        }
     };
 
     return (
@@ -215,6 +237,8 @@ export default function AuthPage() {
                                                 id="email"
                                                 type="email"
                                                 placeholder="admin@psca.gov.pk"
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
                                                 className="pl-12 h-14 bg-muted/5 border-2 border-muted/50 hover:border-primary/30 focus:border-primary focus:ring-4 focus:ring-primary/5 rounded-2xl transition-all font-bold text-[15px]"
                                                 required
                                             />
@@ -232,6 +256,8 @@ export default function AuthPage() {
                                                 id="password"
                                                 type={showPassword ? "text" : "password"}
                                                 placeholder="••••••••"
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
                                                 className="pl-12 pr-12 h-14 bg-muted/5 border-2 border-muted/50 hover:border-primary/30 focus:border-primary focus:ring-4 focus:ring-primary/5 rounded-2xl transition-all font-bold text-[15px]"
                                                 required
                                             />
