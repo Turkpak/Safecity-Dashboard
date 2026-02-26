@@ -16,7 +16,8 @@ import {
     TrendingUp,
     BarChart3,
     CheckCircle2,
-    Briefcase
+    Briefcase,
+    ShieldCheck
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
