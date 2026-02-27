@@ -16,7 +16,11 @@ class MyUserSerializer(serializers.ModelSerializer):
             "id",
             "email",
             "full_name",
-            "stakeholder",
+            "first_name",
+            "last_name",
+            # "company_name",
+            "role",             # Added role
+            "stakeholder",      # Assign stakeholder if needed
             "is_active",
             "password",
         ]
@@ -31,8 +35,13 @@ class MyUserSerializer(serializers.ModelSerializer):
         password = validated_data.pop("password", None)
         user = MyUser(**validated_data)
 
+        # Set password properly
         if password:
             user.set_password(password)
+
+        # Super admin automatically sets is_staff=True for admin or themselves
+        if validated_data.get("role") in ["admin", "super_admin"]:
+            user.is_staff = True
 
         user.save()
         return user
