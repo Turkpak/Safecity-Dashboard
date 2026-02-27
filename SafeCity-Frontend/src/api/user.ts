@@ -1,10 +1,19 @@
-import { post } from "./client";
-import type { UserCreateInput } from "./types";
+import { get, post } from "./client";
+import type { UserCreateInput, UserListItem } from "./types";
 
 const CREATE = "create-user/";
+const LIST = "get-user/";
 
 /**
- * POST /api/create-user/ — create user (super admin only).
+ * GET /api/get-user/ — list all users (no query params).
+ */
+export async function listUsers(): Promise<UserListItem[]> {
+  const data = await get<UserListItem[]>(LIST);
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * POST /api/create-user/ — create user.
  * Body: email, first_name, last_name, password, stakeholder
  */
 export async function createUser(payload: UserCreateInput): Promise<{ user: unknown; tokens: { access: string; refresh: string } }> {

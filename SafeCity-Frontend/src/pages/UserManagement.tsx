@@ -4,15 +4,32 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { listStakeholders, createUser } from "@/api";
+import { listStakeholders, createUser, listUsers } from "@/api";
 import { useState } from "react";
-import { UserPlus } from "lucide-react";
+import { UserPlus, Users } from "lucide-react";
 
 export default function UserManagement() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -24,16 +41,19 @@ export default function UserManagement() {
     queryFn: listStakeholders,
   });
 
+  const { data: users = [], isLoading: usersLoading } = useQuery({
+    queryKey: ["users"],
+    queryFn: listUsers,
+  });
+
   const createUserMutation = useMutation({
     mutationFn: createUser,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
       queryClient.invalidateQueries({ queryKey: ["stakeholders"] });
       toast({ title: "Success", description: "User created successfully." });
-      setEmail("");
-      setFirstName("");
-      setLastName("");
-      setPassword("");
-      setStakeholderId("");
+      resetForm();
+      setDialogOpen(false);
     },
     onError: (e: Error) => {
       toast({
@@ -43,6 +63,14 @@ export default function UserManagement() {
       });
     },
   });
+
+  function resetForm() {
+    setEmail("");
+    setFirstName("");
+    setLastName("");
+    setPassword("");
+    setStakeholderId("");
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,31 +106,45 @@ export default function UserManagement() {
     });
   };
 
+  const getStakeholderLabel = (id: number | null) => {
+    if (id == null) return "—";
+    const s = stakeholders.find((st) => st.id === id);
+    return s ? `${s.stakeholder_title} (${s.stakeholder_type})` : String(id);
+  };
+
   return (
     <Layout title="User Management">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
-          <p className="text-muted-foreground mt-1">Create new users.</p>
+        {/* Header with Add New User button on the right */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
+            <p className="text-muted-foreground mt-1">Create and view registered users.</p>
+          </div>
+          <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0">
+            <UserPlus className="h-4 w-4" />
+            Add New User
+          </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5" />
-              Add New User
-            </CardTitle>
-            <CardDescription>
-              Fill in the form below. All fields are required.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6 max-w-xl">
+        {/* Add New User dialog */}
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <UserPlus className="h-5 w-5" />
+                Add New User
+              </DialogTitle>
+              <DialogDescription>
+                Fill in the form below. All fields are required.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="dialog-email">Email</Label>
                   <Input
-                    id="email"
+                    id="dialog-email"
                     type="email"
                     placeholder="e.g. sana@psc.com"
                     value={email}
@@ -111,9 +153,9 @@ export default function UserManagement() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="stakeholder">Stakeholder</Label>
+                  <Label htmlFor="dialog-stakeholder">Stakeholder</Label>
                   <Select value={stakeholderId} onValueChange={setStakeholderId}>
-                    <SelectTrigger id="stakeholder">
+                    <SelectTrigger id="dialog-stakeholder">
                       <SelectValue placeholder="Select stakeholder" />
                     </SelectTrigger>
                     <SelectContent>
@@ -128,9 +170,9 @@ export default function UserManagement() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="first_name">First name</Label>
+                  <Label htmlFor="dialog-first_name">First name</Label>
                   <Input
-                    id="first_name"
+                    id="dialog-first_name"
                     placeholder="e.g. Sana"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
@@ -138,9 +180,9 @@ export default function UserManagement() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="last_name">Last name</Label>
+                  <Label htmlFor="dialog-last_name">Last name</Label>
                   <Input
-                    id="last_name"
+                    id="dialog-last_name"
                     placeholder="e.g. Admin"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
@@ -148,10 +190,10 @@ export default function UserManagement() {
                   />
                 </div>
               </div>
-              <div className="space-y-2 max-w-md">
-                <Label htmlFor="password">Password</Label>
+              <div className="space-y-2">
+                <Label htmlFor="dialog-password">Password</Label>
                 <Input
-                  id="password"
+                  id="dialog-password"
                   type="password"
                   placeholder="Min. 8 characters"
                   value={password}
@@ -159,10 +201,74 @@ export default function UserManagement() {
                   autoComplete="new-password"
                 />
               </div>
-              <Button type="submit" disabled={createUserMutation.isPending}>
-                {createUserMutation.isPending ? "Creating…" : "Create user"}
-              </Button>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createUserMutation.isPending}>
+                  {createUserMutation.isPending ? "Creating…" : "Create user"}
+                </Button>
+              </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Users table */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Registered Users
+            </CardTitle>
+            <CardDescription>
+              All users added via the Add New User form. Total: {users.length}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {usersLoading ? (
+              <p className="text-muted-foreground py-8 text-center">Loading users…</p>
+            ) : users.length === 0 ? (
+              <p className="text-muted-foreground py-8 text-center">No users yet. Click &quot;Add New User&quot; to create one.</p>
+            ) : (
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[80px]">#</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Full name</TableHead>
+                      <TableHead>Stakeholder</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((u) => (
+                      <TableRow key={u.id}>
+                        <TableCell className="font-mono text-muted-foreground">{u.id}</TableCell>
+                        <TableCell>{u.email}</TableCell>
+                        <TableCell>{u.full_name}</TableCell>
+                        <TableCell>{getStakeholderLabel(u.stakeholder)}</TableCell>
+                        <TableCell>
+                          <span
+                            className={
+                              u.is_active
+                                ? "text-green-600 dark:text-green-400 font-medium"
+                                : "text-muted-foreground"
+                            }
+                          >
+                            {u.is_active ? "Active" : "Inactive"}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

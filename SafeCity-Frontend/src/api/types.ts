@@ -44,6 +44,15 @@ export interface UserCreateInput {
   company_name?: string;
 }
 
+/** User item from GET /api/get-user/ (list) */
+export interface UserListItem {
+  id: number;
+  email: string;
+  full_name: string;
+  stakeholder: number | null;
+  is_active: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Province
 // ---------------------------------------------------------------------------
