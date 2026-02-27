@@ -41,7 +41,7 @@ class UserLoginDashboardCreateView(viewsets.ViewSet):
                     'id': user.id,
                     'token': auth_data['access'],
                     'refresh': auth_data['refresh'],
-                    'is_admin': user.is_admin,
+                    'role': user.role,
                     'stakeholder_id': user.stakeholder.id if user.stakeholder else None,
                     'stakeholder_type': user.stakeholder.stakeholder_type if user.stakeholder else None,
                     'is_active': user.is_active,
