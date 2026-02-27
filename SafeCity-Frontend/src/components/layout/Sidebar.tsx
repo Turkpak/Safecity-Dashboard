@@ -35,10 +35,6 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { icon: LayoutDashboard, label: "Citywise Progress", href: "/" },
-  { icon: BarChart3, label: "City Comparison", href: "/comparison" },
-  { icon: LucideBanknote, label: "Finance & Budget", href: "/finance" },
-  { icon: MapIcon, label: "GIS Layers", href: "/gis" },
   {
     icon: Navigation2,
     label: "Area Management",
@@ -49,8 +45,14 @@ const NAV_ITEMS: NavItem[] = [
       { icon: MapPin, label: "Tehsil", href: "/tehsil-management" },
     ]
   },
-  { icon: FolderKanban, label: "Project Management", href: "/project-management" },
   { icon: Users, label: "Stakeholders", href: "/stakeholder-management" },
+  { icon: LayoutDashboard, label: "Citywise Progress", href: "/" },
+  { icon: BarChart3, label: "City Comparison", href: "/comparison" },
+  { icon: LucideBanknote, label: "Finance & Budget", href: "/finance" },
+  { icon: MapIcon, label: "GIS Layers", href: "/gis" },
+  
+  { icon: FolderKanban, label: "Project Management", href: "/project-management" },
+  
   { icon: UserCog, label: "User Management", href: "/user-management" },
   { icon: Settings, label: "Settings", href: "/settings" },
 ];

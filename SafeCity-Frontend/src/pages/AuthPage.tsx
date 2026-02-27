@@ -275,10 +275,7 @@ export default function AuthPage() {
                                 </div>
 
                                 <div className="flex items-center justify-between px-1">
-                                    <div className="flex items-center space-x-2.5">
-                                        <Checkbox id="remember" className="h-5 w-5 rounded-lg border-2 border-muted-foreground/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all shadow-sm" />
-                                        <label htmlFor="remember" className="text-xs font-bold text-muted-foreground/70 cursor-pointer hover:text-foreground select-none">Persistent Session</label>
-                                    </div>
+                                    
 
 
 
