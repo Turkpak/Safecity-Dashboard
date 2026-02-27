@@ -9,17 +9,39 @@ const LIST = "list-project/";
 const UPDATE = "update-project/";
 const DELETE_PATH = "delete-project/";
 
+function normalizeProjectFeature(f: {
+  id?: number;
+  properties?: Record<string, unknown>;
+  geometry?: unknown;
+}): Project {
+  const props = (f.properties ?? f) as Record<string, unknown>;
+  const geom = (f as { geometry?: unknown }).geometry ?? props.geom;
+  return {
+    id: (f.id ?? props.id) as number,
+    ...(props as Omit<Project, "id" | "geom">),
+    ...(geom !== undefined && { geom }),
+  } as Project;
+}
+
 export async function listProjects(): Promise<Project[]> {
-  const data = await get<ListProjectResponse | Project[]>(LIST);
-  if (data && typeof data === "object" && "features" in data && Array.isArray(data.features)) {
-    return data.features.map((f) => ({ id: f.id, ...f.properties }));
+  const data = await get<ListProjectResponse | Project[] | Array<{ id?: number; properties?: Record<string, unknown> }>>(LIST);
+  if (!data) return [];
+  if (typeof data === "object" && "features" in data && Array.isArray((data as ListProjectResponse).features)) {
+    return (data as ListProjectResponse).features.map((f) => normalizeProjectFeature(f));
   }
-  return Array.isArray(data) ? data : [];
+  if (Array.isArray(data)) {
+    return data.map((f) => normalizeProjectFeature(f as { id?: number; properties?: Record<string, unknown> }));
+  }
+  return [];
 }
 
 export async function getProjectById(id: number): Promise<Project | null> {
-  const data = await get<Project>(LIST, { id: String(id) });
-  return data ?? null;
+  const data = await get<Project | { id?: number; properties?: Record<string, unknown> }>(LIST, { id: String(id) });
+  if (!data) return null;
+  if (typeof data === "object" && "properties" in data) {
+    return normalizeProjectFeature(data as { id?: number; properties?: Record<string, unknown> });
+  }
+  return data as Project;
 }
 
 function appendFormValue(form: FormData, key: string, value: unknown): void {

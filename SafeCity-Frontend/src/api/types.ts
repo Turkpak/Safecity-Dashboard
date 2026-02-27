@@ -198,6 +198,10 @@ export interface Project {
   division: number;
   district: number;
   tehsil: number;
+  province_name?: string | null;
+  division_name?: string | null;
+  district_name?: string | null;
+  tehsil_name?: string | null;
   total_budget_allocated: string | null;
   budget_utilized: string | null;
   budget_variance?: string | null;
@@ -239,6 +243,8 @@ export interface ProjectUpdateInput {
   tehsil?: number;
   total_budget_allocated?: string | null;
   budget_utilized?: string | null;
+  budget_variance?: string | null;
+  budget_remaining?: string | null;
 }
 
 // ---------------------------------------------------------------------------
