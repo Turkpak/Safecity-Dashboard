@@ -34,6 +34,16 @@ export interface LoginResponse {
   is_active: boolean;
 }
 
+/** Payload for POST /api/create-user/ (User Management form) */
+export interface UserCreateInput {
+  email: string;
+  first_name: string;
+  last_name: string;
+  password: string;
+  stakeholder: number;
+  company_name?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Province
 // ---------------------------------------------------------------------------

@@ -49,7 +49,7 @@ export default function AuthPage() {
             try {
                 const data = await apiLogin({ email, password });
                 setUser(data);
-                localStorage.setItem("userRole", data.stakeholder_type || stakeholderType);
+                localStorage.setItem("userRole", data.is_admin ? "Admin" : (data.stakeholder_type || stakeholderType));
                 setLocation("/");
                 toast({ title: "Welcome", description: "Login successful." });
             } catch (err) {
