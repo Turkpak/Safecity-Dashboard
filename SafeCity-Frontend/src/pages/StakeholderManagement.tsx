@@ -1,10 +1,11 @@
 import { Layout } from "@/components/layout/Layout";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -13,15 +14,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit2, Trash2, X, Users, Save } from "lucide-react";
+import { Plus, Edit2, Trash2, Users, Save, Search, LayoutList } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
   DialogTitle,
+  DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
   listStakeholders,
@@ -32,7 +36,7 @@ import {
 import type { Stakeholder as ApiStakeholder, StakeholderStatus } from "@/api/types";
 
 function statusDisplay(s: StakeholderStatus): string {
-  return s === "active" ? "Active" : "Disable";
+  return s === "active" ? "Active" : "Disabled";
 }
 
 export default function StakeholderManagement() {
@@ -40,7 +44,7 @@ export default function StakeholderManagement() {
   const [editingStakeholder, setEditingStakeholder] = useState<ApiStakeholder | null>(null);
   const [formData, setFormData] = useState({ type: "", title: "", status: "active" as StakeholderStatus });
   const [searchQuery, setSearchQuery] = useState("");
-  const [pageSize, setPageSize] = useState("5");
+  const [pageSize, setPageSize] = useState("10");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -90,7 +94,6 @@ export default function StakeholderManagement() {
     const typeTrimmed = formData.type.trim();
     const titleTrimmed = formData.title.trim();
 
-    // Validate before calling API — do not POST if required fields are missing
     if (!typeTrimmed) {
       toast({
         title: "Validation Error",
@@ -118,7 +121,6 @@ export default function StakeholderManagement() {
         },
       });
     } else {
-      // POST http://127.0.0.1:8000/api/create-stakeholder/ with body: { stakeholder_type, stakeholder_title }
       createMutation.mutate({
         stakeholder_type: typeTrimmed,
         stakeholder_title: titleTrimmed,
@@ -158,230 +160,299 @@ export default function StakeholderManagement() {
       s.stakeholder_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.stakeholder_title.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  const paginated = filteredStakeholders.slice(0, parseInt(pageSize, 10) || 5);
+  const paginated = filteredStakeholders.slice(0, parseInt(pageSize, 10) || 10);
+
+  const activeCount = stakeholders.filter((s) => s.status === "active").length;
+  const disabledCount = stakeholders.filter((s) => s.status === "disable").length;
 
   return (
     <Layout title="Stakeholder Management">
       <div className="flex flex-col gap-6 max-w-[1400px] mx-auto pb-20">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-primary p-4 rounded-t-lg shadow-lg border-b-4 border-secondary gap-3">
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <Users className="h-5 w-5 text-secondary" /> Stakeholders
-          </h1>
-          <Dialog
-            open={isAddDialogOpen}
-            onOpenChange={(open) => {
-              setIsAddDialogOpen(open);
-              if (!open) closeDialog();
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button className="bg-secondary hover:bg-secondary/90 text-white border-none shadow-md font-bold">
-                <Plus className="h-4 w-4 mr-2" /> Add Stakeholder
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] p-0 border-none rounded-xl max-h-[90vh] overflow-y-auto">
-              <div className="bg-primary px-6 py-4 flex items-center justify-between border-b-4 border-secondary">
-                <DialogTitle className="text-white text-lg font-bold">
-                  {editingStakeholder
-                    ? `Edit Stakeholder${editingStakeholder.id ? ` (ID: ${editingStakeholder.id})` : ""}`
-                    : "Add Stakeholder"}
-                </DialogTitle>
-                <button
-                  type="button"
-                  onClick={closeDialog}
-                  className="text-white/70 hover:text-white transition-colors"
-                  aria-label="Close"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+        {/* Summary stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card className="border-l-4 border-l-primary/80 shadow-sm">
+            <CardContent className="pt-5 pb-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total</p>
+                  <p className="text-2xl font-bold text-foreground mt-0.5">{stakeholders.length}</p>
+                </div>
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
               </div>
-              <form
-                onSubmit={handleCreateOrUpdate}
-                className="p-8 space-y-6"
-                noValidate
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-l-emerald-500/80 shadow-sm">
+            <CardContent className="pt-5 pb-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Active</p>
+                  <p className="text-2xl font-bold text-foreground mt-0.5">{activeCount}</p>
+                </div>
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-sm" aria-hidden />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-l-slate-400/80 shadow-sm">
+            <CardContent className="pt-5 pb-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Disabled</p>
+                  <p className="text-2xl font-bold text-foreground mt-0.5">{disabledCount}</p>
+                </div>
+                <span className="h-2.5 w-2.5 rounded-full bg-slate-400 shadow-sm" aria-hidden />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main list card */}
+        <Card className="shadow-md overflow-hidden">
+          <CardHeader className="border-b bg-muted/30 pb-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <LayoutList className="h-5 w-5 text-primary" />
+                  Stakeholder list
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  Showing {paginated.length} of {filteredStakeholders.length} stakeholders
+                </CardDescription>
+              </div>
+              <Dialog
+                open={isAddDialogOpen}
+                onOpenChange={(open) => {
+                  setIsAddDialogOpen(open);
+                  if (!open) closeDialog();
+                }}
               >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="stakeholder-type" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Stakeholder Type <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="stakeholder-type"
-                      name="stakeholder_type"
-                      placeholder="e.g. Client"
-                      value={formData.type}
-                      onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                      className="h-10 border-muted-foreground/20 focus:ring-secondary/20"
-                      required
-                      aria-required="true"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="stakeholder-title" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Stakeholder Title <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="stakeholder-title"
-                      name="stakeholder_title"
-                      placeholder="e.g. Punjab Safe City Authority"
-                      value={formData.title}
-                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      className="h-10 border-muted-foreground/20 focus:ring-secondary/20"
-                      required
-                      aria-required="true"
-                    />
-                  </div>
-                </div>
-                {editingStakeholder && (
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Status</Label>
-                    <Select
-                      value={formData.status}
-                      onValueChange={(v) => setFormData({ ...formData, status: v as StakeholderStatus })}
-                    >
-                      <SelectTrigger className="h-10">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="disable">Disable</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                <div className="flex justify-center gap-3 pt-4">
-                  <Button
-                    type="submit"
-                    disabled={createMutation.isPending || updateMutation.isPending}
-                    className="bg-secondary hover:bg-secondary/90 text-white px-8 h-10 shadow-lg font-bold"
-                  >
-                    <Save className="h-4 w-4 mr-2" /> {editingStakeholder ? "Update" : "Add"}
+                <DialogTrigger asChild>
+                  <Button className="bg-secondary hover:bg-secondary/90 text-white font-semibold shadow-sm w-full sm:w-auto">
+                    <Plus className="h-4 w-4 mr-2" /> Add stakeholder
                   </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={closeDialog}
-                    className="bg-slate-500 hover:bg-slate-600 text-white px-8 h-10 shadow-lg border-none font-bold"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <div className="bg-primary/95 p-4 flex flex-col md:flex-row shadow-inner border-x border-primary gap-4">
-          <div className="relative flex-1">
-            <Input
-              placeholder="Search Stakeholder Type here..."
-              className="bg-white text-slate-800 h-10 border-none shadow-sm focus:ring-2 focus:ring-secondary/30 pl-4"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center gap-3 bg-white px-4 py-2 rounded shadow-sm text-sm border-l-4 border-secondary">
-            <span className="text-slate-600 font-medium">Show Stakeholder List:</span>
-            <Select value={pageSize} onValueChange={setPageSize}>
-              <SelectTrigger className="w-20 border-none h-6 p-0 focus:ring-0 shadow-none font-bold text-secondary">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="5">5</SelectItem>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="25">25</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-              </SelectContent>
-            </Select>
-            <span className="text-slate-600">/ page</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-b-lg border border-slate-200 shadow-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-slate-100 border-b-2 border-primary/10">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-16 font-bold text-primary border-r border-slate-200">#</TableHead>
-                  <TableHead className="font-bold text-primary border-r border-slate-200">Type</TableHead>
-                  <TableHead className="font-bold text-primary border-r border-slate-200">Title</TableHead>
-                  <TableHead className="font-bold text-primary border-r border-slate-200 text-center">Status</TableHead>
-                  <TableHead className="font-bold text-primary text-center">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="h-32 text-center text-slate-400">
-                      Loading…
-                    </TableCell>
-                  </TableRow>
-                ) : paginated.length > 0 ? (
-                  paginated.map((stakeholder, index) => (
-                    <TableRow
-                      key={stakeholder.id}
-                      className="group border-b border-slate-100 last:border-0 hover:bg-secondary/5 transition-colors"
-                    >
-                      <TableCell className="font-bold text-primary border-r border-slate-100 bg-slate-50/50">
-                        {index + 1}
-                      </TableCell>
-                      <TableCell className="text-primary font-bold border-r border-slate-100">
-                        {stakeholder.stakeholder_type}
-                      </TableCell>
-                      <TableCell className="text-slate-800 border-r border-slate-100 font-medium">
-                        {stakeholder.stakeholder_title}
-                      </TableCell>
-                      <TableCell className="text-center border-r border-slate-100">
-                        <button
-                          onClick={() => toggleStatus(stakeholder)}
-                          disabled={updateMutation.isPending}
-                          className={cn(
-                            "px-4 py-1.5 rounded text-[10px] font-black transition-all shadow-sm active:scale-95 text-white uppercase tracking-tighter",
-                            stakeholder.status === "active"
-                              ? "bg-primary hover:bg-primary/90"
-                              : "bg-slate-400 hover:bg-slate-500"
-                          )}
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[520px] gap-0 p-0 overflow-hidden">
+                  <DialogHeader className="px-6 pt-6 pb-4 bg-muted/30 border-b">
+                    <DialogTitle>
+                      {editingStakeholder ? `Edit stakeholder` : `Add new stakeholder`}
+                    </DialogTitle>
+                    {editingStakeholder?.id && (
+                      <p className="text-sm text-muted-foreground font-normal">ID: {editingStakeholder.id}</p>
+                    )}
+                  </DialogHeader>
+                  <form onSubmit={handleCreateOrUpdate} className="p-6 space-y-5" noValidate>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div className="space-y-2">
+                        <Label htmlFor="stakeholder-type">Type <span className="text-destructive">*</span></Label>
+                        <Input
+                          id="stakeholder-type"
+                          placeholder="e.g. Client, Consultant"
+                          value={formData.type}
+                          onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                          className="h-10"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="stakeholder-title">Title <span className="text-destructive">*</span></Label>
+                        <Input
+                          id="stakeholder-title"
+                          placeholder="e.g. Punjab Safe City Authority"
+                          value={formData.title}
+                          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                          className="h-10"
+                          required
+                        />
+                      </div>
+                    </div>
+                    {editingStakeholder && (
+                      <div className="space-y-2">
+                        <Label>Status</Label>
+                        <Select
+                          value={formData.status}
+                          onValueChange={(v) => setFormData({ ...formData, status: v as StakeholderStatus })}
                         >
-                          {statusDisplay(stakeholder.status)}
-                        </button>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-center gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => openEditDialog(stakeholder)}
+                          <SelectTrigger className="h-10">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="disable">Disabled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    <DialogFooter className="gap-2 pt-4 pb-0 px-0">
+                      <Button type="button" variant="outline" onClick={closeDialog}>
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={createMutation.isPending || updateMutation.isPending}
+                        className="bg-secondary hover:bg-secondary/90 text-white"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        {editingStakeholder ? "Update" : "Add"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {/* Toolbar: search + page size */}
+            <div className="flex flex-col sm:flex-row gap-3 px-6 py-4 border-b bg-muted/20">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="Search by type or title…"
+                  className="pl-9 h-10 bg-background border-muted-foreground/20"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-sm text-muted-foreground">Rows per page</span>
+                <Select value={pageSize} onValueChange={setPageSize}>
+                  <SelectTrigger className="w-[72px] h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40 border-b">
+                    <TableHead className="w-14 font-semibold text-foreground">#</TableHead>
+                    <TableHead className="font-semibold text-foreground">Type</TableHead>
+                    <TableHead className="font-semibold text-foreground">Title</TableHead>
+                    <TableHead className="font-semibold text-foreground text-center w-[120px]">Status</TableHead>
+                    <TableHead className="font-semibold text-foreground text-right w-[120px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-5 w-6" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-40" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-16 mx-auto" /></TableCell>
+                        <TableCell><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : paginated.length > 0 ? (
+                    paginated.map((stakeholder, index) => (
+                      <TableRow
+                        key={stakeholder.id}
+                        className="group hover:bg-muted/30 transition-colors"
+                      >
+                        <TableCell className="font-medium text-muted-foreground tabular-nums">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell className="font-medium text-foreground">
+                          {stakeholder.stakeholder_type}
+                        </TableCell>
+                        <TableCell className="text-foreground">
+                          {stakeholder.stakeholder_title}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <button
+                            type="button"
+                            onClick={() => toggleStatus(stakeholder)}
                             disabled={updateMutation.isPending}
-                            className="bg-primary hover:bg-primary/90 h-8 px-3 border-none shadow-sm gap-1.5"
+                            className={cn(
+                              "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-semibold transition-all hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                              stakeholder.status === "active"
+                                ? "border-transparent bg-primary text-primary-foreground"
+                                : "border-slate-200 bg-slate-100 text-slate-700"
+                            )}
                           >
-                            <Edit2 className="h-3.5 w-3.5 text-white" />
-                            Edit
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => handleDelete(stakeholder.id)}
-                            disabled={deleteMutation.isPending}
-                            className="bg-secondary hover:bg-secondary/90 h-8 w-8 p-0 border-none shadow-sm"
-                          >
-                            <Trash2 className="h-3.5 w-3.5 text-white" />
-                          </Button>
+                            <span
+                              className={cn(
+                                "h-1.5 w-1.5 rounded-full shrink-0",
+                                stakeholder.status === "active" ? "bg-primary-foreground/80" : "bg-slate-500"
+                              )}
+                              aria-hidden
+                            />
+                            {statusDisplay(stakeholder.status)}
+                          </button>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1.5">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 text-primary hover:bg-primary/10"
+                                  onClick={() => openEditDialog(stakeholder)}
+                                  disabled={updateMutation.isPending}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Edit</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                  onClick={() => handleDelete(stakeholder.id)}
+                                  disabled={deleteMutation.isPending}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Delete</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-48">
+                        <div className="flex flex-col items-center justify-center gap-3 text-center">
+                          <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">
+                            <Users className="h-7 w-7 text-muted-foreground" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-foreground">No stakeholders found</p>
+                            <p className="text-sm text-muted-foreground mt-0.5">
+                              {searchQuery ? "Try a different search." : "Add your first stakeholder to get started."}
+                            </p>
+                          </div>
+                          {!searchQuery && (
+                            <Button
+                              className="mt-1"
+                              onClick={() => setIsAddDialogOpen(true)}
+                            >
+                              <Plus className="h-4 w-4 mr-2" /> Add stakeholder
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={5} className="h-32 text-center text-slate-400">
-                      <div className="flex flex-col items-center gap-2">
-                        <Users className="h-8 w-8 opacity-20 text-primary" />
-                        <p className="font-heading italic">No stakeholders found.</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );
