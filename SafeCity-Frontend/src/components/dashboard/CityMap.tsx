@@ -105,6 +105,28 @@ function MapCenterHandler({ center }: { center: [number, number] }) {
   return null;
 }
 
+// Force Leaflet to recalculate size and redraw tiles after container is laid out (fixes partial tile loading)
+function MapResizeHandler() {
+  const map = useMap();
+  useEffect(() => {
+    const container = map.getContainer();
+    const resize = () => {
+      map.invalidateSize();
+      map.setView(map.getCenter(), map.getZoom());
+    };
+    const t1 = setTimeout(resize, 100);
+    const t2 = setTimeout(resize, 400);
+    const ro = new ResizeObserver(resize);
+    if (container) ro.observe(container);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      if (container) ro.unobserve(container);
+    };
+  }, [map]);
+  return null;
+}
+
 // Component to handle fitting map to GeoJSON bounds
 function GeoJSONFitBounds({ data }: { data: any }) {
   const map = useMap();
@@ -201,19 +223,20 @@ export function CityMap({
         center={center}
         zoom={12}
         scrollWheelZoom={true}
-        style={{ height: "100%", width: "100%" }}
+        style={{ height: "100%", width: "100%", minHeight: 400 }}
         ref={mapRef}
       >
         <MapCenterHandler center={center} />
+        <MapResizeHandler />
         {geoData && <GeoJSONFitBounds data={geoData} />}
         <LayersControl position="topright">
-          <LayersControl.BaseLayer checked name="Operational Dark">
+          <LayersControl.BaseLayer name="Operational Dark">
             <TileLayer
               url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
             />
           </LayersControl.BaseLayer>
-          <LayersControl.BaseLayer name="Street View">
+          <LayersControl.BaseLayer checked name="Street View">
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
