@@ -46,12 +46,13 @@ const NAV_ITEMS: NavItem[] = [
     ]
   },
   { icon: Users, label: "Stakeholders", href: "/stakeholder-management" },
+  { icon: FolderKanban, label: "Project Management", href: "/project-management" },
   { icon: LayoutDashboard, label: "Citywise Progress", href: "/" },
   { icon: BarChart3, label: "City Comparison", href: "/comparison" },
   { icon: LucideBanknote, label: "Finance & Budget", href: "/finance" },
   { icon: MapIcon, label: "GIS Layers", href: "/gis" },
   
-  { icon: FolderKanban, label: "Project Management", href: "/project-management" },
+  
   
   { icon: UserCog, label: "User Management", href: "/user-management" },
   { icon: Settings, label: "Settings", href: "/settings" },
