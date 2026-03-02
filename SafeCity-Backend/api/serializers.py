@@ -158,22 +158,22 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         ]
 
     def get_province_name(self, obj):
-        return obj.province.province_name
+        return obj.province.province_name if obj.province else None
 
     def get_division_name(self, obj):
-        return obj.division.division_name
+        return obj.division.division_name if obj.division else None
 
     def get_district_name(self, obj):
-        return obj.district.district_name
+        return obj.district.district_name if obj.district else None
 
     def get_tehsil_name(self, obj):
-        return obj.tehsil.tehsil_name
-    
+        return obj.tehsil.tehsil_name if obj.tehsil else None
+
     def get_stakeholder_type(self, obj):
-        return obj.stakeholder.stakeholder_type
+        return obj.stakeholder.stakeholder_type if obj.stakeholder else None
 
     def get_stakeholder_title(self, obj):
-        return obj.stakeholder.stakeholder_title
+        return obj.stakeholder.stakeholder_title if obj.stakeholder else None
 
     def create(self, validated_data):
         boundary_file = validated_data.pop("boundary_file", None)
