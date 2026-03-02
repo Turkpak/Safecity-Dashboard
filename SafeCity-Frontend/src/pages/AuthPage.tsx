@@ -250,7 +250,7 @@ export default function AuthPage() {
                                     <div className="space-y-2.5">
                                         <div className="flex items-center justify-between px-1">
                                             <Label htmlFor="password" className="text-[11px] font-black uppercase tracking-widest text-primary/60">Password</Label>
-                                            <button type="button" className="text-[11px] font-bold text-primary hover:text-secondary transition-colors underline underline-offset-4 decoration-current/30">Reset Password</button>
+                                            
                                         </div>
                                         <div className="relative group">
                                             <Input
