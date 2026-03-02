@@ -566,9 +566,7 @@ export default function ProjectManagement() {
                   <FolderKanban className="h-5 w-5" />
                   {selectedProjectForView.project_name || "Unnamed Project"}
                 </CardTitle>
-                <CardDescription>
-                  Full details for the selected project • Click View again or Close to collapse
-                </CardDescription>
+                
               </div>
               <Button
                 variant="ghost"
