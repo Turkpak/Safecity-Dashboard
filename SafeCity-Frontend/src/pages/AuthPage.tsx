@@ -204,32 +204,9 @@ export default function AuthPage() {
                                 className="space-y-7"
                             >
                                 <div className="space-y-5">
-                                    <div className="space-y-2.5">
-                                        <Label htmlFor="stakeholderType" className="text-[11px] font-black uppercase tracking-widest text-primary/60 ml-1">Stakeholder Type</Label>
-                                        <div className="relative group">
-                                            <Select
-                                                value={stakeholderType}
-                                                onValueChange={(val) => {
-                                                    setStakeholderType(val);
-                                                    // If Client is selected, always show login (no signup)
-                                                    // If other types are selected, allow signup option
-                                                    if (val === "Client") {
-                                                        setIsLogin(true);
-                                                    }
-                                                }}
-                                            >
-                                                <SelectTrigger className="pl-12 h-14 bg-muted/5 border-2 border-muted/50 hover:border-primary/30 focus:border-primary rounded-2xl transition-all font-bold text-[15px]">
-                                                    <SelectValue placeholder="Select Stakeholder Type" />
-                                                </SelectTrigger>
-                                                <SelectContent className="rounded-2xl border-2 border-muted shadow-xl">
-                                                    <SelectItem value="Consultants" className="py-3 font-bold text-primary">Consultants</SelectItem>
-                                                    <SelectItem value="Contractor" className="py-3 font-bold text-primary">Contractor</SelectItem>
-                                                    <SelectItem value="Client" className="py-3 font-bold text-primary">Client</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                            <Briefcase className="absolute left-4.5 top-4.5 h-5 w-5 text-muted-foreground/60 transition-colors group-focus-within:text-primary z-10 pointer-events-none" />
-                                        </div>
-                                    </div>
+                                    
+                                        
+                                        
 
                                     <div className="space-y-2.5">
                                         <Label htmlFor="email" className="text-[11px] font-black uppercase tracking-widest text-primary/60 ml-1">Email</Label>

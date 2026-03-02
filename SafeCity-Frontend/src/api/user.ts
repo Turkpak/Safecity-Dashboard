@@ -14,7 +14,7 @@ export async function listUsers(): Promise<UserListItem[]> {
 
 /**
  * POST /api/create-user/ — create user.
- * Body: email, first_name, last_name, password, stakeholder
+ * Body: email, first_name, last_name, password, role, stakeholder
  */
 export async function createUser(payload: UserCreateInput): Promise<{ user: unknown; tokens: { access: string; refresh: string } }> {
   const body = {
@@ -22,6 +22,7 @@ export async function createUser(payload: UserCreateInput): Promise<{ user: unkn
     first_name: payload.first_name.trim(),
     last_name: payload.last_name.trim(),
     password: payload.password,
+    role: payload.role,
     stakeholder: payload.stakeholder,
     company_name: payload.company_name ?? "SafeCity",
   };

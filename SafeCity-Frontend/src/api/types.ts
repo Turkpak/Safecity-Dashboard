@@ -40,6 +40,7 @@ export interface UserCreateInput {
   first_name: string;
   last_name: string;
   password: string;
+  role: string; // e.g. "consultant" | "contractor"
   stakeholder: number;
   company_name?: string;
 }

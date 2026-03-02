@@ -41,6 +41,12 @@ export default function UserManagement() {
     queryFn: listStakeholders,
   });
 
+  /** Role options: only Consultant and Contractor from list-stakeholder API */
+  const roleStakeholders = stakeholders.filter(
+    (s) =>
+      s.stakeholder_type === "Consultant" || s.stakeholder_type === "Contractor"
+  );
+
   const { data: users = [], isLoading: usersLoading } = useQuery({
     queryKey: ["users"],
     queryFn: listUsers,
@@ -94,14 +100,17 @@ export default function UserManagement() {
       return;
     }
     if (!stakeholderId) {
-      toast({ title: "Validation Error", description: "Please select a stakeholder.", variant: "destructive" });
+      toast({ title: "Validation Error", description: "Please select a role.", variant: "destructive" });
       return;
     }
+    const selectedStakeholder = roleStakeholders.find((s) => String(s.id) === stakeholderId);
+    const role = selectedStakeholder ? selectedStakeholder.stakeholder_type.toLowerCase() : "";
     createUserMutation.mutate({
       email: trimmedEmail,
       first_name: trimmedFirst,
       last_name: trimmedLast,
       password,
+      role,
       stakeholder: Number(stakeholderId),
     });
   };
@@ -153,15 +162,16 @@ export default function UserManagement() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="dialog-stakeholder">Stakeholder</Label>
+                  <Label htmlFor="dialog-role">Role</Label>
                   <Select value={stakeholderId} onValueChange={setStakeholderId}>
-                    <SelectTrigger id="dialog-stakeholder">
-                      <SelectValue placeholder="Select stakeholder" />
+                    <SelectTrigger id="dialog-role">
+                      <SelectValue placeholder="Select role (Consultant / Contractor)" />
                     </SelectTrigger>
                     <SelectContent>
-                      {stakeholders.map((s) => (
+                      {roleStakeholders.map((s) => (
                         <SelectItem key={s.id} value={String(s.id)}>
-                          {s.stakeholder_title} ({s.stakeholder_type})
+                          {s.stakeholder_type}
+                          {s.stakeholder_title ? ` — ${s.stakeholder_title}` : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
