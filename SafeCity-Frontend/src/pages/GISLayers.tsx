@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import { listProjects } from "@/api";
-import { Download, FolderKanban, Loader2, AlertTriangle, CalendarCheck } from "lucide-react";
+import { Download, FolderKanban, Loader2, AlertTriangle, CalendarCheck, Filter } from "lucide-react";
 import React, { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -134,8 +134,9 @@ export default function GISLayers() {
   return (
     <Layout title="Advanced GIS Intelligence">
       <div className="flex flex-col gap-6">
-        {/* Filters — single row, no label/icon; short Project text; no text outside */}
+        {/* Filters — single row; Filter icon only (no text); short Project text */}
         <div className="flex flex-nowrap items-center gap-3">
+          <Filter className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
           <div className="flex items-center gap-2 shrink-0">
             <label className="text-sm font-medium text-muted-foreground shrink-0">Division</label>
             <Select value={selectedDivision} onValueChange={handleDivisionChange}>
