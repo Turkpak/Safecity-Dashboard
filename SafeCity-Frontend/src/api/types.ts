@@ -190,6 +190,8 @@ export interface ListProjectResponse {
 export interface Project {
   id: number;
   stakeholder: number;
+  stakeholder_type?: string | null;
+  stakeholder_title?: string | null;
   project_name: string | null;
   project_description: string | null;
   project_starting_date: string | null;

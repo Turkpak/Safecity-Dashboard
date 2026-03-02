@@ -1,12 +1,14 @@
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { FolderKanban, Plus, Upload, FileText, MapPin, X, File, ChevronRight, ChevronLeft, CheckCircle2, Calendar, Eye, Pencil } from "lucide-react";
+import { FolderKanban, Plus, Upload, FileText, MapPin, X, File, ChevronRight, ChevronLeft, CheckCircle2, Calendar, Eye, Pencil, ChevronDown, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -186,7 +188,7 @@ export default function ProjectManagement() {
   const [projectDescription, setProjectDescription] = useState("");
   const [startingDate, setStartingDate] = useState("");
   const [referenceNumber, setReferenceNumber] = useState("");
-  const [stakeholderId, setStakeholderId] = useState<string>("");
+  const [stakeholderIds, setStakeholderIds] = useState<string[]>([]);
   const [selectedTehsilId, setSelectedTehsilId] = useState<string>("");
   const [totalBudgetAllocated, setTotalBudgetAllocated] = useState<string>("");
   const [budgetUtilized, setBudgetUtilized] = useState<string>("");
@@ -297,7 +299,7 @@ export default function ProjectManagement() {
     setProjectDescription("");
     setStartingDate("");
     setReferenceNumber("");
-    setStakeholderId("");
+    setStakeholderIds([]);
     setSelectedProvinceId("");
     setSelectedDivisionId("");
     setSelectedDistrictId("");
@@ -322,7 +324,7 @@ export default function ProjectManagement() {
     setProjectDescription(project.project_description ?? "");
     setStartingDate(project.project_starting_date ? project.project_starting_date.slice(0, 10) : "");
     setReferenceNumber(project.project_reference_no ?? "");
-    setStakeholderId(String(project.stakeholder));
+    setStakeholderIds(project.stakeholder ? [String(project.stakeholder)] : []);
     setSelectedProvinceId(String(project.province));
     setSelectedDivisionId(String(project.division));
     setSelectedDistrictId(String(project.district));
@@ -346,8 +348,8 @@ export default function ProjectManagement() {
       toast({ title: "Validation Error", description: "Please select province, division, district and tehsil", variant: "destructive" });
       return false;
     }
-    if (!stakeholderId) {
-      toast({ title: "Validation Error", description: "Please select a stakeholder", variant: "destructive" });
+    if (stakeholderIds.length === 0) {
+      toast({ title: "Validation Error", description: "Please select at least one stakeholder", variant: "destructive" });
       return false;
     }
     if (!editingProject && !xerFile) {
@@ -404,7 +406,7 @@ export default function ProjectManagement() {
         updateProjectMutation.mutate({
           id: editingProject.id,
           payload: {
-            stakeholder: Number(stakeholderId),
+            stakeholder: Number(stakeholderIds[0]),
             project_name: projectName.trim() || null,
             project_description: projectDescription.trim() || null,
             project_starting_date: startingDate || null,
@@ -421,7 +423,7 @@ export default function ProjectManagement() {
         });
       } else {
         createProjectMutation.mutate({
-          stakeholder: Number(stakeholderId),
+          stakeholder: Number(stakeholderIds[0]),
           project_name: projectName.trim() || null,
           project_description: projectDescription.trim() || null,
           project_starting_date: startingDate || null,
@@ -522,6 +524,16 @@ export default function ProjectManagement() {
                         <FileText className="h-4 w-4 shrink-0" />
                         <span>Ref: {project.project_reference_no || "N/A"}</span>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 shrink-0" />
+                        <span>
+                          {project.stakeholder_title != null && project.stakeholder_title !== ""
+                            ? project.stakeholder_type != null && project.stakeholder_type !== ""
+                              ? `${project.stakeholder_title} (${project.stakeholder_type})`
+                              : project.stakeholder_title
+                            : `Stakeholder #${project.stakeholder}`}
+                        </span>
+                      </div>
                       <div className="flex items-start gap-2">
                         <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
                         <span className="break-words">
@@ -586,6 +598,19 @@ export default function ProjectManagement() {
                 </div>
               )}
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="flex items-center gap-3 rounded-lg border p-3">
+                  <Building2 className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Stakeholder</p>
+                    <p className="text-sm font-medium">
+                      {selectedProjectForView.stakeholder_title != null && selectedProjectForView.stakeholder_title !== ""
+                        ? selectedProjectForView.stakeholder_type != null && selectedProjectForView.stakeholder_type !== ""
+                          ? `${selectedProjectForView.stakeholder_title} (${selectedProjectForView.stakeholder_type})`
+                          : selectedProjectForView.stakeholder_title
+                        : `Stakeholder #${selectedProjectForView.stakeholder}`}
+                    </p>
+                  </div>
+                </div>
                 <div className="flex items-center gap-3 rounded-lg border p-3">
                   <Calendar className="h-5 w-5 text-muted-foreground" />
                   <div>
@@ -837,21 +862,54 @@ export default function ProjectManagement() {
                   </div>
                 </div>
 
-                {/* Stakeholder */}
+                {/* Stakeholder (multi-select) */}
                 <div className="space-y-2">
-                  <Label htmlFor="stakeholderId">Stakeholder *</Label>
-                  <Select value={stakeholderId} onValueChange={setStakeholderId} required>
-                    <SelectTrigger id="stakeholderId">
-                      <SelectValue placeholder="Select stakeholder" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {stakeholdersList.map((s) => (
-                        <SelectItem key={s.id} value={String(s.id)}>
-                          {s.stakeholder_title} ({s.stakeholder_type})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="stakeholderIds">Stakeholder(s) *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="stakeholderIds"
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between font-normal min-h-10 h-auto py-2"
+                      >
+                        <span className="truncate">
+                          {stakeholderIds.length === 0
+                            ? "Select stakeholder(s)"
+                            : stakeholderIds
+                                .map((id) => stakeholdersList.find((s) => String(s.id) === id))
+                                .filter(Boolean)
+                                .map((s) => `${s!.stakeholder_title} (${s!.stakeholder_type})`)
+                                .join(", ")}
+                        </span>
+                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                      <div className="max-h-60 overflow-auto p-2">
+                        {stakeholdersList.map((s) => (
+                          <label
+                            key={s.id}
+                            className="flex items-center gap-2 rounded-md px-2 py-2 hover:bg-muted cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={stakeholderIds.includes(String(s.id))}
+                              onCheckedChange={(checked) => {
+                                setStakeholderIds((prev) =>
+                                  checked
+                                    ? [...prev, String(s.id)]
+                                    : prev.filter((id) => id !== String(s.id))
+                                );
+                              }}
+                            />
+                            <span className="text-sm">
+                              {s.stakeholder_title} ({s.stakeholder_type})
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
                 {/* Province */}
