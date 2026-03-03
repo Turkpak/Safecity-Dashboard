@@ -182,13 +182,13 @@ class ProjectSerializer(GeoFeatureModelSerializer):
 
     # ---------- Readable Names ----------
     def get_province_name(self, obj):
-        return obj.province.province_name
+        return obj.province.province_name if obj.province else None
 
     def get_division_name(self, obj):
-        return obj.division.division_name
+        return obj.division.division_name if obj.division else None
 
     def get_district_name(self, obj):
-        return obj.district.district_name
+        return obj.district.district_name if obj.district else None
 
     def get_tehsil_name(self, obj):
         return obj.tehsil.tehsil_name

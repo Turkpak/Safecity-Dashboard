@@ -1098,82 +1098,63 @@ export default function Dashboard() {
         {/* Financial Progress Pie Charts (hide when a milestone KPI is selected) */}
         {!selectedMilestoneKey && (
           <div className="grid gap-6 md:grid-cols-2">
-            {/* Financial Progress Pie Chart */}
-            <Card className="border-2 transition-colors hover:border-[#101a3c]">
-              <CardHeader>
-                <CardTitle>Financial Progress Overview</CardTitle>
-                
+            {/* Financial Progress Donut Chart */}
+            <Card className="overflow-hidden border border-border/80 bg-card shadow-lg shadow-primary/5 transition-shadow hover:shadow-xl hover:shadow-primary/10">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg font-heading">Financial Progress Overview</CardTitle>
+                <CardDescription className="text-sm text-muted-foreground">Planned vs actual and variance</CardDescription>
               </CardHeader>
-              <CardContent>
-                {/* Always-visible values (avoid pie labels getting clipped) */}
-                <div className="mb-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-xs sm:text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "#3b82f6" }} />
-                    <span className="text-muted-foreground">Planned:</span>
-                    <span className="font-semibold">{financialPlanned.toFixed(1)}%</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "#10b981" }} />
-                    <span className="text-muted-foreground">Actual:</span>
-                    <span className="font-semibold">{financialActual.toFixed(1)}%</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: financialVariance < 0 ? "#f59e0b" : "#ef4444" }}
-                    />
-                    <span className="text-muted-foreground">Variance:</span>
-                    <span className="font-semibold">{absFinancialVariance.toFixed(1)}%</span>
-                  </div>
-                </div>
-                <div className="w-full" style={{ height: isMobile ? '280px' : isTablet ? '320px' : '400px' }}>
+              <CardContent className="pt-0">
+                <div className="relative w-full" style={{ height: isMobile ? '260px' : isTablet ? '300px' : '360px' }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+                    <PieChart margin={{ top: 8, right: 8, bottom: 48, left: 8 }}>
+                      <defs>
+                        <linearGradient id="financial-planned" x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0%" stopColor="#4f46e5" />
+                          <stop offset="100%" stopColor="#6366f1" />
+                        </linearGradient>
+                        <linearGradient id="financial-actual" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#0d9488" />
+                          <stop offset="100%" stopColor="#14b8a6" />
+                        </linearGradient>
+                        <linearGradient id="financial-variance" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor={financialVariance < 0 ? "#d97706" : "#dc2626"} />
+                          <stop offset="100%" stopColor={financialVariance < 0 ? "#f59e0b" : "#ef4444"} />
+                        </linearGradient>
+                      </defs>
                       <Pie
                         data={[
-                          {
-                            name: 'Planned',
-                            value: normalizedFinancialPlanned,
-                            originalValue: financialPlanned,
-                            color: '#3b82f6'
-                          },
-                          {
-                            name: 'Actual',
-                            value: normalizedFinancialActual,
-                            originalValue: financialActual,
-                            color: '#10b981'
-                          },
-                          {
-                            name: 'Variance',
-                            value: normalizedFinancialVariance,
-                            originalValue: absFinancialVariance,
-                            color: financialVariance < 0 ? '#f59e0b' : '#ef4444'
-                          }
+                          { name: 'Planned', value: normalizedFinancialPlanned, originalValue: financialPlanned, fill: 'url(#financial-planned)' },
+                          { name: 'Actual', value: normalizedFinancialActual, originalValue: financialActual, fill: 'url(#financial-actual)' },
+                          { name: 'Variance', value: normalizedFinancialVariance, originalValue: absFinancialVariance, fill: 'url(#financial-variance)' }
                         ]}
                         cx="50%"
-                        cy="44%"
-                        innerRadius={isMobile ? 38 : isTablet ? 48 : 60}
-                        labelLine={false}
-                        // Avoid rendering long labels around the pie (they get clipped on smaller widths)
-                        label={false}
-                        outerRadius={isMobile ? 72 : isTablet ? 92 : 120}
-                        fill="#8884d8"
+                        cy="45%"
+                        innerRadius={isMobile ? 52 : isTablet ? 64 : 80}
+                        outerRadius={isMobile ? 82 : isTablet ? 100 : 120}
+                        paddingAngle={2}
                         dataKey="value"
+                        stroke="rgba(255,255,255,0.9)"
+                        strokeWidth={2}
+                        isAnimationActive
+                        animationDuration={800}
+                        animationBegin={0}
                       >
                         {[
-                          { name: 'Planned', value: normalizedFinancialPlanned, originalValue: financialPlanned, color: '#3b82f6' },
-                          { name: 'Actual', value: normalizedFinancialActual, originalValue: financialActual, color: '#10b981' },
-                          { name: 'Variance', value: normalizedFinancialVariance, originalValue: absFinancialVariance, color: financialVariance < 0 ? '#f59e0b' : '#ef4444' }
+                          { fill: 'url(#financial-planned)' },
+                          { fill: 'url(#financial-actual)' },
+                          { fill: 'url(#financial-variance)' }
                         ].map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
+                          <Cell key={`cell-f-${index}`} fill={entry.fill} stroke="rgba(255,255,255,0.9)" strokeWidth={2} />
                         ))}
                       </Pie>
                       <Tooltip
                         contentStyle={{
                           backgroundColor: "hsl(var(--card))",
-                          borderColor: "hsl(var(--border))",
-                          borderRadius: "8px",
-                          fontSize: isMobile ? '11px' : '12px'
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "12px",
+                          fontSize: isMobile ? "11px" : "13px",
+                          boxShadow: "0 10px 40px -10px rgba(0,0,0,0.15)"
                         }}
                         formatter={(value: number, name: string, props: any) => {
                           const originalValue = props.payload?.originalValue ?? value;
@@ -1184,97 +1165,85 @@ export default function Dashboard() {
                         verticalAlign="bottom"
                         align="center"
                         layout="horizontal"
-                        wrapperStyle={{ paddingTop: isMobile ? "10px" : "14px", fontSize: isMobile ? '11px' : '12px' }}
+                        wrapperStyle={{ paddingTop: 16, fontSize: isMobile ? "11px" : "12px" }}
+                        iconType="circle"
+                        iconSize={10}
                         formatter={(value) => {
                           let itemValue = 0;
                           if (value === 'Planned') itemValue = financialPlanned;
                           else if (value === 'Actual') itemValue = financialActual;
                           else if (value === 'Variance') itemValue = absFinancialVariance;
-                          return `${value}: ${itemValue.toFixed(1)}%`;
+                          return <span className="text-muted-foreground font-medium">{value} <span className="font-semibold text-foreground">{itemValue.toFixed(1)}%</span></span>;
                         }}
                       />
                     </PieChart>
                   </ResponsiveContainer>
+                  {/* Center label - centered in chart area */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-2xl sm:text-3xl font-bold font-heading tabular-nums text-foreground">{financialActual.toFixed(1)}%</span>
+                    <span className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground">Actual</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Overall Progress Pie Chart */}
-            <Card className="border-2 transition-colors hover:border-[#101a3c]">
-              <CardHeader>
-                <CardTitle>Overall Progress</CardTitle>
-                
+            {/* Overall Progress Donut Chart */}
+            <Card className="overflow-hidden border border-border/80 bg-card shadow-lg shadow-primary/5 transition-shadow hover:shadow-xl hover:shadow-primary/10">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg font-heading">Overall Progress</CardTitle>
+                <CardDescription className="text-sm text-muted-foreground">Planned vs actual and variance</CardDescription>
               </CardHeader>
-              <CardContent>
-                {/* Always-visible values (avoid pie labels getting clipped) */}
-                <div className="mb-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-xs sm:text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "#3b82f6" }} />
-                    <span className="text-muted-foreground">Planned:</span>
-                    <span className="font-semibold">{avgPlanned.toFixed(1)}%</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "#10b981" }} />
-                    <span className="text-muted-foreground">Actual:</span>
-                    <span className="font-semibold">{avgActual.toFixed(1)}%</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: variance < 0 ? "#f59e0b" : "#ef4444" }}
-                    />
-                    <span className="text-muted-foreground">Variance:</span>
-                    <span className="font-semibold">{absVariance.toFixed(1)}%</span>
-                  </div>
-                </div>
-                <div className="w-full" style={{ height: isMobile ? '280px' : isTablet ? '320px' : '400px' }}>
+              <CardContent className="pt-0">
+                <div className="relative w-full" style={{ height: isMobile ? '260px' : isTablet ? '300px' : '360px' }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+                    <PieChart margin={{ top: 8, right: 8, bottom: 48, left: 8 }}>
+                      <defs>
+                        <linearGradient id="overall-planned" x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0%" stopColor="#4f46e5" />
+                          <stop offset="100%" stopColor="#6366f1" />
+                        </linearGradient>
+                        <linearGradient id="overall-actual" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#0d9488" />
+                          <stop offset="100%" stopColor="#14b8a6" />
+                        </linearGradient>
+                        <linearGradient id="overall-variance" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor={variance < 0 ? "#d97706" : "#dc2626"} />
+                          <stop offset="100%" stopColor={variance < 0 ? "#f59e0b" : "#ef4444"} />
+                        </linearGradient>
+                      </defs>
                       <Pie
                         data={[
-                          {
-                            name: 'Planned',
-                            value: normalizedPlanned,
-                            originalValue: avgPlanned,
-                            color: '#3b82f6'
-                          },
-                          {
-                            name: 'Actual',
-                            value: normalizedActual,
-                            originalValue: avgActual,
-                            color: '#10b981'
-                          },
-                          {
-                            name: 'Variance',
-                            value: normalizedVariance,
-                            originalValue: absVariance,
-                            color: variance < 0 ? '#f59e0b' : '#ef4444'
-                          }
+                          { name: 'Planned', value: normalizedPlanned, originalValue: avgPlanned, fill: 'url(#overall-planned)' },
+                          { name: 'Actual', value: normalizedActual, originalValue: avgActual, fill: 'url(#overall-actual)' },
+                          { name: 'Variance', value: normalizedVariance, originalValue: absVariance, fill: 'url(#overall-variance)' }
                         ]}
                         cx="50%"
-                        cy="44%"
-                        innerRadius={isMobile ? 38 : isTablet ? 48 : 60}
-                        labelLine={false}
-                        // Avoid rendering long labels around the pie (they get clipped on smaller widths)
-                        label={false}
-                        outerRadius={isMobile ? 72 : isTablet ? 92 : 120}
-                        fill="#8884d8"
+                        cy="45%"
+                        innerRadius={isMobile ? 52 : isTablet ? 64 : 80}
+                        outerRadius={isMobile ? 82 : isTablet ? 100 : 120}
+                        paddingAngle={2}
                         dataKey="value"
+                        stroke="rgba(255,255,255,0.9)"
+                        strokeWidth={2}
+                        isAnimationActive
+                        animationDuration={800}
+                        animationBegin={0}
                       >
                         {[
-                          { name: 'Planned', value: normalizedPlanned, originalValue: avgPlanned, color: '#3b82f6' },
-                          { name: 'Actual', value: normalizedActual, originalValue: avgActual, color: '#10b981' },
-                          { name: 'Variance', value: normalizedVariance, originalValue: absVariance, color: variance < 0 ? '#f59e0b' : '#ef4444' }
+                          { fill: 'url(#overall-planned)' },
+                          { fill: 'url(#overall-actual)' },
+                          { fill: 'url(#overall-variance)' }
                         ].map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
+                          <Cell key={`cell-o-${index}`} fill={entry.fill} stroke="rgba(255,255,255,0.9)" strokeWidth={2} />
                         ))}
                       </Pie>
                       <Tooltip
                         contentStyle={{
                           backgroundColor: "hsl(var(--card))",
-                          borderColor: "hsl(var(--border))",
-                          borderRadius: "8px",
-                          fontSize: isMobile ? '11px' : '12px'
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "12px",
+                          fontSize: isMobile ? "11px" : "13px",
+                          boxShadow: "0 10px 40px -10px rgba(0,0,0,0.15)"
                         }}
                         formatter={(value: number, name: string, props: any) => {
                           const originalValue = props.payload?.originalValue ?? value;
@@ -1285,17 +1254,24 @@ export default function Dashboard() {
                         verticalAlign="bottom"
                         align="center"
                         layout="horizontal"
-                        wrapperStyle={{ paddingTop: isMobile ? "10px" : "14px", fontSize: isMobile ? '11px' : '12px' }}
+                        wrapperStyle={{ paddingTop: 16, fontSize: isMobile ? "11px" : "12px" }}
+                        iconType="circle"
+                        iconSize={10}
                         formatter={(value) => {
                           let itemValue = 0;
                           if (value === 'Planned') itemValue = avgPlanned;
                           else if (value === 'Actual') itemValue = avgActual;
                           else if (value === 'Variance') itemValue = absVariance;
-                          return `${value}: ${itemValue.toFixed(1)}%`;
+                          return <span className="text-muted-foreground font-medium">{value} <span className="font-semibold text-foreground">{itemValue.toFixed(1)}%</span></span>;
                         }}
                       />
                     </PieChart>
                   </ResponsiveContainer>
+                  {/* Center label - centered in chart area */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-2xl sm:text-3xl font-bold font-heading tabular-nums text-foreground">{avgActual.toFixed(1)}%</span>
+                    <span className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground">Actual</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>

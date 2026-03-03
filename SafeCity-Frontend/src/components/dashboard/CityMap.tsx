@@ -96,12 +96,35 @@ const CITY_COORDINATES: Record<string, [number, number]> = {
   gujranwala: [32.1877, 74.1945],
 };
 
-// Component to handle map center changes
-function MapCenterHandler({ center }: { center: [number, number] }) {
+// Component to handle map center and zoom changes (e.g. from area filter)
+function MapCenterHandler({ center, zoom }: { center: [number, number]; zoom?: number }) {
   const map = useMap();
   useEffect(() => {
-    map.setView(center, map.getZoom());
-  }, [center, map]);
+    const z = zoom ?? map.getZoom();
+    map.setView(center, z, { animate: true, duration: 0.5 });
+  }, [center, zoom, map]);
+  return null;
+}
+
+// Force Leaflet to recalculate size and redraw tiles after container is laid out (fixes partial tile loading)
+function MapResizeHandler() {
+  const map = useMap();
+  useEffect(() => {
+    const container = map.getContainer();
+    const resize = () => {
+      map.invalidateSize();
+      map.setView(map.getCenter(), map.getZoom());
+    };
+    const t1 = setTimeout(resize, 100);
+    const t2 = setTimeout(resize, 400);
+    const ro = new ResizeObserver(resize);
+    if (container) ro.observe(container);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      if (container) ro.unobserve(container);
+    };
+  }, [map]);
   return null;
 }
 
@@ -137,7 +160,9 @@ export function CityMap({
   geoData,
   showStats = true,
   showLegend = true,
-  onLegendClose
+  onLegendClose,
+  filterCenter,
+  filterZoom,
 }: {
   city?: string;
   activeLayers?: Set<LayerType>;
@@ -147,10 +172,15 @@ export function CityMap({
   showStats?: boolean;
   showLegend?: boolean;
   onLegendClose?: () => void;
+  /** When set (e.g. from area filter), overrides city-based center and navigates map */
+  filterCenter?: [number, number];
+  filterZoom?: number;
 }) {
   const [isMounted, setIsMounted] = useState(false);
   const [constructionSites, setConstructionSites] = useState(MOCK_DATA.construction);
-  const center = CITY_COORDINATES[city.toLowerCase()] || CITY_COORDINATES.lahore;
+  const cityCenter = CITY_COORDINATES[city.toLowerCase()] || CITY_COORDINATES.lahore;
+  const center = filterCenter ?? cityCenter;
+  const zoom = filterZoom ?? 12;
   const [isLegendCollapsed, setIsLegendCollapsed] = useState(false);
   const mapRef = useRef<L.Map | null>(null);
 
@@ -199,21 +229,22 @@ export function CityMap({
     <div className="min-h-[400px] h-full w-full rounded-xl overflow-hidden border shadow-2xl relative z-0 group">
       <MapContainer
         center={center}
-        zoom={12}
+        zoom={zoom}
         scrollWheelZoom={true}
-        style={{ height: "100%", width: "100%" }}
+        style={{ height: "100%", width: "100%", minHeight: 400 }}
         ref={mapRef}
       >
-        <MapCenterHandler center={center} />
+        <MapCenterHandler center={center} zoom={zoom} />
+        <MapResizeHandler />
         {geoData && <GeoJSONFitBounds data={geoData} />}
         <LayersControl position="topright">
-          <LayersControl.BaseLayer checked name="Operational Dark">
+          <LayersControl.BaseLayer name="Operational Dark">
             <TileLayer
               url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
             />
           </LayersControl.BaseLayer>
-          <LayersControl.BaseLayer name="Street View">
+          <LayersControl.BaseLayer checked name="Street View">
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

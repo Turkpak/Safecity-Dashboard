@@ -1,12 +1,14 @@
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { FolderKanban, Plus, Upload, FileText, MapPin, X, File, ChevronRight, ChevronLeft, CheckCircle2, Calendar, Users, Trash2, Eye } from "lucide-react";
+import { FolderKanban, Plus, Upload, FileText, MapPin, X, File, ChevronRight, ChevronLeft, CheckCircle2, Calendar, Eye, Pencil, ChevronDown, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -19,6 +21,7 @@ import {
   listDistricts,
   listTehsils,
   createProject,
+  updateProject,
   deleteProject,
 } from "@/api";
 import type { Project as ApiProject } from "@/api/types";
@@ -103,6 +106,8 @@ export default function ProjectManagement() {
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [showXERDialog, setShowXERDialog] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [editingProject, setEditingProject] = useState<ApiProject | null>(null);
+  const [selectedProjectForView, setSelectedProjectForView] = useState<ApiProject | null>(null);
 
   const { data: projectsData = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["projects"],
@@ -144,11 +149,27 @@ export default function ProjectManagement() {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       toast({ title: "Success", description: "Project created successfully." });
       resetForm();
+      setEditingProject(null);
       setShowAddProjectDialog(false);
       setShowXERDialog(false);
     },
     onError: (e: Error) => {
       toast({ title: "Error", description: e.message || "Failed to create project", variant: "destructive" });
+    },
+  });
+  const updateProjectMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: Parameters<typeof updateProject>[1] }) =>
+      updateProject(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast({ title: "Success", description: "Project updated successfully." });
+      resetForm();
+      setEditingProject(null);
+      setShowAddProjectDialog(false);
+      setShowXERDialog(false);
+    },
+    onError: (e: Error) => {
+      toast({ title: "Error", description: e.message || "Failed to update project", variant: "destructive" });
     },
   });
   const deleteProjectMutation = useMutation({
@@ -167,7 +188,7 @@ export default function ProjectManagement() {
   const [projectDescription, setProjectDescription] = useState("");
   const [startingDate, setStartingDate] = useState("");
   const [referenceNumber, setReferenceNumber] = useState("");
-  const [stakeholderId, setStakeholderId] = useState<string>("");
+  const [stakeholderIds, setStakeholderIds] = useState<string[]>([]);
   const [selectedTehsilId, setSelectedTehsilId] = useState<string>("");
   const [totalBudgetAllocated, setTotalBudgetAllocated] = useState<string>("");
   const [budgetUtilized, setBudgetUtilized] = useState<string>("");
@@ -278,7 +299,7 @@ export default function ProjectManagement() {
     setProjectDescription("");
     setStartingDate("");
     setReferenceNumber("");
-    setStakeholderId("");
+    setStakeholderIds([]);
     setSelectedProvinceId("");
     setSelectedDivisionId("");
     setSelectedDistrictId("");
@@ -291,6 +312,32 @@ export default function ProjectManagement() {
     setCurrentStep(1);
   };
 
+  // Open dialog for editing a project — prefetch division/district/tehsil so dropdowns show selected values
+  const openEditDialog = async (project: ApiProject) => {
+    await Promise.all([
+      queryClient.prefetchQuery({ queryKey: ["divisions", project.province], queryFn: () => listDivisions(project.province) }),
+      queryClient.prefetchQuery({ queryKey: ["districts", project.division], queryFn: () => listDistricts(project.division) }),
+      queryClient.prefetchQuery({ queryKey: ["tehsils", project.district], queryFn: () => listTehsils(project.district) }),
+    ]);
+    setEditingProject(project);
+    setProjectName(project.project_name ?? "");
+    setProjectDescription(project.project_description ?? "");
+    setStartingDate(project.project_starting_date ? project.project_starting_date.slice(0, 10) : "");
+    setReferenceNumber(project.project_reference_no ?? "");
+    setStakeholderIds(project.stakeholder ? [String(project.stakeholder)] : []);
+    setSelectedProvinceId(String(project.province));
+    setSelectedDivisionId(String(project.division));
+    setSelectedDistrictId(String(project.district));
+    setSelectedTehsilId(String(project.tehsil));
+    setTotalBudgetAllocated(project.total_budget_allocated ?? "");
+    setBudgetUtilized(project.budget_utilized ?? "");
+    setXerFile(null);
+    setAreaFile(null);
+    setGeoData(project.geom && typeof project.geom === "object" ? (project.geom as object) : null);
+    setCurrentStep(1);
+    setShowAddProjectDialog(true);
+  };
+
   // Validate step 1
   const validateStep1 = () => {
     if (!projectName.trim()) {
@@ -301,11 +348,11 @@ export default function ProjectManagement() {
       toast({ title: "Validation Error", description: "Please select province, division, district and tehsil", variant: "destructive" });
       return false;
     }
-    if (!stakeholderId) {
-      toast({ title: "Validation Error", description: "Please select a stakeholder", variant: "destructive" });
+    if (stakeholderIds.length === 0) {
+      toast({ title: "Validation Error", description: "Please select at least one stakeholder", variant: "destructive" });
       return false;
     }
-    if (!xerFile) {
+    if (!editingProject && !xerFile) {
       toast({ title: "Validation Error", description: "Please upload an XER file", variant: "destructive" });
       return false;
     }
@@ -314,7 +361,7 @@ export default function ProjectManagement() {
 
   // Validate step 2
   const validateStep2 = () => {
-    if (!areaFile) {
+    if (!editingProject && !areaFile) {
       toast({
         title: "Validation Error",
         description: "Please upload a project area file",
@@ -352,19 +399,45 @@ export default function ProjectManagement() {
       if (!validateStep2()) return;
       const totalBudget = totalBudgetAllocated.trim() ? Number(totalBudgetAllocated) : 0;
       const utilized = budgetUtilized.trim() ? Number(budgetUtilized) : 0;
-      createProjectMutation.mutate({
-        stakeholder: Number(stakeholderId),
-        project_name: projectName.trim() || null,
-        project_description: projectDescription.trim() || null,
-        project_starting_date: startingDate || null,
-        project_reference_no: referenceNumber.trim() || null,
-        province: Number(selectedProvinceId),
-        division: Number(selectedDivisionId),
-        district: Number(selectedDistrictId),
-        tehsil: Number(selectedTehsilId),
-        total_budget_allocated: totalBudget,
-        budget_utilized: utilized,
-      });
+      const variance = totalBudget - utilized;
+      const remaining = Math.max(0, totalBudget - utilized);
+
+      if (editingProject) {
+        updateProjectMutation.mutate({
+          id: editingProject.id,
+          payload: {
+            stakeholder: Number(stakeholderIds[0]),
+            project_name: projectName.trim() || null,
+            project_description: projectDescription.trim() || null,
+            project_starting_date: startingDate || null,
+            project_reference_no: referenceNumber.trim() || null,
+            province: Number(selectedProvinceId),
+            division: Number(selectedDivisionId),
+            district: Number(selectedDistrictId),
+            tehsil: Number(selectedTehsilId),
+            total_budget_allocated: totalBudgetAllocated.trim() || null,
+            budget_utilized: budgetUtilized.trim() || null,
+            budget_variance: String(variance),
+            budget_remaining: String(remaining),
+          },
+        });
+      } else {
+        createProjectMutation.mutate({
+          stakeholder: Number(stakeholderIds[0]),
+          project_name: projectName.trim() || null,
+          project_description: projectDescription.trim() || null,
+          project_starting_date: startingDate || null,
+          project_reference_no: referenceNumber.trim() || null,
+          province: Number(selectedProvinceId),
+          division: Number(selectedDivisionId),
+          district: Number(selectedDistrictId),
+          tehsil: Number(selectedTehsilId),
+          total_budget_allocated: totalBudget,
+          budget_utilized: utilized,
+          xer_file: xerFile ?? undefined,
+          boundary_file: areaFile ?? undefined,
+        });
+      }
     }
   };
 
@@ -372,19 +445,24 @@ export default function ProjectManagement() {
     const project = projectsData.find((p) => p.id === id);
     if (window.confirm(`Are you sure you want to delete "${project?.project_name}"?`)) {
       deleteProjectMutation.mutate(id);
+      setSelectedProjectForView((prev) => (prev?.id === id ? null : prev));
     }
   };
 
   return (
     <Layout title="Project Management">
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Header with Add Project Button */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">No of Added Projects</h1>
-            
+            <h1 className="text-3xl font-bold tracking-tight">Added Projects</h1>
+            <p className="text-muted-foreground mt-1">
+              {!projectsLoading && projectsData.length > 0
+                ? `${projectsData.length} project${projectsData.length !== 1 ? "s" : ""}`
+                : "Manage and view project details below"}
+            </p>
           </div>
-          <Button onClick={() => setShowAddProjectDialog(true)} className="gap-2">
+          <Button onClick={() => setShowAddProjectDialog(true)} className="gap-2 shrink-0">
             <Plus className="h-4 w-4" />
             Add New Project
           </Button>
@@ -406,68 +484,221 @@ export default function ProjectManagement() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {projectsData.map((project: ApiProject) => (
-              <Card key={project.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg mb-1">{project.project_name || "Unnamed"}</CardTitle>
-                      <CardDescription className="text-xs">
-                        Updated {project.updated_at ? new Date(project.updated_at).toLocaleDateString() : "—"}
-                      </CardDescription>
-                    </div>
-                    <Badge variant="outline" className="bg-blue-500 text-white border-blue-500">
-                      Active
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {project.project_description && (
-                      <div className="text-sm">
-                        <p className="text-muted-foreground line-clamp-2">{project.project_description}</p>
+          <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+            {projectsData.map((project: ApiProject) => {
+              const isSelected = selectedProjectForView?.id === project.id;
+              return (
+                <Card
+                  key={project.id}
+                  className={`transition-all duration-200 hover:shadow-md ${
+                    isSelected
+                      ? "ring-2 ring-primary shadow-md"
+                      : "hover:border-primary/30"
+                  }`}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-lg leading-tight truncate" title={project.project_name || "Unnamed"}>
+                          {project.project_name || "Unnamed"}
+                        </CardTitle>
+                        <CardDescription className="text-xs mt-1">
+                          Updated {project.updated_at ? new Date(project.updated_at).toLocaleDateString() : "—"}
+                        </CardDescription>
                       </div>
+                      <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 shrink-0">
+                        Active
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {project.project_description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">{project.project_description}</p>
                     )}
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">
-                        Start: {project.project_starting_date ? new Date(project.project_starting_date).toLocaleDateString() : "N/A"}
-                      </span>
+                    <div className="space-y-2.5 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 shrink-0" />
+                        <span>Start: {project.project_starting_date ? new Date(project.project_starting_date).toLocaleDateString() : "N/A"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 shrink-0" />
+                        <span>Ref: {project.project_reference_no || "N/A"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 shrink-0" />
+                        <span>
+                          {project.stakeholder_title != null && project.stakeholder_title !== ""
+                            ? project.stakeholder_type != null && project.stakeholder_type !== ""
+                              ? `${project.stakeholder_title} (${project.stakeholder_type})`
+                              : project.stakeholder_title
+                            : `Stakeholder #${project.stakeholder}`}
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
+                        <span className="break-words">
+                          {project.tehsil_name ?? String(project.tehsil)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Ref: {project.project_reference_no || "N/A"}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">
-                        Province/District/Tehsil IDs: {project.province} / {project.district} / {project.tehsil}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between pt-2 border-t">
+                    <div className="flex flex-row items-center gap-3 pt-4 mt-1 border-t">
                       <Button
-                        variant="ghost"
+                        variant="default"
                         size="sm"
-                        onClick={() => handleDeleteProject(project.id)}
-                        disabled={deleteProjectMutation.isPending}
-                        className="text-destructive hover:text-destructive"
+                        onClick={() => openEditDialog(project)}
+                        disabled={updateProjectMutation.isPending}
+                        className="gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground"
                       >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
+                        <Pencil className="h-3.5 w-3.5" />
+                        Update
                       </Button>
-                      <Button variant="ghost" size="sm" asChild>
-                        <a href={`/project/${project.tehsil}/${project.id}`}>
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </a>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedProjectForView(isSelected ? null : project)}
+                        className={`gap-1.5 border-emerald-500/70 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-500/50 dark:text-emerald-400 dark:hover:bg-emerald-950/30 ${isSelected ? "bg-emerald-50 dark:bg-emerald-950/20" : ""}`}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        View
                       </Button>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
+        )}
+
+        {/* Detail panel: selected project info in the space beneath the cards */}
+        {selectedProjectForView && (
+          <Card className="border-primary/20 shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div>
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <FolderKanban className="h-5 w-5" />
+                  {selectedProjectForView.project_name || "Unnamed Project"}
+                </CardTitle>
+                
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSelectedProjectForView(null)}
+                className="shrink-0"
+                aria-label="Close detail view"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {selectedProjectForView.project_description && (
+                <div>
+                  <h4 className="text-sm font-medium mb-1">Description</h4>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedProjectForView.project_description}</p>
+                </div>
+              )}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="flex items-center gap-3 rounded-lg border p-3">
+                  <Building2 className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Stakeholder</p>
+                    <p className="text-sm font-medium">
+                      {selectedProjectForView.stakeholder_title != null && selectedProjectForView.stakeholder_title !== ""
+                        ? selectedProjectForView.stakeholder_type != null && selectedProjectForView.stakeholder_type !== ""
+                          ? `${selectedProjectForView.stakeholder_title} (${selectedProjectForView.stakeholder_type})`
+                          : selectedProjectForView.stakeholder_title
+                        : `Stakeholder #${selectedProjectForView.stakeholder}`}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-lg border p-3">
+                  <Calendar className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Start Date</p>
+                    <p className="text-sm font-medium">
+                      {selectedProjectForView.project_starting_date
+                        ? new Date(selectedProjectForView.project_starting_date).toLocaleDateString()
+                        : "N/A"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-lg border p-3">
+                  <FileText className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Reference No</p>
+                    <p className="text-sm font-medium">{selectedProjectForView.project_reference_no || "N/A"}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-lg border p-3">
+                  <MapPin className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Location</p>
+                    <p className="text-sm font-medium">
+                      {selectedProjectForView.tehsil_name ?? String(selectedProjectForView.tehsil)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              {(selectedProjectForView.total_budget_allocated != null || selectedProjectForView.budget_utilized != null) && (
+                <div className="rounded-lg border p-4">
+                  <h4 className="text-sm font-medium mb-3">Budget</h4>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    {selectedProjectForView.total_budget_allocated != null && selectedProjectForView.total_budget_allocated !== "" && (
+                      <span className="text-muted-foreground">
+                        Allocated: <strong className="text-foreground">{selectedProjectForView.total_budget_allocated}</strong>
+                      </span>
+                    )}
+                    {selectedProjectForView.budget_utilized != null && selectedProjectForView.budget_utilized !== "" && (
+                      <span className="text-muted-foreground">
+                        Utilized: <strong className="text-foreground">{selectedProjectForView.budget_utilized}</strong>
+                      </span>
+                    )}
+                    {selectedProjectForView.budget_remaining != null && selectedProjectForView.budget_remaining !== "" && (
+                      <span className="text-muted-foreground">
+                        Remaining: <strong className="text-foreground">{selectedProjectForView.budget_remaining}</strong>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+              {selectedProjectForView.xer_file && (
+                <div className="rounded-lg border p-3 flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-muted-foreground" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground">XER File</p>
+                    <a
+                      href={selectedProjectForView.xer_file.startsWith("http") ? selectedProjectForView.xer_file : `${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"}${selectedProjectForView.xer_file.startsWith("/") ? "" : "/"}${selectedProjectForView.xer_file}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-medium text-primary hover:underline truncate block"
+                    >
+                      {selectedProjectForView.xer_file.split("/").pop() ?? selectedProjectForView.xer_file}
+                    </a>
+                  </div>
+                </div>
+              )}
+              {selectedProjectForView.geom && typeof selectedProjectForView.geom === "object" && (
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Project Area (Map)</h4>
+                  <div className="rounded-md border overflow-hidden">
+                    <ProjectAreaMap geoData={selectedProjectForView.geom} />
+                  </div>
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button variant="outline" size="sm" onClick={() => openEditDialog(selectedProjectForView)} className="gap-1.5">
+                  <Pencil className="h-3.5 w-3.5" />
+                  Update this project
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <a href={`/project/${selectedProjectForView.tehsil}/${selectedProjectForView.id}`} className="gap-1.5">
+                    <Eye className="h-3.5 w-3.5" />
+                    Open full project page
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
 
@@ -476,13 +707,16 @@ export default function ProjectManagement() {
         setShowAddProjectDialog(open);
         if (!open) {
           resetForm();
+          setEditingProject(null);
         }
       }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add New Project</DialogTitle>
+            <DialogTitle>{editingProject ? "Update Project" : "Add New Project"}</DialogTitle>
             <DialogDescription>
-              Fill in the project details and upload required files
+              {editingProject
+                ? "Edit the project details below. Leave file fields unchanged unless you want to replace them."
+                : "Fill in the project details and upload required files"}
             </DialogDescription>
           </DialogHeader>
 
@@ -628,21 +862,54 @@ export default function ProjectManagement() {
                   </div>
                 </div>
 
-                {/* Stakeholder */}
+                {/* Stakeholder (multi-select) */}
                 <div className="space-y-2">
-                  <Label htmlFor="stakeholderId">Stakeholder *</Label>
-                  <Select value={stakeholderId} onValueChange={setStakeholderId} required>
-                    <SelectTrigger id="stakeholderId">
-                      <SelectValue placeholder="Select stakeholder" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {stakeholdersList.map((s) => (
-                        <SelectItem key={s.id} value={String(s.id)}>
-                          {s.stakeholder_title} ({s.stakeholder_type})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="stakeholderIds">Stakeholder(s) *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="stakeholderIds"
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between font-normal min-h-10 h-auto py-2"
+                      >
+                        <span className="truncate">
+                          {stakeholderIds.length === 0
+                            ? "Select stakeholder(s)"
+                            : stakeholderIds
+                                .map((id) => stakeholdersList.find((s) => String(s.id) === id))
+                                .filter(Boolean)
+                                .map((s) => `${s!.stakeholder_title} (${s!.stakeholder_type})`)
+                                .join(", ")}
+                        </span>
+                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                      <div className="max-h-60 overflow-auto p-2">
+                        {stakeholdersList.map((s) => (
+                          <label
+                            key={s.id}
+                            className="flex items-center gap-2 rounded-md px-2 py-2 hover:bg-muted cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={stakeholderIds.includes(String(s.id))}
+                              onCheckedChange={(checked) => {
+                                setStakeholderIds((prev) =>
+                                  checked
+                                    ? [...prev, String(s.id)]
+                                    : prev.filter((id) => id !== String(s.id))
+                                );
+                              }}
+                            />
+                            <span className="text-sm">
+                              {s.stakeholder_title} ({s.stakeholder_type})
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
                 {/* Province */}
@@ -708,6 +975,24 @@ export default function ProjectManagement() {
                 {/* XER File Upload */}
                 <div className="space-y-2">
                   <Label>XER File *</Label>
+                  {editingProject && editingProject.xer_file && !xerFile && (
+                    <div className="rounded-lg border bg-muted/50 p-3 flex items-center gap-3 mb-2">
+                      <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          Current file: {editingProject.xer_file.split("/").pop() ?? editingProject.xer_file}
+                        </p>
+                        <a
+                          href={editingProject.xer_file.startsWith("http") ? editingProject.xer_file : `${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"}${editingProject.xer_file.startsWith("/") ? "" : "/"}${editingProject.xer_file}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Open / download
+                        </a>
+                      </div>
+                    </div>
+                  )}
                   <div
                     className={`relative border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center transition-all ${
                       xerFile
@@ -740,7 +1025,9 @@ export default function ProjectManagement() {
                     ) : (
                       <>
                         <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                        <p className="text-sm font-medium">Click to upload XER file</p>
+                        <p className="text-sm font-medium">
+                          {editingProject ? "Click to upload a new XER file (optional)" : "Click to upload XER file"}
+                        </p>
                         <p className="text-xs text-muted-foreground">.xer format</p>
                       </>
                     )}
@@ -752,8 +1039,40 @@ export default function ProjectManagement() {
             {/* Step 2: Project Area */}
             {currentStep === 2 && (
               <div className="space-y-6">
+                {/* When editing: show current boundary file name & format first, then map once */}
+                {editingProject && (editingProject.boundary_file || geoData) && (
+                  <div className="space-y-2">
+                    <Label>Current project boundary</Label>
+                    {editingProject.boundary_file && (
+                      <div className="rounded-lg border bg-muted/50 p-3 flex items-center gap-3">
+                        <MapPin className="h-5 w-5 text-muted-foreground shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            File: {editingProject.boundary_file.split("/").pop() ?? editingProject.boundary_file}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Format: {(() => {
+                              const name = (editingProject.boundary_file.split("/").pop() ?? "").toLowerCase();
+                              if (name.endsWith(".geojson") || name.endsWith(".json")) return "GeoJSON";
+                              if (name.endsWith(".kml")) return "KML";
+                              if (name.endsWith(".kmz")) return "KMZ";
+                              if (name.endsWith(".shp") || name.endsWith(".zip")) return "Shapefile";
+                              return "GeoJSON";
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {geoData && (
+                      <div className="rounded-md border overflow-hidden">
+                        <ProjectAreaMap geoData={geoData} />
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-2">
-                  <Label>Project Area (GeoJSON, Shapefile, KMZ, KML) *</Label>
+                  <Label>Project Area (GeoJSON, Shapefile, KMZ, KML) {editingProject ? "(optional – upload to replace)" : "*"}</Label>
                   <div
                     className={`relative border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center transition-all ${
                       areaFile
@@ -808,10 +1127,13 @@ export default function ProjectManagement() {
                   </div>
                 )}
 
-                {geoData && (
+                {/* Map preview only when NOT editing (new upload) – avoid showing boundary twice */}
+                {!editingProject && geoData && (
                   <div className="space-y-2">
                     <Label>Map Preview</Label>
-                    <ProjectAreaMap geoData={geoData} />
+                    <div className="rounded-md border overflow-hidden">
+                      <ProjectAreaMap geoData={geoData} />
+                    </div>
                   </div>
                 )}
               </div>
@@ -845,7 +1167,9 @@ export default function ProjectManagement() {
                     <ChevronLeft className="h-4 w-4" />
                     Previous
                   </Button>
-                  <Button type="submit">Create Project</Button>
+                  <Button type="submit" disabled={updateProjectMutation.isPending}>
+                    {editingProject ? "Update Project" : "Create Project"}
+                  </Button>
                 </>
               )}
             </DialogFooter>

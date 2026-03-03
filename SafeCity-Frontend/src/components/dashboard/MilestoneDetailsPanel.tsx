@@ -10,7 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, X, Plus, Trash2, Edit2, Calendar, AlertTriangle, Clock, Image as ImageIcon, XCircle } from "lucide-react";
+import { AlertCircle, X, Plus, Trash2, Edit2, Calendar, AlertTriangle, Clock, Image as ImageIcon, XCircle, MoreVertical } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -342,6 +348,41 @@ function statusColor(status: GanttTask["status"], baseColor: string) {
   return baseColor;
 }
 
+// Hex to rgba for light bar background (single color family, no white tone)
+function hexToRgba(hex: string, alpha: number): string {
+  const m = hex.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+  if (!m) return hex;
+  const r = parseInt(m[1], 16);
+  const g = parseInt(m[2], 16);
+  const b = parseInt(m[3], 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// Gantt chart year for date labels
+const GANTT_CHART_YEAR = 2026;
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function getMonthHeaderLabel(monthShort: string, year: number): { label: string; dateRange: string } {
+  const idx = MONTH_NAMES.findIndex((m) => m.startsWith(monthShort.substring(0, 3)));
+  const monthIndex = idx >= 0 ? idx : 0;
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  return {
+    label: `${monthShort} ${year}`,
+    dateRange: `1 - ${daysInMonth}`,
+  };
+}
+
+// Planned timeline date range for a task (startIdx, endIdx = month indices). Returns YYYY-MM-DD for min/max.
+function getPlannedDateRange(startIdx: number, endIdx: number, year: number): { minDate: string; maxDate: string } {
+  const minD = new Date(year, startIdx, 1);
+  const maxD = new Date(year, endIdx + 1, 0);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    minDate: `${minD.getFullYear()}-${pad(minD.getMonth() + 1)}-${pad(minD.getDate())}`,
+    maxDate: `${maxD.getFullYear()}-${pad(maxD.getMonth() + 1)}-${pad(maxD.getDate())}`,
+  };
+}
+
 // Generate a deterministic "responsible person" name for a task
 function getResponsiblePerson(taskId: string, taskName: string): string {
   const seed = hash01(taskId + "|person");
@@ -349,7 +390,7 @@ function getResponsiblePerson(taskId: string, taskName: string): string {
   return names[Math.floor(seed * names.length)];
 }
 
-// Calculate progress percentage for display
+// Calculate progress percentage for display (actual)
 // Note: subProject should already have adjusted progress from adjustedSubProjects
 function getProgressPercentage(task: GanttTask, subProject?: SubProject): number {
   // If we have sub-project data, use actual progress (already adjusted for delays)
@@ -364,6 +405,17 @@ function getProgressPercentage(task: GanttTask, subProject?: SubProject): number
   return Math.round(40 + seed * 40); // 40-80%
 }
 
+// Planned progress for display (where we should be)
+function getPlannedPercentage(task: GanttTask, subProject?: SubProject): number {
+  if (subProject) {
+    return Math.round(Math.min(100, Math.max(0, subProject.plannedProgress)));
+  }
+  const seed = hash01(task.id + "|planned");
+  if (task.status === "ahead") return Math.round(50 + seed * 30);
+  if (task.status === "behind") return Math.round(60 + seed * 35);
+  return Math.round(45 + seed * 40);
+}
+
 // Delay Log Form Dialog Component (for adding/editing)
 function DelayLogFormDialog({
   open,
@@ -376,6 +428,8 @@ function DelayLogFormDialog({
   onSave,
   existingLog,
   defaultDate,
+  minDate,
+  maxDate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -387,16 +441,19 @@ function DelayLogFormDialog({
   onSave: (log: DelayLog) => void;
   existingLog?: DelayLog;
   defaultDate?: string; // ISO date string for default date
+  minDate?: string; // YYYY-MM-DD: restrict to planned timeline start
+  maxDate?: string; // YYYY-MM-DD: restrict to planned timeline end
 }) {
-  // Get default date: use existing log's delayDate, or defaultDate, or current date
+  // Get default date: use existing log's delayDate, or defaultDate, clamped to [minDate, maxDate] when provided
   const getDefaultDate = () => {
-    if (existingLog?.delayDate) {
-      return existingLog.delayDate.split('T')[0]; // Get date part only
-    }
-    if (defaultDate) {
-      return defaultDate.split('T')[0];
-    }
-    return new Date().toISOString().split('T')[0];
+    let d: string | undefined;
+    if (existingLog?.delayDate) d = existingLog.delayDate.split('T')[0];
+    else if (defaultDate) d = defaultDate.split('T')[0];
+    else if (minDate && maxDate) d = minDate;
+    else d = new Date().toISOString().split('T')[0];
+    if (d && minDate && d < minDate) return minDate;
+    if (d && maxDate && d > maxDate) return maxDate;
+    return d!;
   };
 
   const [formData, setFormData] = useState<DelayLogFormData>({
@@ -420,7 +477,7 @@ function DelayLogFormDialog({
         imagePreview: existingLog?.imageUrl || null,
       });
     }
-  }, [open, existingLog, defaultDate]);
+  }, [open, existingLog, defaultDate, minDate, maxDate]);
 
   // Handle image file selection
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -516,7 +573,7 @@ function DelayLogFormDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <ScrollArea className="flex-1 px-6 py-2">
+          <ScrollArea className="flex-1 max-h-[65vh] px-6 py-2">
             <div className="space-y-5 pb-4">
               <div className="space-y-2">
                 <Label htmlFor="loggedBy" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Logged By <span className="text-destructive">*</span></Label>
@@ -539,11 +596,16 @@ function DelayLogFormDialog({
                   <Input
                     id="delayDate"
                     type="date"
+                    min={minDate}
+                    max={maxDate}
                     value={formData.delayDate}
                     onChange={(e) => setFormData({ ...formData, delayDate: e.target.value })}
                     className="h-11 bg-muted/30 border-muted-foreground/20 focus:border-primary/50 transition-all"
                     required
                   />
+                  {minDate && maxDate && (
+                    <p className="text-[10px] text-muted-foreground">Within planned timeline: {minDate} to {maxDate}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="delayDuration" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Duration (Days) <span className="text-destructive">*</span></Label>
@@ -642,6 +704,7 @@ function DelayLogCards({
   ganttTasks,
   subProjects,
   months,
+  onDelete,
   isMobile,
   isTablet,
 }: {
@@ -649,6 +712,7 @@ function DelayLogCards({
   ganttTasks: GanttTask[];
   subProjects?: SubProject[];
   months: string[];
+  onDelete?: (logId: string) => void;
   isMobile: boolean;
   isTablet: boolean;
 }) {
@@ -686,87 +750,106 @@ function DelayLogCards({
   return (
     <div className="mt-6 space-y-4">
       <div className="flex items-center gap-2">
-        <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-        <h3 className={`${isMobile ? 'text-sm' : 'text-base'} font-semibold`}>
+        <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-orange-400" />
+        <h3 className={`${isMobile ? 'text-sm' : 'text-base'} font-semibold text-foreground`}>
           Delay Logs ({delayLogs.length} total)
         </h3>
       </div>
 
-      <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : isTablet ? 'grid-cols-2' : 'grid-cols-3'}`}>
+      <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : isTablet ? 'grid-cols-2' : 'grid-cols-2'}`}>
         {sortedLogs.map((log) => {
           const taskName = getTaskName(log.taskId);
           const subProject = subProjects?.find(sp => sp.id === log.taskId);
           const variance = subProject
-            ? subProject.plannedProgress - subProject.actualProgress
+            ? Math.max(0, subProject.plannedProgress - subProject.actualProgress)
             : 0;
+          const displayDate = log.loggedAt || log.delayDate;
 
           return (
-            <Card key={log.id} className="border-orange-200 dark:border-orange-900 bg-orange-50/50 dark:bg-orange-950/20">
+            <Card key={log.id} className="border-amber-200 dark:border-orange-800 bg-amber-50/80 dark:bg-orange-950/20 rounded-xl overflow-hidden shadow-sm">
               <CardContent className="p-4">
                 <div className="space-y-3">
-                  {/* Task header */}
-                  <div>
-                    <h4 className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold text-foreground mb-1 truncate`} title={taskName}>
-                      {taskName}
-                    </h4>
-                    {variance > 0 && (
-                      <Badge variant="destructive" className="text-xs">
-                        {variance.toFixed(1)}% behind schedule
-                      </Badge>
-                    )}
+                  {/* Task title */}
+                  <h4 className={`${isMobile ? 'text-sm' : 'text-base'} font-semibold text-foreground truncate`} title={taskName}>
+                    {taskName}
+                  </h4>
+
+                  {/* Red status badge: X% behind schedule */}
+                  {variance > 0 && (
+                    <Badge variant="destructive" className="rounded-md px-2.5 py-1 text-xs font-semibold">
+                      {variance.toFixed(1)}% behind schedule
+                    </Badge>
+                  )}
+
+                  {/* Timeline: Month (calendar) + Duration (clock) - button-like */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 dark:border-orange-700 bg-white dark:bg-orange-950/40 px-2.5 py-1.5 text-xs font-medium text-foreground">
+                      <Calendar className="h-3.5 w-3.5 text-amber-600 dark:text-orange-400" />
+                      {months[log.monthIndex] || `M${log.monthIndex + 1}`}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 dark:border-orange-700 bg-white dark:bg-orange-950/40 px-2.5 py-1.5 text-xs font-medium text-foreground">
+                      <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-orange-400" />
+                      {log.delayDuration} day{log.delayDuration !== 1 ? 's' : ''}
+                    </span>
                   </div>
 
-                  {/* Delay log details */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <Badge variant="outline" className="text-[10px] gap-1">
-                        <Calendar className="h-2.5 w-2.5" />
-                        {months[log.monthIndex] || `M${log.monthIndex + 1}`}
-                      </Badge>
-                      <Badge variant="secondary" className="text-[10px]">
-                        <Clock className="h-2.5 w-2.5 mr-1" />
-                        {log.delayDuration} day{log.delayDuration !== 1 ? 's' : ''}
-                      </Badge>
-                    </div>
+                  {/* Reason for delay */}
+                  <p className="text-sm text-muted-foreground leading-snug" title={log.reason}>
+                    {log.reason}
+                  </p>
 
-                    <div className="text-[11px] text-muted-foreground" title={log.reason}>
-                      {log.reason}
-                    </div>
-
-                    {/* Image display */}
-                    {log.imageUrl && (
-                      <div className="relative rounded-lg overflow-hidden border border-orange-200 dark:border-orange-900">
-                        <img
-                          src={log.imageUrl}
-                          alt="Delay evidence"
-                          className="w-full h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => {
-                            // Open image in new window/modal for full view
-                            const newWindow = window.open();
-                            if (newWindow) {
-                              newWindow.document.write(`
-                                <html>
-                                  <head><title>Delay Evidence</title></head>
-                                  <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;">
-                                    <img src="${log.imageUrl}" style="max-width:100%;max-height:100vh;object-fit:contain;" />
-                                  </body>
-                                </html>
-                              `);
-                            }
-                          }}
-                        />
-                        <div className="absolute top-2 right-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded flex items-center gap-1">
-                          <ImageIcon className="h-3 w-3" />
-                          Evidence
-                        </div>
+                  {/* Image display */}
+                  {log.imageUrl && (
+                    <div className="relative rounded-lg overflow-hidden border border-amber-200 dark:border-orange-800">
+                      <img
+                        src={log.imageUrl}
+                        alt="Delay evidence"
+                        className="w-full h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => {
+                          const newWindow = window.open();
+                          if (newWindow) {
+                            newWindow.document.write(`
+                              <html>
+                                <head><title>Delay Evidence</title></head>
+                                <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;">
+                                  <img src="${log.imageUrl}" style="max-width:100%;max-height:100vh;object-fit:contain;" />
+                                </body>
+                              </html>
+                            `);
+                          }
+                        }}
+                      />
+                      <div className="absolute top-2 right-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded flex items-center gap-1">
+                        <ImageIcon className="h-3 w-3" />
+                        Evidence
                       </div>
-                    )}
-
-                    <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1 border-t border-orange-200 dark:border-orange-900">
-                      <span>By: {log.loggedBy}</span>
-                      <span>{new Date(log.delayDate).toLocaleDateString()}</span>
                     </div>
+                  )}
+
+                  {/* Attribution and date */}
+                  <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-amber-200/80 dark:border-orange-800/80">
+                    <span>By: {log.loggedBy}</span>
+                    <span>{new Date(displayDate).toLocaleDateString()}</span>
                   </div>
+
+                  {/* Delete button beneath each delay log card */}
+                  {onDelete && (
+                    <div className="pt-3 mt-2 border-t border-amber-200/80 dark:border-orange-800/80">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-center gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => {
+                          if (confirm("Delete this delay log?")) {
+                            onDelete(log.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete delay log
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1133,6 +1216,7 @@ function GanttMini({
   subProjects,
   delayLogs,
   onAddDelayLog,
+  onDeleteDelayLog,
 }: {
   tasks: GanttTask[];
   months: string[];
@@ -1140,6 +1224,7 @@ function GanttMini({
   subProjects?: SubProject[];
   delayLogs?: DelayLog[];
   onAddDelayLog?: (log: DelayLog) => void;
+  onDeleteDelayLog?: (logId: string) => void;
 }) {
   const n = months.length || 1;
   // Initialize all tasks as expanded by default
@@ -1171,6 +1256,16 @@ function GanttMini({
     monthName: string;
     clickDate?: string; // ISO date string from click position
   } | null>(null);
+
+  // Add delay log from row options button (restricted to planned timeline)
+  const [rowAddLogOpen, setRowAddLogOpen] = useState(false);
+  const [selectedRowForDelayLog, setSelectedRowForDelayLog] = useState<{
+    taskId: string;
+    taskName: string;
+    startIdx: number;
+    endIdx: number;
+  } | null>(null);
+
 
   const { width } = useWindowSize();
   const isMobile = width < 640;
@@ -1252,7 +1347,9 @@ function GanttMini({
   };
 
   const handleDeleteDelayLog = (logId: string) => {
-    setDelayLogs((prev) => prev.filter(log => log.id !== logId));
+    if (onDeleteDelayLog) {
+      onDeleteDelayLog(logId);
+    }
   };
 
   // Get delay logs for selected task/month
@@ -1272,9 +1369,10 @@ function GanttMini({
     });
   };
 
-  // Calculate grid columns: responsive left label column + one column per month
+  // Calculate grid columns: WBS column + month columns + Actions column
   const labelColWidth = isMobile ? '140px' : isTablet ? '180px' : '240px';
-  const gridCols = `${labelColWidth} repeat(${n}, 1fr)`;
+  const actionsColWidth = '48px';
+  const gridCols = `${labelColWidth} repeat(${n}, 1fr) ${actionsColWidth}`;
 
   return (
     <div className="space-y-4">
@@ -1314,8 +1412,53 @@ function GanttMini({
         />
       )}
 
-      {/* Legend for delay logs */}
+      {/* Add Delay Log Dialog (from row options button - date restricted to planned timeline) */}
+      {selectedRowForDelayLog && (() => {
+        const { minDate, maxDate } = getPlannedDateRange(
+          selectedRowForDelayLog.startIdx,
+          selectedRowForDelayLog.endIdx,
+          GANTT_CHART_YEAR
+        );
+        const defaultInRange = minDate; // first day of planned timeline
+        return (
+          <DelayLogFormDialog
+            open={rowAddLogOpen}
+            onOpenChange={(open) => {
+              if (!open) {
+                setRowAddLogOpen(false);
+                setSelectedRowForDelayLog(null);
+              }
+            }}
+            taskName={selectedRowForDelayLog.taskName}
+            taskId={selectedRowForDelayLog.taskId}
+            monthIndex={selectedRowForDelayLog.startIdx}
+            monthName={months[selectedRowForDelayLog.startIdx] || "—"}
+            months={months}
+            onSave={(log) => {
+              handleSaveDelayLog(log);
+              setRowAddLogOpen(false);
+              setSelectedRowForDelayLog(null);
+            }}
+            defaultDate={defaultInRange}
+            minDate={minDate}
+            maxDate={maxDate}
+          />
+        );
+      })()}
+
+      {/* Legend for delay logs and progress */}
       <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground bg-muted/30 p-2 rounded-lg border border-border/50">
+                        <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-0.5 h-5 w-6 rounded-sm overflow-hidden border border-border">
+            <div className="flex-1 bg-emerald-600 min-h-[2px]" title="Planned (top)" />
+            <div className="flex-1 bg-emerald-600 min-h-[2px]" title="Actual (bottom)" />
+          </div>
+          <span>Bar: top = Planned, bottom = Actual (same color)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <MoreVertical className="h-4 w-4 text-muted-foreground" />
+          <span>Options (⋯) per row: Add delay log (within planned timeline). Delete via button beneath each delay log card.</span>
+        </div>
         <div className="flex items-center gap-2">
           <div className="h-2 w-2 rounded-full bg-blue-500" />
           <span>Click on Gantt bars to add delay log</span>
@@ -1341,14 +1484,21 @@ function GanttMini({
         {/* Header row with month labels */}
         <div className={`grid border-b-2 border-border bg-muted/30 ${isMobile ? 'overflow-x-auto min-w-full' : ''}`} style={{ gridTemplateColumns: gridCols }}>
           <div className={`${isMobile ? 'p-1.5 text-[10px]' : 'p-2 text-xs'} font-bold text-muted-foreground border-r-2 border-border bg-muted/40`}>WBS Subprocess</div>
-          {months.map((m, idx) => (
-            <div
-              key={m}
-              className={`${isMobile ? 'p-1.5 text-[10px]' : 'p-2 text-xs'} font-semibold text-center text-muted-foreground border-r-2 border-border bg-muted/40 last:border-r-0`}
-            >
-              {isMobile ? m.substring(0, 3) : m}
-            </div>
-          ))}
+          {months.map((m, idx) => {
+            const { label, dateRange } = getMonthHeaderLabel(m, GANTT_CHART_YEAR);
+            return (
+              <div
+                key={m}
+                className={`${isMobile ? 'p-1 text-[9px]' : 'p-2 text-xs'} font-semibold text-center text-muted-foreground border-r-2 border-border bg-muted/40 flex flex-col items-center justify-center gap-0.5`}
+              >
+                <span>{isMobile ? label.replace(` ${GANTT_CHART_YEAR}`, "'26") : label}</span>
+                <span className={`font-normal opacity-90 ${isMobile ? 'text-[8px]' : 'text-[10px]'}`}>{dateRange}</span>
+              </div>
+            );
+          })}
+          <div className={`${isMobile ? 'p-1 text-[9px]' : 'p-2 text-xs'} font-semibold text-center text-muted-foreground border-border bg-muted/40 flex items-center justify-center`} title="Add delay log (within planned timeline)">
+            Options
+          </div>
         </div>
 
         {/* Task rows */}
@@ -1358,6 +1508,7 @@ function GanttMini({
             const hasChildren = (t.children?.length ?? 0) > 0;
             const subProject = getSubProjectForTask(t.id);
             const progress = getProgressPercentage(t, subProject);
+            const plannedPct = getPlannedPercentage(t, subProject);
             const responsible = getResponsiblePerson(t.id, t.name);
             const span = t.endIdx - t.startIdx + 1;
 
@@ -1397,8 +1548,8 @@ function GanttMini({
                     </div>
                   </div>
 
-                  {/* Timeline container - wraps grid cells and bars */}
-                  <div className="relative border-r-2 border-border" style={{ gridColumn: `2 / -1` }}>
+                  {/* Timeline container - month columns only (Actions column is last) */}
+                  <div className="relative border-r-2 border-border" style={{ gridColumn: `2 / span ${n}` }}>
                     {/* Grid cells for timeline - background cells */}
                     <div className="grid h-12" style={{ gridTemplateColumns: `repeat(${n}, 1fr)` }}>
                       {months.map((m, monthIdx) => {
@@ -1488,13 +1639,17 @@ function GanttMini({
                     </div>
 
                     {/* Task bar spanning across cells - clickable to add delay logs */}
+                    {(() => {
+                      const fillColor = statusColor(t.status, baseColor);
+                      const barBgColor = hexToRgba(fillColor, 0.4);
+                      return (
                     <div
                       className="absolute top-1 bottom-1 rounded shadow-sm z-10 overflow-hidden"
                       style={{
                         left: `${(t.startIdx / n) * 100}%`,
                         width: `${(span / n) * 100}%`,
                         maxWidth: `calc(100% - ${(t.startIdx / n) * 100}%)`,
-                        backgroundColor: statusColor(t.status, baseColor),
+                        backgroundColor: barBgColor,
                       }}
                       onClick={(e) => {
                         // Calculate which month was clicked
@@ -1508,24 +1663,36 @@ function GanttMini({
                       }}
                       title="Click on the bar to add a delay log at this position"
                     >
-                      {/* Progress bar overlay showing actual progress */}
-                      <div
-                        className="absolute top-0 left-0 bottom-0 bg-white/30 transition-all duration-300 z-10"
-                        style={{
-                          width: `${Math.min(100, Math.max(0, progress))}%`,
-                        }}
-                      />
-                      {/* Delay impact area - shows the portion lost due to delays */}
-                      {subProject && (subProject as any).delayImpact > 0 && (subProject as any).originalProgress > progress && (
-                        <div
-                          className="absolute top-0 bottom-0 bg-red-500/40 border-r-2 border-red-600/60 z-8 transition-all duration-300"
-                          style={{
-                            left: `${Math.min(100, Math.max(0, progress))}%`,
-                            width: `${Math.min(100 - progress, (subProject as any).delayImpact)}%`,
-                          }}
-                          title={`Delay Impact: ${((subProject as any).delayImpact).toFixed(1)}% progress lost`}
-                        />
-                      )}
+                      {/* Horizontal split: top = Planned, bottom = Actual (same dark color, no white tone) */}
+                      <div className="absolute inset-0 flex flex-col z-8">
+                        {/* Top half: Planned progress */}
+                        <div className="flex-1 min-h-0 flex items-stretch border-b border-black/20">
+                          <div
+                            className="h-full transition-all duration-300"
+                            style={{ width: `${Math.min(100, Math.max(0, plannedPct))}%`, backgroundColor: fillColor }}
+                            title={`Planned: ${plannedPct}%`}
+                          />
+                        </div>
+                        {/* Bottom half: Actual progress */}
+                        <div className="flex-1 min-h-0 flex items-stretch relative">
+                          <div
+                            className="h-full transition-all duration-300"
+                            style={{ width: `${Math.min(100, Math.max(0, progress))}%`, backgroundColor: fillColor }}
+                            title={`Actual: ${progress}%`}
+                          />
+                          {/* Delay impact stripe within actual row (starts after actual %) */}
+                          {subProject && (subProject as any).delayImpact > 0 && (subProject as any).originalProgress > progress && (
+                            <div
+                              className="absolute top-0 bottom-0 bg-red-500/50 border-r-2 border-red-600/60 transition-all duration-300"
+                              style={{
+                                left: `${Math.min(100, Math.max(0, progress))}%`,
+                                width: `${Math.min(100 - progress, (subProject as any).delayImpact)}%`,
+                              }}
+                              title={`Delay impact: ${((subProject as any).delayImpact).toFixed(1)}%`}
+                            />
+                          )}
+                        </div>
+                      </div>
                       {/* Delay log markers on the progress bar - more visible with icons */}
                       {delayLogs && delayLogs.filter(log => log.taskId === t.id && log.monthIndex >= t.startIdx && log.monthIndex <= t.endIdx).map((log) => {
                         // Calculate position within the bar based on month index
@@ -1594,10 +1761,12 @@ function GanttMini({
                             )}
                             <span className="truncate">{responsible}</span>
                           </div>
-                          <div className={`${isMobile ? 'text-[7px]' : 'text-[8px]'} opacity-90 flex items-center gap-1`}>
-                            <span>{progress}%</span>
+                          <div className={`${isMobile ? 'text-[7px]' : 'text-[8px]'} opacity-95 flex items-center gap-1.5 flex-wrap`}>
+                            <span title="Top strip = Planned"><span className="opacity-80">P:</span>{plannedPct}%</span>
+                            <span className="opacity-60">|</span>
+                            <span title="Bottom strip = Actual"><span className="opacity-80">A:</span>{progress}%</span>
                             {subProject && (subProject as any).delayImpact > 0 && (
-                              <span className="text-orange-200" title={`Original: ${((subProject as any).originalProgress).toFixed(0)}%`}>
+                              <span className="text-orange-200" title={`Delay impact: ${((subProject as any).delayImpact).toFixed(0)}%`}>
                                 (-{((subProject as any).delayImpact).toFixed(0)}%)
                               </span>
                             )}
@@ -1605,6 +1774,39 @@ function GanttMini({
                         </div>
                       </div>
                     </div>
+                  ); })()}
+                  </div>
+                  {/* Actions column: options menu (Add delay log / Delete delay log(s)) */}
+                  <div className="flex items-center justify-center border-border bg-muted/10 p-1">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-8 w-8 rounded-md border border-border/60 bg-background hover:bg-muted/60 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                          title="Options"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            setSelectedRowForDelayLog({
+                              taskId: t.id,
+                              taskName: t.name,
+                              startIdx: t.startIdx,
+                              endIdx: t.endIdx,
+                            });
+                            setRowAddLogOpen(true);
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add delay log
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
 
@@ -1614,6 +1816,7 @@ function GanttMini({
                     {t.children!.map((c) => {
                       const childSubProject = getSubProjectForTask(c.id);
                       const childProgress = getProgressPercentage(c, childSubProject);
+                      const childPlannedPct = getPlannedPercentage(c, childSubProject);
                       const childResponsible = getResponsiblePerson(c.id, c.name);
                       const childSpan = c.endIdx - c.startIdx + 1;
 
@@ -1631,8 +1834,8 @@ function GanttMini({
                             </div>
                           </div>
 
-                          {/* Timeline container - wraps grid cells and bars */}
-                          <div className="relative border-r-2 border-border" style={{ gridColumn: `2 / -1` }}>
+                          {/* Timeline container - month columns only */}
+                          <div className="relative border-r-2 border-border" style={{ gridColumn: `2 / span ${n}` }}>
                             {/* Grid cells for timeline - background cells */}
                             <div className="grid h-10" style={{ gridTemplateColumns: `repeat(${n}, 1fr)` }}>
                               {months.map((m, monthIdx) => {
@@ -1716,15 +1919,18 @@ function GanttMini({
                               })}
                             </div>
 
-                            {/* Child task bar spanning across cells - clickable to add delay logs */}
+                            {/* Child task bar - same dark color for both strips */}
+                            {(() => {
+                              const childFillColor = statusColor(c.status, baseColor);
+                              const childBarBgColor = hexToRgba(childFillColor, 0.4);
+                              return (
                             <div
                               className="absolute top-0.5 bottom-0.5 rounded z-20 overflow-hidden"
                               style={{
                                 left: `${(c.startIdx / n) * 100}%`,
                                 width: `${(childSpan / n) * 100}%`,
                                 maxWidth: `calc(100% - ${(c.startIdx / n) * 100}%)`,
-                                backgroundColor: statusColor(c.status, baseColor),
-                                opacity: 0.75,
+                                backgroundColor: childBarBgColor,
                               }}
                               onClick={(e) => {
                                 // Calculate which month was clicked
@@ -1738,24 +1944,33 @@ function GanttMini({
                               }}
                               title="Click on the bar to add a delay log at this position"
                             >
-                              {/* Progress bar overlay showing actual progress */}
-                              <div
-                                className="absolute top-0 left-0 bottom-0 bg-white/30 transition-all duration-300 z-10"
-                                style={{
-                                  width: `${Math.min(100, Math.max(0, childProgress))}%`,
-                                }}
-                              />
-                              {/* Delay impact area for child tasks */}
-                              {childSubProject && (childSubProject as any).delayImpact > 0 && (childSubProject as any).originalProgress > childProgress && (
-                                <div
-                                  className="absolute top-0 bottom-0 bg-red-500/40 border-r-2 border-red-600/60 z-15 transition-all duration-300"
-                                  style={{
-                                    left: `${Math.min(100, Math.max(0, childProgress))}%`,
-                                    width: `${Math.min(100 - childProgress, (childSubProject as any).delayImpact)}%`,
-                                  }}
-                                  title={`Delay Impact: ${((childSubProject as any).delayImpact).toFixed(1)}%`}
-                                />
-                              )}
+                              {/* Horizontal split: top = Planned, bottom = Actual */}
+                              <div className="absolute inset-0 flex flex-col z-8">
+                                <div className="flex-1 min-h-0 flex items-stretch border-b border-black/20">
+                                  <div
+                                    className="h-full transition-all duration-300"
+                                    style={{ width: `${Math.min(100, Math.max(0, childPlannedPct))}%`, backgroundColor: childFillColor }}
+                                    title={`Planned: ${childPlannedPct}%`}
+                                  />
+                                </div>
+                                <div className="flex-1 min-h-0 flex items-stretch relative">
+                                  <div
+                                    className="h-full transition-all duration-300"
+                                    style={{ width: `${Math.min(100, Math.max(0, childProgress))}%`, backgroundColor: childFillColor }}
+                                    title={`Actual: ${childProgress}%`}
+                                  />
+                                  {childSubProject && (childSubProject as any).delayImpact > 0 && (childSubProject as any).originalProgress > childProgress && (
+                                    <div
+                                      className="absolute top-0 bottom-0 bg-red-500/50 border-r-2 border-red-600/60 transition-all duration-300"
+                                      style={{
+                                        left: `${Math.min(100, Math.max(0, childProgress))}%`,
+                                        width: `${Math.min(100 - childProgress, (childSubProject as any).delayImpact)}%`,
+                                      }}
+                                      title={`Delay impact: ${((childSubProject as any).delayImpact).toFixed(1)}%`}
+                                    />
+                                  )}
+                                </div>
+                              </div>
                               {/* Delay log markers on the progress bar - more visible with icons */}
                               {delayLogs && delayLogs.filter(log => log.taskId === c.id && log.monthIndex >= c.startIdx && log.monthIndex <= c.endIdx).map((log) => {
                                 // Calculate position within the bar based on month index
@@ -1813,14 +2028,51 @@ function GanttMini({
                                   </div>
                                 );
                               })}
-                              {/* Text content */}
-                              <div className={`${isMobile ? 'text-[7px]' : 'text-[8px]'} font-medium text-white truncate flex-1 pointer-events-none relative z-20 px-1.5 flex items-center h-full`}>
+                              {/* Text content: Actual / Planned */}
+                              <div className={`${isMobile ? 'text-[7px]' : 'text-[8px]'} font-medium text-white truncate flex-1 pointer-events-none relative z-20 px-1.5 flex items-center h-full drop-shadow-md`}>
                                 <div className="flex-1 min-w-0">
                                   <div className="truncate">{childResponsible}</div>
-                                  <div className={`${isMobile ? 'text-[6px]' : 'text-[7px]'} opacity-90`}>{childProgress}%</div>
+                                  <div className={`${isMobile ? 'text-[6px]' : 'text-[7px]'} opacity-95 flex items-center gap-1`}>
+                                    <span title="Top = Planned">P:{childPlannedPct}%</span>
+                                    <span className="opacity-60">|</span>
+                                    <span title="Bottom = Actual">A:{childProgress}%</span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
+                          ); })()}
+                          </div>
+                          {/* Actions column for child row: options menu */}
+                          <div className="flex items-center justify-center border-border bg-muted/10 p-1">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="h-7 w-7 rounded-md border border-border/60 bg-background hover:bg-muted/60 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                                  title="Options"
+                                >
+                                  <MoreVertical className="h-3.5 w-3.5" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuItem
+                                  onSelect={(e) => {
+                                    e.preventDefault();
+                                    setSelectedRowForDelayLog({
+                                      taskId: c.id,
+                                      taskName: c.name,
+                                      startIdx: c.startIdx,
+                                      endIdx: c.endIdx,
+                                    });
+                                    setRowAddLogOpen(true);
+                                  }}
+                                >
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  Add delay log
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
                       );
@@ -2018,27 +2270,26 @@ export function MilestoneDetailsPanel({
                   subProjects={adjustedSubProjects}
                   delayLogs={delayLogs}
                   onAddDelayLog={handleAddDelayLog}
+                  onDeleteDelayLog={handleDeleteDelayLog}
                 />
                 {/* Overall Progress Summary with Delay Impact - beneath Gantt chart */}
-                {overallProgress.impact > 0 && (
-                  <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900 rounded-lg p-3 mt-4">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                {delayLogs.length > 0 && (
+                  <div className="bg-amber-50/80 dark:bg-orange-950/30 border border-amber-200 dark:border-orange-800 rounded-xl p-4 mt-4 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold text-orange-900 dark:text-orange-100 mb-1">
+                        <div className="text-sm font-bold text-amber-900 dark:text-orange-100 mb-2">
                           Delay Impact on Overall Progress
                         </div>
-                        <div className="text-xs text-orange-700 dark:text-orange-300 space-y-1">
-                          <div className="flex items-center gap-2">
+                        <div className="text-xs text-amber-800 dark:text-orange-200 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span>Current Progress: <strong>{overallProgress.actual}%</strong></span>
-                            {overallProgress.impact > 0 && (
-                              <span className="text-orange-600 dark:text-orange-400">
-                                (Impact: -{overallProgress.impact}%)
-                              </span>
-                            )}
+                            <span className="text-amber-700 dark:text-orange-400 font-medium">
+                              (Impact: {overallProgress.impact > 0 ? `-${overallProgress.impact}%` : '0%'})
+                            </span>
                           </div>
                           <div>Planned Progress: <strong>{overallProgress.planned}%</strong></div>
-                          <div className="text-[10px] opacity-75 mt-1">
+                          <div className="text-[11px] opacity-90 mt-1.5">
                             {delayLogs.length} delay log{delayLogs.length !== 1 ? 's' : ''} recorded affecting {adjustedSubProjects.filter(sp => (sp as any).delayImpact > 0).length} sub-project{adjustedSubProjects.filter(sp => (sp as any).delayImpact > 0).length !== 1 ? 's' : ''}
                           </div>
                         </div>
@@ -2052,6 +2303,7 @@ export function MilestoneDetailsPanel({
                   ganttTasks={ganttTasks}
                   subProjects={subProjects}
                   months={months}
+                  onDelete={onDeleteDelayLog}
                   isMobile={isMobile}
                   isTablet={isTablet}
                 />
@@ -2195,27 +2447,26 @@ export function MilestoneDetailsPanel({
                 subProjects={adjustedSubProjects}
                 delayLogs={delayLogs}
                 onAddDelayLog={handleAddDelayLog}
+                onDeleteDelayLog={handleDeleteDelayLog}
               />
               {/* Overall Progress Summary with Delay Impact - beneath Gantt chart */}
-              {overallProgress.impact > 0 && (
-                <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900 rounded-lg p-3 mt-4">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+              {delayLogs.length > 0 && (
+                <div className="bg-amber-50/80 dark:bg-orange-950/30 border border-amber-200 dark:border-orange-800 rounded-xl p-4 mt-4 shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-orange-900 dark:text-orange-100 mb-1">
+                      <div className="text-sm font-bold text-amber-900 dark:text-orange-100 mb-2">
                         Delay Impact on Overall Progress
                       </div>
-                      <div className="text-xs text-orange-700 dark:text-orange-300 space-y-1">
-                        <div className="flex items-center gap-2">
+                      <div className="text-xs text-amber-800 dark:text-orange-200 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span>Current Progress: <strong>{overallProgress.actual}%</strong></span>
-                          {overallProgress.impact > 0 && (
-                            <span className="text-orange-600 dark:text-orange-400">
-                              (Impact: -{overallProgress.impact}%)
-                            </span>
-                          )}
+                          <span className="text-amber-700 dark:text-orange-400 font-medium">
+                            (Impact: {overallProgress.impact > 0 ? `-${overallProgress.impact}%` : '0%'})
+                          </span>
                         </div>
                         <div>Planned Progress: <strong>{overallProgress.planned}%</strong></div>
-                        <div className="text-[10px] opacity-75 mt-1">
+                        <div className="text-[11px] opacity-90 mt-1.5">
                           {delayLogs.length} delay log{delayLogs.length !== 1 ? 's' : ''} recorded affecting {adjustedSubProjects.filter(sp => (sp as any).delayImpact > 0).length} sub-project{adjustedSubProjects.filter(sp => (sp as any).delayImpact > 0).length !== 1 ? 's' : ''}
                         </div>
                       </div>
@@ -2229,6 +2480,7 @@ export function MilestoneDetailsPanel({
                 ganttTasks={ganttTasks}
                 subProjects={subProjects}
                 months={months}
+                onDelete={handleDeleteDelayLog}
                 isMobile={isMobile}
                 isTablet={isTablet}
               />
@@ -2350,7 +2602,42 @@ export function MilestoneDetailsPanel({
               </div>
             </TabsContent>
 
-            <TabsContent value="logs" className="mt-4">
+            <TabsContent value="logs" className="mt-4 space-y-6">
+              {/* Delay Impact on Overall Progress - shown in Delay Log section */}
+              {delayLogs.length > 0 && (
+                <div className="bg-amber-50/80 dark:bg-orange-950/30 border border-amber-200 dark:border-orange-800 rounded-xl p-4 shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold text-amber-900 dark:text-orange-100 mb-2">
+                        Delay Impact on Overall Progress
+                      </div>
+                      <div className="text-xs text-amber-800 dark:text-orange-200 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span>Current Progress: <strong>{overallProgress.actual}%</strong></span>
+                          <span className="text-amber-700 dark:text-orange-400 font-medium">
+                            (Impact: {overallProgress.impact > 0 ? `-${overallProgress.impact}%` : '0%'})
+                          </span>
+                        </div>
+                        <div>Planned Progress: <strong>{overallProgress.planned}%</strong></div>
+                        <div className="text-[11px] opacity-90 mt-1.5">
+                          {delayLogs.length} delay log{delayLogs.length !== 1 ? 's' : ''} recorded affecting {adjustedSubProjects.filter(sp => (sp as any).delayImpact > 0).length} sub-project{adjustedSubProjects.filter(sp => (sp as any).delayImpact > 0).length !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Delay Log cards - same layout as under Gantt */}
+              <DelayLogCards
+                delayLogs={delayLogs}
+                ganttTasks={ganttTasks}
+                subProjects={subProjects}
+                months={months}
+                onDelete={handleDeleteDelayLog}
+                isMobile={isMobile}
+                isTablet={isTablet}
+              />
               <DelayLogsTable
                 delayLogs={delayLogs}
                 ganttTasks={ganttTasks}

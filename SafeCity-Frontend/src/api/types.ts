@@ -34,6 +34,26 @@ export interface LoginResponse {
   is_active: boolean;
 }
 
+/** Payload for POST /api/create-user/ (User Management form) */
+export interface UserCreateInput {
+  email: string;
+  first_name: string;
+  last_name: string;
+  password: string;
+  role: string; // e.g. "consultant" | "contractor"
+  stakeholder: number;
+  company_name?: string;
+}
+
+/** User item from GET /api/get-user/ (list) */
+export interface UserListItem {
+  id: number;
+  email: string;
+  full_name: string;
+  stakeholder: number | null;
+  is_active: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Province
 // ---------------------------------------------------------------------------
@@ -171,6 +191,8 @@ export interface ListProjectResponse {
 export interface Project {
   id: number;
   stakeholder: number;
+  stakeholder_type?: string | null;
+  stakeholder_title?: string | null;
   project_name: string | null;
   project_description: string | null;
   project_starting_date: string | null;
@@ -179,6 +201,10 @@ export interface Project {
   division: number;
   district: number;
   tehsil: number;
+  province_name?: string | null;
+  division_name?: string | null;
+  district_name?: string | null;
+  tehsil_name?: string | null;
   total_budget_allocated: string | null;
   budget_utilized: string | null;
   budget_variance?: string | null;
@@ -202,6 +228,10 @@ export interface ProjectCreateInput {
   tehsil: number;
   total_budget_allocated?: number | string | null;
   budget_utilized?: number | string | null;
+  /** .xer file for project schedule */
+  xer_file?: File | null;
+  /** Boundary: .geojson (sent as-is) or .kml/.kmz/.zip/.shp (converted to GeoJSON on frontend) */
+  boundary_file?: File | null;
 }
 
 export interface ProjectUpdateInput {
@@ -216,6 +246,8 @@ export interface ProjectUpdateInput {
   tehsil?: number;
   total_budget_allocated?: string | null;
   budget_utilized?: string | null;
+  budget_variance?: string | null;
+  budget_remaining?: string | null;
 }
 
 // ---------------------------------------------------------------------------

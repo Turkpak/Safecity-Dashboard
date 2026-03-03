@@ -26,7 +26,9 @@ class ListProjectView(viewsets.ViewSet):
                 ).create_response()
 
             else:
-                queryset = Project.objects.all()
+                queryset = Project.objects.select_related(
+                    "province", "division", "district", "tehsil", "stakeholder"
+                ).all()
                 serializer = ProjectSerializer(queryset, many=True)
                 return ApiResponse(
                     status=status.HTTP_200_OK,

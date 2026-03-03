@@ -1,129 +1,130 @@
 import { Layout } from "@/components/layout/Layout";
 import { CityMap } from "@/components/dashboard/CityMap";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import {
-  Map as MapIcon,
-  Layers,
-  Camera,
-  AlertTriangle,
-  Truck,
-  Shield,
-  Activity,
-  Landmark,
-  TrendingUp,
-  MapPin,
-  Construction,
-  Search,
-  Download,
-  Filter,
-  Info,
-  Ruler,
-  Zap
-} from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { listProjects } from "@/api";
+import { Download, FolderKanban, Loader2, AlertTriangle, CalendarCheck, Filter } from "lucide-react";
+import React, { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  getAllDivisions,
+  getDistrictsByDivision,
+  getTehsilsByDivisionAndDistrict,
+} from "@/data/punjabHierarchy";
+import { getMapCenterForArea } from "@/data/areaMapCenters";
+import type { Project } from "@/api/types";
 
-const GIS_STATS = [
-  { label: "CCTV Uptime", value: "98.4%", change: "+0.2%", icon: Camera },
-  { label: "Patrol Coverage", value: "92%", change: "+5%", icon: Truck },
-  { label: "Construction Radius", value: "1.8km", change: "-0.1km", icon: Construction },
-  { label: "Station Nodes", value: "24", change: "0", icon: Landmark },
-];
+/** Card config: id, label, icon, and Tailwind classes for bg + left border (situation-based colors) */
+const PROJECT_STAT_CARDS = [
+  { id: "total", label: "Total No of Projects", icon: FolderKanban, bgClass: "bg-primary", borderClass: "border-l-primary", iconOpacity: "opacity-90" },
+  { id: "in_progress", label: "Projects in Progress", icon: Loader2, bgClass: "bg-blue-600", borderClass: "border-l-blue-400", iconOpacity: "opacity-80" },
+  { id: "in_delay", label: "Projects in Delay", icon: AlertTriangle, bgClass: "bg-rose-600", borderClass: "border-l-rose-400", iconOpacity: "opacity-90" },
+  { id: "pending", label: "Pending Projects", icon: CalendarCheck, bgClass: "bg-amber-600", borderClass: "border-l-amber-400", iconOpacity: "opacity-80" },
+] as const;
 
 export type LayerType = "cameras" | "incidents" | "patrols" | "construction" | "stations" | "traffic" | "hotspots";
 
+const DEFAULT_ACTIVE_LAYERS = new Set<LayerType>([
+  "cameras", "incidents", "patrols", "construction", "traffic"
+]);
+
+/** Normalize project geom for Leaflet: accept geometry or Feature/FeatureCollection */
+function normalizeProjectGeom(geom: unknown): object | null {
+  if (geom == null) return null;
+  const g = geom as Record<string, unknown>;
+  if (g.type === "FeatureCollection" && Array.isArray(g.features)) return geom as object;
+  if (g.type === "Feature" && g.geometry) return geom as object;
+  if (g.type === "Polygon" || g.type === "MultiPolygon" || g.type === "Point" || g.type === "LineString")
+    return { type: "Feature", geometry: g, properties: {} } as object;
+  return null;
+}
+
 export default function GISLayers() {
   const [selectedCity, setSelectedCity] = useState("lahore");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeLayers, setActiveLayers] = useState<Set<LayerType>>(new Set([
-    "cameras", "incidents", "patrols", "construction", "traffic"
-  ] as LayerType[]));
   const [showLegend, setShowLegend] = useState(true);
   const [mapRef, setMapRef] = useState<any>(null);
+  const [selectedDivision, setSelectedDivision] = useState<string>("all");
+  const [selectedDistrict, setSelectedDistrict] = useState<string>("all");
+  const [selectedTehsil, setSelectedTehsil] = useState<string>("all");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
 
-  const layerConfig = [
-    {
-      id: "cameras" as LayerType,
-      icon: Camera,
-      label: "CCTV Network",
-      detail: "4,500 Cameras",
-      status: "Active",
-      color: "text-blue-500",
-      layerName: "CCTV Coverage"
-    },
-    {
-      id: "construction" as LayerType,
-      icon: Construction,
-      label: "Construction Sites",
-      detail: "8 Active Projects",
-      status: "In Progress",
-      color: "text-orange-500",
-      layerName: "Construction Projects"
-    },
-    {
-      id: "hotspots" as LayerType,
-      icon: AlertTriangle,
-      label: "Hotspot Zones",
-      detail: "12 Critical",
-      status: "Warning",
-      color: "text-secondary",
-      layerName: "Incident Hotspots"
-    },
-    {
-      id: "patrols" as LayerType,
-      icon: Truck,
-      label: "Patrol Fleet",
-      detail: "86 Units",
-      status: "Tracking",
-      color: "text-emerald-500",
-      layerName: "Patrol Units"
-    },
-    {
-      id: "stations" as LayerType,
-      icon: Landmark,
-      label: "Police Stations",
-      detail: "24 Locations",
-      status: "Static",
-      color: "text-primary",
-      layerName: "Police Stations"
-    },
-    {
-      id: "traffic" as LayerType,
-      icon: Activity,
-      label: "Traffic Sensors",
-      detail: "1,200 Nodes",
-      status: "Live",
-      color: "text-purple-500",
-      layerName: "Traffic Density"
-    },
-  ];
-
-  const toggleLayer = (layerId: LayerType) => {
-    setActiveLayers(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(layerId)) {
-        newSet.delete(layerId);
-      } else {
-        newSet.add(layerId);
-      }
-      return newSet;
-    });
+  const handleDivisionChange = (value: string) => {
+    setSelectedDivision(value);
+    setSelectedDistrict("all");
+    setSelectedTehsil("all");
+    setSelectedProjectId("all");
   };
 
-  const filteredLayers = useMemo(() => {
-    if (!searchQuery) return layerConfig;
-    const query = searchQuery.toLowerCase();
-    return layerConfig.filter(layer =>
-      layer.label.toLowerCase().includes(query) ||
-      layer.detail.toLowerCase().includes(query)
+  const handleDistrictChange = (value: string) => {
+    setSelectedDistrict(value);
+    setSelectedTehsil("all");
+    setSelectedProjectId("all");
+  };
+
+  const handleTehsilChange = (value: string) => {
+    setSelectedTehsil(value);
+    setSelectedProjectId("all");
+  };
+
+  const { data: projects = [] } = useQuery({
+    queryKey: ["projects"],
+    queryFn: listProjects,
+  });
+
+  const filteredProjects = useMemo((): Project[] => {
+    if (selectedDivision === "all") return projects;
+    let list = projects.filter(
+      (p) => p.division_name && p.division_name.trim().toLowerCase() === selectedDivision.trim().toLowerCase()
     );
-  }, [searchQuery]);
+    if (selectedDistrict !== "all") {
+      list = list.filter(
+        (p) => p.district_name && p.district_name.trim().toLowerCase() === selectedDistrict.trim().toLowerCase()
+      );
+    }
+    if (selectedTehsil !== "all") {
+      list = list.filter(
+        (p) => p.tehsil_name && p.tehsil_name.trim().toLowerCase() === selectedTehsil.trim().toLowerCase()
+      );
+    }
+    return list;
+  }, [projects, selectedDivision, selectedDistrict, selectedTehsil]);
+
+  const totalFiltered = filteredProjects.length;
+  const inProgressCount = Math.round(totalFiltered * 0.5);
+  const inDelayCount = Math.round(totalFiltered * 0.15);
+  const pendingCount = Math.max(0, totalFiltered - inProgressCount - inDelayCount);
+
+  const projectCounts = {
+    total: totalFiltered,
+    in_progress: inProgressCount,
+    in_delay: inDelayCount,
+    pending: pendingCount,
+  } as const;
+
+  const mapView = useMemo(
+    () =>
+      getMapCenterForArea(
+        selectedDivision === "all" ? "" : selectedDivision,
+        selectedDistrict === "all" ? undefined : selectedDistrict,
+        selectedTehsil === "all" ? undefined : selectedTehsil
+      ),
+    [selectedDivision, selectedDistrict, selectedTehsil]
+  );
+
+  const selectedProject = useMemo(
+    () =>
+      selectedProjectId && selectedProjectId !== "all"
+        ? filteredProjects.find((p) => String(p.id) === selectedProjectId) ?? null
+        : null,
+    [filteredProjects, selectedProjectId]
+  );
+
+  const projectBoundaryGeo = useMemo(
+    () => (selectedProject?.geom ? normalizeProjectGeom(selectedProject.geom) : null),
+    [selectedProject]
+  );
 
   const handleExportMap = () => {
     // Export functionality - can be enhanced with html2canvas
@@ -133,19 +134,114 @@ export default function GISLayers() {
   return (
     <Layout title="Advanced GIS Intelligence">
       <div className="flex flex-col gap-6">
-        {/* Statistics Bar */}
+        {/* Filters — single row; Filter icon only (no text); short Project text */}
+        <div className="flex flex-nowrap items-center gap-3">
+          <Filter className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
+          <div className="flex items-center gap-2 shrink-0">
+            <label className="text-sm font-medium text-muted-foreground shrink-0">Division</label>
+            <Select value={selectedDivision} onValueChange={handleDivisionChange}>
+              <SelectTrigger className="h-9 w-[140px] border-border/50 bg-background rounded-md">
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                {getAllDivisions().map((div) => (
+                  <SelectItem key={div} value={div}>{div}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <label className="text-sm font-medium text-muted-foreground shrink-0">District</label>
+            <Select
+              value={selectedDistrict}
+              onValueChange={handleDistrictChange}
+              disabled={selectedDivision === "all"}
+            >
+              <SelectTrigger
+                className={`h-9 w-[140px] border-border/50 bg-background rounded-md ${selectedDivision === "all" ? "opacity-50 cursor-not-allowed" : ""}`}
+                disabled={selectedDivision === "all"}
+              >
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                {selectedDivision !== "all" &&
+                  getDistrictsByDivision(selectedDivision).map((dist) => (
+                    <SelectItem key={dist} value={dist}>{dist}</SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <label className="text-sm font-medium text-muted-foreground shrink-0">Tehsil</label>
+            <Select
+              value={selectedTehsil}
+              onValueChange={handleTehsilChange}
+              disabled={selectedDivision === "all" || selectedDistrict === "all"}
+            >
+              <SelectTrigger
+                className={`h-9 w-[140px] border-border/50 bg-background rounded-md ${selectedDivision === "all" || selectedDistrict === "all" ? "opacity-50 cursor-not-allowed" : ""}`}
+                disabled={selectedDivision === "all" || selectedDistrict === "all"}
+              >
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                {selectedDivision !== "all" &&
+                  selectedDistrict !== "all" &&
+                  getTehsilsByDivisionAndDistrict(selectedDivision, selectedDistrict).map((teh) => (
+                    <SelectItem key={teh} value={teh}>{teh}</SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <label className="text-sm font-medium text-muted-foreground shrink-0">Project</label>
+            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+              <SelectTrigger className="h-9 w-[160px] border-border/50 bg-background rounded-md">
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All ({filteredProjects.length})</SelectItem>
+                {filteredProjects.map((p) => (
+                  <SelectItem key={p.id} value={String(p.id)}>
+                    {p.project_name || `#${p.id}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {(selectedDivision !== "all" || selectedDistrict !== "all" || selectedTehsil !== "all" || selectedProjectId !== "all") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedDivision("all");
+                setSelectedDistrict("all");
+                setSelectedTehsil("all");
+                setSelectedProjectId("all");
+              }}
+              className="h-9 px-3 text-xs font-medium shrink-0"
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+
+        {/* Project stats cards — situation-based colors */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {GIS_STATS.map((stat) => (
-            <Card key={stat.label} className="border-none shadow-sm bg-primary text-white overflow-hidden relative group">
-              <div className="absolute right-[-10px] top-[-10px] opacity-10 group-hover:scale-110 transition-transform">
+          {PROJECT_STAT_CARDS.map((stat) => (
+            <Card
+              key={stat.id}
+              className={`border-none shadow-md text-white overflow-hidden relative group border-l-4 ${stat.bgClass} ${stat.borderClass}`}
+            >
+              <div className={`absolute right-[-10px] top-[-10px] ${stat.iconOpacity} group-hover:scale-110 transition-transform`}>
                 <stat.icon className="h-20 w-20" />
               </div>
               <CardContent className="p-4 flex flex-col gap-1 relative z-10">
-                <p className="text-[10px] uppercase font-bold tracking-widest opacity-70">{stat.label}</p>
-                <div className="flex items-end gap-2">
-                  <span className="text-2xl font-bold font-heading">{stat.value}</span>
-                  <span className="text-[10px] mb-1 text-emerald-400 font-bold">{stat.change}</span>
-                </div>
+                <p className="text-[10px] uppercase font-bold tracking-widest opacity-90">{stat.label}</p>
+                <p className="text-2xl font-bold font-heading">{projectCounts[stat.id]}</p>
               </CardContent>
             </Card>
           ))}
@@ -157,16 +253,7 @@ export default function GISLayers() {
 
 
             <div className="flex flex-wrap gap-2 items-center">
-              <Select value={selectedCity} onValueChange={setSelectedCity}>
-                <SelectTrigger className="w-full sm:w-[140px] h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="lahore">Lahore</SelectItem>
-                  <SelectItem value="rawalpindi">Rawalpindi</SelectItem>
-                  <SelectItem value="gujranwala">Gujranwala</SelectItem>
-                </SelectContent>
-              </Select>
+            
               <Button
                 variant="outline"
                 size="sm"
@@ -175,80 +262,23 @@ export default function GISLayers() {
               >
                 <Download className="h-3 w-3 mr-1" /> Export
               </Button>
-              <Badge variant="secondary" className="px-2 py-1 font-mono text-[10px] hidden sm:inline-flex">
-                {selectedCity.toUpperCase()}_GRID_ACTIVE
-              </Badge>
-              <Badge className="bg-emerald-500 hover:bg-emerald-600 px-3 py-1 font-mono text-[10px]">SYNCED</Badge>
+             
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* GIS Explorer Sidebar */}
-              <div className="lg:col-span-4 space-y-6">
-                <Card className="border-primary/10">
-                  <CardHeader className="p-4 border-b space-y-3">
-                    <CardTitle className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-                      <Layers className="h-3 w-3" /> Spatial Inventory
-                    </CardTitle>
-                    <div className="relative">
-                      <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search layers..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-8 h-8 text-xs"
-                      />
-                    </div>
-                  </CardHeader>
-                  <ScrollArea className="h-[320px] sm:h-[420px] lg:h-[600px]">
-                    <CardContent className="p-4 space-y-3">
-                      {filteredLayers.map((item) => {
-                        const isActive = activeLayers.has(item.id);
-                        return (
-                          <div
-                            key={item.id}
-                            onClick={() => toggleLayer(item.id)}
-                            className={`flex items-center justify-between p-4 rounded-xl transition-all duration-200 cursor-pointer group shadow-sm border border-transparent active:scale-[0.98] select-none ${isActive ? 'bg-primary/10 border-primary/20' : 'bg-muted/30 hover:bg-muted hover:border-muted-foreground/10'
-                              }`}
-                          >
-                            <div className="flex items-center gap-4 flex-1">
-                              <div className={`p-2.5 rounded-lg transition-colors shadow-sm ${isActive ? 'bg-primary/20 text-primary' : 'bg-white group-hover:bg-muted text-muted-foreground'
-                                }`}>
-                                <item.icon className="h-5 w-5" />
-                              </div>
-                              <div className="flex-1">
-                                <p className="text-sm font-bold tracking-tight mb-0.5">{item.label}</p>
-                                <p className="text-[11px] text-muted-foreground uppercase font-semibold">{item.detail}</p>
-                              </div>
-                            </div>
-                            <Switch
-                              checked={isActive}
-                              className="ml-2 pointer-events-none"
-                            />
-                          </div>
-                        );
-                      })}
-                    </CardContent>
-                  </ScrollArea>
-                </Card>
-
-
-              </div>
-
-              {/* Advanced Map Engine */}
-              <div className="lg:col-span-8">
-                <CityMap
-                  city={selectedCity}
-                  activeLayers={activeLayers}
-                  searchQuery={searchQuery}
-                  onMapReady={setMapRef}
-                  showLegend={showLegend}
-                  onLegendClose={() => setShowLegend(false)}
-                  showStats={false}
-                />
-              </div>
-            </div>
+          <div className="w-full min-h-[480px] h-[65vh] max-h-[720px] rounded-xl overflow-hidden">
+            <CityMap
+              city={selectedCity}
+              activeLayers={DEFAULT_ACTIVE_LAYERS}
+              searchQuery=""
+              onMapReady={setMapRef}
+              showLegend={showLegend}
+              onLegendClose={() => setShowLegend(false)}
+              showStats={false}
+              filterCenter={!projectBoundaryGeo && selectedDivision !== "all" ? mapView.center : undefined}
+              filterZoom={!projectBoundaryGeo && selectedDivision !== "all" ? mapView.zoom : undefined}
+              geoData={projectBoundaryGeo ?? undefined}
+            />
           </div>
         </div>
       </div>
