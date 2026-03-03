@@ -28,10 +28,20 @@ export interface LoginResponse {
   token: string;
   refresh: string;
   access: string;
-  is_admin: boolean;
+  is_admin?: boolean;
+  /** From backend: super_admin | contractor | consultant */
+  role?: string;
   stakeholder_id: number | null;
   stakeholder_type: string | null;
   is_active: boolean;
+}
+
+/** CRUD permissions assignable by Super Admin when creating a user (optional; backend can adopt later) */
+export interface UserCrudPermissions {
+  create?: boolean;
+  read?: boolean;
+  update?: boolean;
+  delete?: boolean;
 }
 
 /** Payload for POST /api/create-user/ (User Management form) */
@@ -43,6 +53,8 @@ export interface UserCreateInput {
   role: string; // e.g. "consultant" | "contractor"
   stakeholder: number;
   company_name?: string;
+  /** Optional CRUD permissions (Super Admin assigns to Contractor/Consultant); backend can accept when implemented */
+  permissions?: UserCrudPermissions;
 }
 
 /** User item from GET /api/get-user/ (list) */
@@ -50,6 +62,7 @@ export interface UserListItem {
   id: number;
   email: string;
   full_name: string;
+  role?: string; // super_admin | contractor | consultant
   stakeholder: number | null;
   is_active: boolean;
 }

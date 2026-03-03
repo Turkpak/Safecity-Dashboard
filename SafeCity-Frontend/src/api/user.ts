@@ -17,7 +17,7 @@ export async function listUsers(): Promise<UserListItem[]> {
  * Body: email, first_name, last_name, password, role, stakeholder
  */
 export async function createUser(payload: UserCreateInput): Promise<{ user: unknown; tokens: { access: string; refresh: string } }> {
-  const body = {
+  const body: Record<string, unknown> = {
     email: payload.email.trim(),
     first_name: payload.first_name.trim(),
     last_name: payload.last_name.trim(),
@@ -26,5 +26,8 @@ export async function createUser(payload: UserCreateInput): Promise<{ user: unkn
     stakeholder: payload.stakeholder,
     company_name: payload.company_name ?? "SafeCity",
   };
+  if (payload.permissions != null) {
+    body.permissions = payload.permissions;
+  }
   return post<{ user: unknown; tokens: { access: string; refresh: string } }>(CREATE, body);
 }

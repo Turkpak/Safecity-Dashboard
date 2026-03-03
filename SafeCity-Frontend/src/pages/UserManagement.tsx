@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -22,19 +23,40 @@ import {
 } from "@/components/ui/table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { listStakeholders, createUser, listUsers } from "@/api";
 import { useState } from "react";
-import { UserPlus, Users } from "lucide-react";
+import { UserPlus, Users, ShieldAlert } from "lucide-react";
+import type { UserCrudPermissions } from "@/api/types";
+
+/** Normalize role from login (backend may return super_admin or Super Admin) */
+function isSuperAdminRole(role: string | undefined): boolean {
+  if (!role) return false;
+  const r = role.trim().toLowerCase();
+  return r === "super_admin" || r === "super admin";
+}
+
+const DEFAULT_CRUD: UserCrudPermissions = {
+  create: true,
+  read: true,
+  update: true,
+  delete: false,
+};
 
 export default function UserManagement() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const currentRole = (user?.role ?? localStorage.getItem("userRole") ?? "").trim().toLowerCase();
+  const isSuperAdmin = isSuperAdminRole(user?.role ?? undefined) || isSuperAdminRole(localStorage.getItem("userRole") ?? undefined);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [stakeholderId, setStakeholderId] = useState<string>("");
+  const [permissions, setPermissions] = useState<UserCrudPermissions>({ ...DEFAULT_CRUD });
 
   const { data: stakeholders = [] } = useQuery({
     queryKey: ["stakeholders"],
@@ -76,6 +98,7 @@ export default function UserManagement() {
     setLastName("");
     setPassword("");
     setStakeholderId("");
+    setPermissions({ ...DEFAULT_CRUD });
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -112,6 +135,7 @@ export default function UserManagement() {
       password,
       role,
       stakeholder: Number(stakeholderId),
+      permissions: isSuperAdmin ? permissions : undefined,
     });
   };
 
@@ -121,14 +145,43 @@ export default function UserManagement() {
     return s ? `${s.stakeholder_title} (${s.stakeholder_type})` : String(id);
   };
 
+  const formatRole = (role: string | undefined) => {
+    if (!role) return "—";
+    const r = role.trim().toLowerCase();
+    if (r === "super_admin") return "Super Admin";
+    if (r === "contractor") return "Contractor";
+    if (r === "consultant") return "Consultant";
+    return role;
+  };
+
+  if (!isSuperAdmin) {
+    return (
+      <Layout title="User Management">
+        <div className="space-y-6">
+          <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                <ShieldAlert className="h-5 w-5" />
+                Access restricted
+              </CardTitle>
+              <CardDescription>
+                User Management is available only to Super Admin. Your role: <strong>{currentRole || "—"}</strong>. Contact an administrator to manage users.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout title="User Management">
       <div className="space-y-6">
-        {/* Header with Add New User button on the right */}
+        {/* Header with Add New User button on the right — Super Admin only */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
-            <p className="text-muted-foreground mt-1">Create and view registered users.</p>
+            <p className="text-muted-foreground mt-1">Create and assign users (Contractor / Consultant) and their CRUD permissions.</p>
           </div>
           <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0">
             <UserPlus className="h-4 w-4" />
@@ -145,7 +198,7 @@ export default function UserManagement() {
                 Add New User
               </DialogTitle>
               <DialogDescription>
-                Fill in the form below. All fields are required.
+                Assign role (Contractor or Consultant) and which CRUD operations this user can perform on the app.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -211,6 +264,40 @@ export default function UserManagement() {
                   autoComplete="new-password"
                 />
               </div>
+              <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
+                <Label className="text-sm font-semibold">CRUD permissions</Label>
+                <p className="text-xs text-muted-foreground">Choose which operations this user can perform across the app.</p>
+                <div className="flex flex-wrap gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={permissions.create ?? false}
+                      onCheckedChange={(c) => setPermissions((p) => ({ ...p, create: !!c }))}
+                    />
+                    <span className="text-sm">Create</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={permissions.read ?? false}
+                      onCheckedChange={(c) => setPermissions((p) => ({ ...p, read: !!c }))}
+                    />
+                    <span className="text-sm">Read</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={permissions.update ?? false}
+                      onCheckedChange={(c) => setPermissions((p) => ({ ...p, update: !!c }))}
+                    />
+                    <span className="text-sm">Update</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={permissions.delete ?? false}
+                      onCheckedChange={(c) => setPermissions((p) => ({ ...p, delete: !!c }))}
+                    />
+                    <span className="text-sm">Delete</span>
+                  </label>
+                </div>
+              </div>
               <DialogFooter>
                 <Button
                   type="button"
@@ -235,7 +322,7 @@ export default function UserManagement() {
               Registered Users
             </CardTitle>
             <CardDescription>
-              All users added via the Add New User form. Total: {users.length}
+              Users added by Super Admin. Role and CRUD permissions are assigned when creating a user. Total: {users.length}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -251,6 +338,7 @@ export default function UserManagement() {
                       <TableHead className="w-[80px]">#</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Full name</TableHead>
+                      <TableHead>Role</TableHead>
                       <TableHead>Stakeholder</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
@@ -261,6 +349,7 @@ export default function UserManagement() {
                         <TableCell className="font-mono text-muted-foreground">{u.id}</TableCell>
                         <TableCell>{u.email}</TableCell>
                         <TableCell>{u.full_name}</TableCell>
+                        <TableCell className="capitalize">{formatRole(u.role)}</TableCell>
                         <TableCell>{getStakeholderLabel(u.stakeholder)}</TableCell>
                         <TableCell>
                           <span

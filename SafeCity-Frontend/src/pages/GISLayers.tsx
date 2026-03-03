@@ -26,10 +26,6 @@ const PROJECT_STAT_CARDS = [
 
 export type LayerType = "cameras" | "incidents" | "patrols" | "construction" | "stations" | "traffic" | "hotspots";
 
-const DEFAULT_ACTIVE_LAYERS = new Set<LayerType>([
-  "cameras", "incidents", "patrols", "construction", "traffic"
-]);
-
 /** Normalize project geom for Leaflet: accept geometry or Feature/FeatureCollection */
 function normalizeProjectGeom(geom: unknown): object | null {
   if (geom == null) return null;
@@ -269,12 +265,14 @@ export default function GISLayers() {
           <div className="w-full min-h-[480px] h-[65vh] max-h-[720px] rounded-xl overflow-hidden">
             <CityMap
               city={selectedCity}
-              activeLayers={DEFAULT_ACTIVE_LAYERS}
+              activeLayers={new Set()}
               searchQuery=""
               onMapReady={setMapRef}
               showLegend={showLegend}
               onLegendClose={() => setShowLegend(false)}
               showStats={false}
+              showSurveillanceLayers={false}
+              legendProjects={filteredProjects}
               filterCenter={!projectBoundaryGeo && selectedDivision !== "all" ? mapView.center : undefined}
               filterZoom={!projectBoundaryGeo && selectedDivision !== "all" ? mapView.zoom : undefined}
               geoData={projectBoundaryGeo ?? undefined}

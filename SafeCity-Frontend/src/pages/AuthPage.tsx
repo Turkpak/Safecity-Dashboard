@@ -49,7 +49,8 @@ export default function AuthPage() {
             try {
                 const data = await apiLogin({ email, password });
                 setUser(data);
-                localStorage.setItem("userRole", data.is_admin ? "Admin" : (data.stakeholder_type || stakeholderType));
+                const roleForNav = data.role ?? (data.is_admin ? "admin" : (data.stakeholder_type?.toLowerCase() || stakeholderType?.toLowerCase() || ""));
+                localStorage.setItem("userRole", roleForNav);
                 setLocation("/");
                 toast({ title: "Welcome", description: "Login successful." });
             } catch (err) {
