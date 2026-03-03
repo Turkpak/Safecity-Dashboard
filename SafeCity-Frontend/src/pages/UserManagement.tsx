@@ -25,8 +25,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { listStakeholders, createUser, listUsers } from "@/api";
-import { useState } from "react";
-import { UserPlus, Users, ShieldAlert } from "lucide-react";
+import { useState, useRef } from "react";
+import { UserPlus, Users, ShieldAlert, ListChecks, UserCog } from "lucide-react";
 import type { UserCrudPermissions } from "@/api/types";
 
 /** Normalize role from login (backend may return super_admin or Super Admin) */
@@ -36,7 +36,20 @@ function isSuperAdminRole(role: string | undefined): boolean {
   return r === "super_admin" || r === "super admin";
 }
 
-const DEFAULT_CRUD: UserCrudPermissions = {
+/** Page rows for the Page Permissions table. Area Management is a single row covering Province, Division, District, Tehsil. */
+const PAGE_PERMISSIONS_ROWS: { id: string; label: string }[] = [
+  { id: "area_management", label: "Area Management (Province, Division, District, Tehsil)" },
+  { id: "stakeholders", label: "Stakeholders" },
+  { id: "project_management", label: "Project Management" },
+  { id: "citywise_progress", label: "Citywise Progress" },
+  { id: "city_comparison", label: "City Comparison" },
+  { id: "finance", label: "Finance & Budget" },
+  { id: "gis_layers", label: "GIS Layers" },
+  { id: "user_management", label: "User Management" },
+  { id: "settings", label: "Settings" },
+];
+
+const DEFAULT_PAGE_CRUD: UserCrudPermissions = {
   create: true,
   read: true,
   update: true,
@@ -56,7 +69,10 @@ export default function UserManagement() {
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [stakeholderId, setStakeholderId] = useState<string>("");
-  const [permissions, setPermissions] = useState<UserCrudPermissions>({ ...DEFAULT_CRUD });
+  /** Which user's page permissions we are editing (null = none selected) */
+  const [selectedUserIdForPermissions, setSelectedUserIdForPermissions] = useState<number | null>(null);
+  /** Per-user, per-page CRUD: userId -> pageId -> { create, read, update, delete } */
+  const [pagePermissionsByUser, setPagePermissionsByUser] = useState<Record<number, Record<string, UserCrudPermissions>>>({});
 
   const { data: stakeholders = [] } = useQuery({
     queryKey: ["stakeholders"],
@@ -73,6 +89,8 @@ export default function UserManagement() {
     queryKey: ["users"],
     queryFn: listUsers,
   });
+
+  const pagePermissionsCardRef = useRef<HTMLDivElement>(null);
 
   const createUserMutation = useMutation({
     mutationFn: createUser,
@@ -98,7 +116,6 @@ export default function UserManagement() {
     setLastName("");
     setPassword("");
     setStakeholderId("");
-    setPermissions({ ...DEFAULT_CRUD });
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -135,7 +152,6 @@ export default function UserManagement() {
       password,
       role,
       stakeholder: Number(stakeholderId),
-      permissions: isSuperAdmin ? permissions : undefined,
     });
   };
 
@@ -152,6 +168,38 @@ export default function UserManagement() {
     if (r === "contractor") return "Contractor";
     if (r === "consultant") return "Consultant";
     return role;
+  };
+
+  /** Users that can have page permissions assigned (Contractor / Consultant only) */
+  const usersForPermissionAssignment = users.filter(
+    (u) => (u.role ?? "").trim().toLowerCase() !== "super_admin"
+  );
+
+  /** Get page permissions for the currently selected user (for editing in the table) */
+  const getPermissionsForSelectedUser = (pageId: string): UserCrudPermissions => {
+    if (selectedUserIdForPermissions == null) return DEFAULT_PAGE_CRUD;
+    const byPage = pagePermissionsByUser[selectedUserIdForPermissions];
+    return byPage?.[pageId] ?? DEFAULT_PAGE_CRUD;
+  };
+
+  /** Update one CRUD flag for the selected user and page */
+  const setPermissionForSelectedUser = (
+    pageId: string,
+    key: keyof UserCrudPermissions,
+    value: boolean
+  ) => {
+    if (selectedUserIdForPermissions == null) return;
+    setPagePermissionsByUser((prev) => {
+      const userPerms = prev[selectedUserIdForPermissions] ?? {};
+      const pagePerms = userPerms[pageId] ?? { ...DEFAULT_PAGE_CRUD };
+      return {
+        ...prev,
+        [selectedUserIdForPermissions]: {
+          ...userPerms,
+          [pageId]: { ...pagePerms, [key]: value },
+        },
+      };
+    });
   };
 
   if (!isSuperAdmin) {
@@ -179,10 +227,7 @@ export default function UserManagement() {
       <div className="space-y-6">
         {/* Header with Add New User button on the right — Super Admin only */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
-            <p className="text-muted-foreground mt-1">Create and assign users (Contractor / Consultant) and their CRUD permissions.</p>
-          </div>
+          
           <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0">
             <UserPlus className="h-4 w-4" />
             Add New User
@@ -198,7 +243,7 @@ export default function UserManagement() {
                 Add New User
               </DialogTitle>
               <DialogDescription>
-                Assign role (Contractor or Consultant) and which CRUD operations this user can perform on the app.
+                Create a new user and assign role (Contractor or Consultant). Page-level CRUD permissions are managed in the table below.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -264,40 +309,6 @@ export default function UserManagement() {
                   autoComplete="new-password"
                 />
               </div>
-              <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
-                <Label className="text-sm font-semibold">CRUD permissions</Label>
-                <p className="text-xs text-muted-foreground">Choose which operations this user can perform across the app.</p>
-                <div className="flex flex-wrap gap-6">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox
-                      checked={permissions.create ?? false}
-                      onCheckedChange={(c) => setPermissions((p) => ({ ...p, create: !!c }))}
-                    />
-                    <span className="text-sm">Create</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox
-                      checked={permissions.read ?? false}
-                      onCheckedChange={(c) => setPermissions((p) => ({ ...p, read: !!c }))}
-                    />
-                    <span className="text-sm">Read</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox
-                      checked={permissions.update ?? false}
-                      onCheckedChange={(c) => setPermissions((p) => ({ ...p, update: !!c }))}
-                    />
-                    <span className="text-sm">Update</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox
-                      checked={permissions.delete ?? false}
-                      onCheckedChange={(c) => setPermissions((p) => ({ ...p, delete: !!c }))}
-                    />
-                    <span className="text-sm">Delete</span>
-                  </label>
-                </div>
-              </div>
               <DialogFooter>
                 <Button
                   type="button"
@@ -322,7 +333,7 @@ export default function UserManagement() {
               Registered Users
             </CardTitle>
             <CardDescription>
-              Users added by Super Admin. Role and CRUD permissions are assigned when creating a user. Total: {users.length}
+              Users added by Super Admin. Assign CRUD per page in the Page Permissions table below. Total: {users.length}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -341,29 +352,153 @@ export default function UserManagement() {
                       <TableHead>Role</TableHead>
                       <TableHead>Stakeholder</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="w-[120px] text-right">Page permissions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((u) => (
-                      <TableRow key={u.id}>
-                        <TableCell className="font-mono text-muted-foreground">{u.id}</TableCell>
-                        <TableCell>{u.email}</TableCell>
-                        <TableCell>{u.full_name}</TableCell>
-                        <TableCell className="capitalize">{formatRole(u.role)}</TableCell>
-                        <TableCell>{getStakeholderLabel(u.stakeholder)}</TableCell>
-                        <TableCell>
-                          <span
-                            className={
-                              u.is_active
-                                ? "text-green-600 dark:text-green-400 font-medium"
-                                : "text-muted-foreground"
-                            }
-                          >
-                            {u.is_active ? "Active" : "Inactive"}
-                          </span>
-                        </TableCell>
-                      </TableRow>
+                    {users.map((u) => {
+                      const isSuperAdminUser = (u.role ?? "").trim().toLowerCase() === "super_admin";
+                      return (
+                        <TableRow key={u.id}>
+                          <TableCell className="font-mono text-muted-foreground">{u.id}</TableCell>
+                          <TableCell>{u.email}</TableCell>
+                          <TableCell>{u.full_name}</TableCell>
+                          <TableCell className="capitalize">{formatRole(u.role)}</TableCell>
+                          <TableCell>{getStakeholderLabel(u.stakeholder)}</TableCell>
+                          <TableCell>
+                            <span
+                              className={
+                                u.is_active
+                                  ? "text-green-600 dark:text-green-400 font-medium"
+                                  : "text-muted-foreground"
+                              }
+                            >
+                              {u.is_active ? "Active" : "Inactive"}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {!isSuperAdminUser && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 gap-1 text-xs"
+                                onClick={() => {
+                                  setSelectedUserIdForPermissions(u.id);
+                                  pagePermissionsCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                }}
+                              >
+                                <UserCog className="h-3.5 w-3.5" />
+                                Edit permissions
+                              </Button>
+                            )}
+                            {isSuperAdminUser && <span className="text-muted-foreground text-xs">—</span>}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Page Permissions table — per user; select user then edit CRUD per page */}
+        <Card ref={pagePermissionsCardRef}>
+          <CardHeader>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+              <div className="space-y-1.5">
+                <CardTitle className="flex items-center gap-2">
+                  <ListChecks className="h-5 w-5" />
+                  Page permissions
+                </CardTitle>
+                <CardDescription>
+                  Select the user for whom you are assigning permissions. Then use the checkboxes to set Create, Read, Update, and Delete per page. Area Management covers Province, Division, District, and Tehsil.
+                </CardDescription>
+              </div>
+              <div className="flex flex-nowrap items-center gap-3 shrink-0">
+                <Label htmlFor="permissions-user-select" className="text-sm font-medium whitespace-nowrap">
+                  Permissions for user:
+                </Label>
+                <Select
+                  value={selectedUserIdForPermissions != null ? String(selectedUserIdForPermissions) : "__none__"}
+                  onValueChange={(v) => setSelectedUserIdForPermissions(v === "__none__" ? null : Number(v))}
+                >
+                  <SelectTrigger id="permissions-user-select" className="h-9 w-[280px] max-w-full shrink">
+                    <SelectValue placeholder="Select user…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Select user…</SelectItem>
+                    {usersForPermissionAssignment.map((u) => (
+                      <SelectItem key={u.id} value={String(u.id)}>
+                        {u.full_name || u.email} ({formatRole(u.role)})
+                      </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+                {selectedUserIdForPermissions != null && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedUserIdForPermissions(null)}
+                    className="text-muted-foreground shrink-0 h-9"
+                  >
+                    Clear selection
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {selectedUserIdForPermissions == null ? (
+              <p className="text-muted-foreground py-8 text-center rounded-md border border-dashed">
+                Select a user above (or click &quot;Edit permissions&quot; in the Registered Users table) to manage their page-level CRUD.
+              </p>
+            ) : (
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[280px]">Page</TableHead>
+                      <TableHead className="text-center w-[90px]">Create</TableHead>
+                      <TableHead className="text-center w-[90px]">Read</TableHead>
+                      <TableHead className="text-center w-[90px]">Update</TableHead>
+                      <TableHead className="text-center w-[90px]">Delete</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {PAGE_PERMISSIONS_ROWS.map(({ id, label }) => {
+                      const perms = getPermissionsForSelectedUser(id);
+                      return (
+                        <TableRow key={id}>
+                          <TableCell className="font-medium">{label}</TableCell>
+                          <TableCell className="text-center">
+                            <Checkbox
+                              checked={perms.create ?? false}
+                              onCheckedChange={(c) => setPermissionForSelectedUser(id, "create", !!c)}
+                            />
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Checkbox
+                              checked={perms.read ?? false}
+                              onCheckedChange={(c) => setPermissionForSelectedUser(id, "read", !!c)}
+                            />
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Checkbox
+                              checked={perms.update ?? false}
+                              onCheckedChange={(c) => setPermissionForSelectedUser(id, "update", !!c)}
+                            />
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Checkbox
+                              checked={perms.delete ?? false}
+                              onCheckedChange={(c) => setPermissionForSelectedUser(id, "delete", !!c)}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
