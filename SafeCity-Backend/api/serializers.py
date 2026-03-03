@@ -3,7 +3,7 @@ from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from .models import *
 from django.contrib.gis.geos import GEOSGeometry
 import json
-
+from django.contrib.auth import get_user_model
 # --------------------------------------------------------
 # MyUser Serializer
 # --------------------------------------------------------
@@ -71,7 +71,50 @@ class MyUserLoginDashboardSerializer(serializers.ModelSerializer):
     def get_stakeholder_id(self, obj):
         # If user has a stakeholder, return its id, else None
         return obj.stakeholder.id if obj.stakeholder else None
-    
+
+User = get_user_model()
+
+class UserPermissionSerializer(serializers.ModelSerializer):
+    user_email = serializers.ReadOnlyField(source='user.email')
+    user_full_name = serializers.ReadOnlyField(source='user.get_full_name')
+    created_by_email = serializers.ReadOnlyField(source='created_by.email')
+    updated_by_email = serializers.ReadOnlyField(source='updated_by.email')
+
+    class Meta:
+        model = UserPermission
+        fields = [
+            'id',
+            'user',
+            'user_email',
+            'user_full_name',
+            'sidebar_label',
+            'can_view',
+            'can_create',
+            'can_update',
+            'can_delete',
+            'created_by',
+            'created_by_email',
+            'updated_by',
+            'updated_by_email',
+        ]
+
+class UserWithPermissionsSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+    permissions = UserPermissionSerializer(source="userpermission_set", many=True, read_only=True)
+
+    class Meta:
+        model = MyUser
+        fields = [
+            "id",
+            "email",
+            "full_name",
+            "role",
+            "is_active",
+            "permissions",
+        ]
+
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}"
 # --------------------------------------------------------
 # Province Administrative Divisions
 # --------------------------------------------------------
