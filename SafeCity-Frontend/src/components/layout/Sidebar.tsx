@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useEffect, useState } from "react";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface NavItem {
@@ -54,19 +55,16 @@ const NAV_ITEMS: NavItem[] = [
   
   
   
-  { icon: UserCog, label: "User Management", href: "/user-management" },
+  { icon: UserCog, label: "User Management", href: "/user-management", roles: ["super_admin"] },
   { icon: Settings, label: "Settings", href: "/settings" },
 ];
 
 export function Sidebar() {
   const [location] = useLocation();
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const { user } = useAuth();
+  const userRole = (user?.role ?? localStorage.getItem("userRole"))?.trim().toLowerCase() ?? null;
   const { isCollapsed, toggleSidebar } = useSidebar();
   const [accordionValue, setAccordionValue] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    setUserRole(localStorage.getItem("userRole"));
-  }, []);
 
   // Auto-open accordion if a sub-item is selected
   useEffect(() => {
