@@ -1178,11 +1178,8 @@ export default function Dashboard() {
                       />
                     </PieChart>
                   </ResponsiveContainer>
-                  {/* Center label */}
-                  <div
-                    className="absolute left-1/2 top-[45%] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center pointer-events-none"
-                    style={{ marginTop: isMobile ? -4 : 0 }}
-                  >
+                  {/* Center label - centered in chart area */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="text-2xl sm:text-3xl font-bold font-heading tabular-nums text-foreground">{financialActual.toFixed(1)}%</span>
                     <span className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground">Actual</span>
                   </div>
@@ -1270,11 +1267,8 @@ export default function Dashboard() {
                       />
                     </PieChart>
                   </ResponsiveContainer>
-                  {/* Center label */}
-                  <div
-                    className="absolute left-1/2 top-[45%] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center pointer-events-none"
-                    style={{ marginTop: isMobile ? -4 : 0 }}
-                  >
+                  {/* Center label - centered in chart area */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="text-2xl sm:text-3xl font-bold font-heading tabular-nums text-foreground">{avgActual.toFixed(1)}%</span>
                     <span className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground">Actual</span>
                   </div>
