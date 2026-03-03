@@ -136,6 +136,18 @@ class StakeholderSerializer(serializers.ModelSerializer):
         model = Stakeholder
         fields = ['id', 'stakeholder_type', 'stakeholder_title', 'status']
 
+class ProjectActivitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectActivity
+        fields = [
+            'id',
+            'project',
+            'activity_id',
+            'activity_name',
+            'start_date',
+            'finish_date',
+            'percent_complete'
+        ]
 # --------------------------------------------------------
 # Project
 # --------------------------------------------------------
@@ -144,19 +156,31 @@ class ProjectSerializer(GeoFeatureModelSerializer):
     division_name = serializers.SerializerMethodField()
     district_name = serializers.SerializerMethodField()
     tehsil_name = serializers.SerializerMethodField()
-    stakeholder_type = serializers.SerializerMethodField()
-    stakeholder_title = serializers.SerializerMethodField()
+    stakeholder_details = serializers.SerializerMethodField()
+    stakeholder = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Stakeholder.objects.all(),
+        required=False
+    )
+    activities = ProjectActivitySerializer(many=True, read_only=True) 
+
     class Meta:
         model = Project
-        geo_field = "geom"  # required for GeoFeatureModelSerializer
+        geo_field = "geom"
         fields = [
-            'id', 'stakeholder', 'stakeholder_type', 'stakeholder_title', 'project_name', 'project_description',
-            'project_starting_date', 'project_reference_no', 'province', 'province_name',
-            'division', 'division_name', 'district', 'district_name', 'tehsil', 'tehsil_name', 'total_budget_allocated',
-            'budget_utilized', 'budget_variance', 'budget_remaining',
-            'xer_file', 'boundary_file', 'geom', 'created_at', 'updated_at'
+            'id', 'stakeholder', 'stakeholder_details',
+            'project_name', 'project_description',
+            'project_starting_date', 'project_reference_no',
+            'province', 'province_name',
+            'division', 'division_name', 'district', 'district_name',
+            'tehsil', 'tehsil_name',
+            'total_budget_allocated', 'budget_utilized',
+            'budget_variance', 'budget_remaining',
+            'xer_file', 'boundary_file', 'geom',
+            'created_at', 'updated_at', 'activities'
         ]
 
+    # ---------- Readable Names ----------
     def get_province_name(self, obj):
         return obj.province.province_name
 
@@ -168,53 +192,82 @@ class ProjectSerializer(GeoFeatureModelSerializer):
 
     def get_tehsil_name(self, obj):
         return obj.tehsil.tehsil_name
-    
-    def get_stakeholder_type(self, obj):
-        return obj.stakeholder.stakeholder_type
 
-    def get_stakeholder_title(self, obj):
-        return obj.stakeholder.stakeholder_title
+    # ---------- Stakeholder Details ----------
+    def get_stakeholder_details(self, obj):
+        return [
+            {
+                "stakeholder_type": s.stakeholder_type,
+                "stakeholder_title": s.stakeholder_title
+            }
+            for s in obj.stakeholder.all()
+        ]
 
+    # ---------- Create ----------
     def create(self, validated_data):
-        boundary_file = validated_data.pop("boundary_file", None)
-        project = super().create(validated_data)
+        stakeholders = validated_data.pop('stakeholder', [])
+        xer_file = validated_data.pop('xer_file', None)
+        boundary_file = validated_data.pop('boundary_file', None)
 
+        project = Project.objects.create(**validated_data)
+
+        # Assign ManyToMany
+        project.stakeholder.set(stakeholders)
+
+        # Assign XER file
+        if xer_file:
+            project.xer_file = xer_file
+
+        # Handle GeoJSON
         if boundary_file:
             try:
+                boundary_file.seek(0)
                 geojson_data = json.load(boundary_file)
-                # handle both FeatureCollection or single Feature
-                geometry = None
-                if geojson_data.get("type") == "FeatureCollection":
-                    geometry = geojson_data["features"][0]["geometry"]
-                else:
-                    geometry = geojson_data.get("geometry")
+                geometry = (
+                    geojson_data["features"][0]["geometry"]
+                    if geojson_data.get("type") == "FeatureCollection"
+                    else geojson_data.get("geometry")
+                )
                 project.geom = GEOSGeometry(json.dumps(geometry))
-                project.boundary_file = boundary_file  # save the file too
-                project.save()
+                project.boundary_file = boundary_file
             except Exception as e:
                 raise serializers.ValidationError({"boundary_file": f"Invalid GeoJSON: {e}"})
 
+        project.save()
         return project
 
+    # ---------- Update ----------
     def update(self, instance, validated_data):
-        boundary_file = validated_data.pop("boundary_file", None)
-        instance = super().update(instance, validated_data)
+        stakeholders = validated_data.pop('stakeholder', None)
+        xer_file = validated_data.pop('xer_file', None)
+        boundary_file = validated_data.pop('boundary_file', None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        if stakeholders is not None:
+            instance.stakeholder.set(stakeholders)
+
+        if xer_file:
+            instance.xer_file = xer_file
 
         if boundary_file:
             try:
+                boundary_file.seek(0)
                 geojson_data = json.load(boundary_file)
-                geometry = None
-                if geojson_data.get("type") == "FeatureCollection":
-                    geometry = geojson_data["features"][0]["geometry"]
-                else:
-                    geometry = geojson_data.get("geometry")
+                geometry = (
+                    geojson_data["features"][0]["geometry"]
+                    if geojson_data.get("type") == "FeatureCollection"
+                    else geojson_data.get("geometry")
+                )
                 instance.geom = GEOSGeometry(json.dumps(geometry))
                 instance.boundary_file = boundary_file
-                instance.save()
             except Exception as e:
                 raise serializers.ValidationError({"boundary_file": f"Invalid GeoJSON: {e}"})
 
+        instance.save()
         return instance
+
 
 # --------------------------------------------------------
 # Pictorial Archive

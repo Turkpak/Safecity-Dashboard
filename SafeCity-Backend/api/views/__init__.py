@@ -6,4 +6,5 @@ from .DistrictView import *
 from .TehsilView import *
 from .StakeholderView import *
 from .ProjectView import *
+from .ProjectActivityView import *
 from .PictorialArchiveView import *

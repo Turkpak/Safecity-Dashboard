@@ -300,7 +300,7 @@ class Tehsil(models.Model):
 # Projects
 # --------------------------------------------------------
 class Project(models.Model):
-    stakeholder = models.ForeignKey(Stakeholder, on_delete=models.CASCADE, related_name='project')
+    stakeholder = models.ManyToManyField(Stakeholder, related_name='projects', blank=True)
     project_name = models.CharField(max_length=255, null=True, blank=True)
     project_description = models.TextField(null=True, blank=True)
     project_starting_date = models.DateField(null=True, blank=True)
@@ -328,11 +328,25 @@ class Project(models.Model):
     def __str__(self):
         return self.project_name
 
+    # def save(self, *args, **kwargs):
+    #     try:
+    #         total = float(self.total_budget_allocated or 0)
+    #         utilized = float(self.budget_utilized or 0)
+    #     except ValueError:
+    #         total = 0
+    #         utilized = 0
+
+    #     self.budget_variance = total - utilized
+    #     self.budget_remaining = max(total - utilized, 0)
+
+    #     super().save(*args, **kwargs)
     def save(self, *args, **kwargs):
+        is_new = self.pk is None
+
         try:
             total = float(self.total_budget_allocated or 0)
             utilized = float(self.budget_utilized or 0)
-        except ValueError:
+        except (ValueError, TypeError):
             total = 0
             utilized = 0
 
@@ -341,7 +355,19 @@ class Project(models.Model):
 
         super().save(*args, **kwargs)
 
+        # Only parse when XER exists
+        # if self.xer_file:
+        #     # Optional: prevent duplicate parsing
+        #     if is_new or not self.activities.exists():
+        #         self.parse_xer_file()
 
+class ProjectActivity(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="activities")
+    activity_id = models.CharField(max_length=100)
+    activity_name = models.CharField(max_length=255)
+    start_date = models.DateField()
+    finish_date = models.DateField()
+    percent_complete = models.FloatField(default=0)
     
 # --------------------------------------------------------
 # Pictorial Archive

@@ -49,6 +49,13 @@ router.register(r'list-project', ListProjectView, basename='list-project')
 router.register(r'update-project', ProjectUpdateView, basename='update-project') 
 router.register(r'delete-project', ProjectDeleteView, basename='delete-project')
 
+#---------------------------------- Project Activity View ----------------------------------
+router.register(r'create-project-activity', ProjectActivityCreateView, basename='create-project-activity')
+router.register(r'list-project-activity', ListProjectActivityView, basename='list-project-activity')
+router.register(r'update-project-activity', ProjectActivityUpdateView, basename='update-project-activity')
+router.register(r'delete-project-activity', ProjectActivityDeleteView, basename='delete-project-activity')
+
+
 #--------------------------------- Pictorial Archive View ---------------------------------
 router.register(r'create-pictorial-archive', PictorialArchiveCreateView, basename='create-pictorial-archive')
 router.register(r'list-pictorial-archive', ListPictorialArchiveView, basename='list-pictorial-archive')
