@@ -3,7 +3,9 @@ from ..common_imports import *
 class TehsilDeleteView(viewsets.ViewSet):
     queryset = Tehsil.objects.all()
     serializer_class = TehsilSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, HasSidebarPermission] 
+    sidebar_label = "Area Management"
+    sub_label = "Tehsil"
 
     def destroy(self, request, *args, **kwargs):
         tehsil_id = kwargs.get('pk')

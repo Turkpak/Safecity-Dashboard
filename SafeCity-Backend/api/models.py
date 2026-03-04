@@ -390,6 +390,7 @@ class PictorialArchive(models.Model):
 class UserPermission(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     sidebar_label = models.CharField(max_length=100)  # e.g., "Project Management"
+    sub_label = models.CharField(max_length=255, blank=True, null=True)
     can_view = models.BooleanField(default=False)
     can_create = models.BooleanField(default=False)
     can_update = models.BooleanField(default=False)
@@ -412,7 +413,7 @@ class UserPermission(models.Model):
     )
 
     class Meta:
-        unique_together = ('user', 'sidebar_label')
+        unique_together = ('user', 'sidebar_label', 'sub_label')
 
     def __str__(self):
         return f"{self.user.email} - {self.sidebar_label}"

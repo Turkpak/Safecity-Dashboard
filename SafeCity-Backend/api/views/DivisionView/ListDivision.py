@@ -1,8 +1,9 @@
 from ..common_imports import *
 
 class ListDivisionView(viewsets.ViewSet):
-    permission_classes = [AllowAny]
-
+    permission_classes = [IsAuthenticated, HasSidebarPermission] 
+    sidebar_label = "Area Management"
+    sub_label = "Division"
     def list(self, request, *args, **kwargs):
         try:
             division_id = request.query_params.get("id")

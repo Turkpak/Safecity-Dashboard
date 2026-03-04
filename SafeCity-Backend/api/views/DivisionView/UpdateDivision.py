@@ -3,8 +3,9 @@ from ..common_imports import *
 class DivisionUpdateView(viewsets.ViewSet):
     queryset = Division.objects.all()
     serializer_class = DivisionSerializer
-    permission_classes = [AllowAny]
-
+    permission_classes = [IsAuthenticated, HasSidebarPermission] 
+    sidebar_label = "Area Management"
+    sub_label = "Division"
     def update(self, request, *args, **kwargs):
         data = request.data
         division_id = kwargs.get('pk') 

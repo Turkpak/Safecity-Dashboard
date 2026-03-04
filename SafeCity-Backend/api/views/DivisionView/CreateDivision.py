@@ -3,8 +3,9 @@ from ..common_imports import *
 class DivisionCreateView(viewsets.ViewSet):
     queryset = Division.objects.all()
     serializer_class = DivisionSerializer
-    permission_classes = [AllowAny]
-
+    permission_classes = [IsAuthenticated, HasSidebarPermission] 
+    sidebar_label = "Area Management"
+    sub_label = "Division"
     def create(self, request, *args, **kwargs):
         data = request.data
         try:

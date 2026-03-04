@@ -3,7 +3,8 @@ from ..common_imports import *
 class ListStakeholderView(viewsets.ViewSet):
     queryset = Stakeholder.objects.all()
     serializer_class = StakeholderSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, HasSidebarPermission] 
+    sidebar_label = "Stakeholders"
 
     def list(self, request, *args, **kwargs):
         stakeholder_id = request.query_params.get("id")

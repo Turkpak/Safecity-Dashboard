@@ -1,7 +1,8 @@
 from ..common_imports import * 
 class StakeholderCreateView(viewsets.ViewSet):
-    permission_classes = [AllowAny]
-
+    permission_classes = [IsAuthenticated, HasSidebarPermission] 
+    sidebar_label = "Stakeholders"
+    
     def create(self, request, *args, **kwargs):
         data = request.data
         try:

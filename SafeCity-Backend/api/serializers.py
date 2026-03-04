@@ -88,6 +88,7 @@ class UserPermissionSerializer(serializers.ModelSerializer):
             'user_email',
             'user_full_name',
             'sidebar_label',
+            'sub_label',
             'can_view',
             'can_create',
             'can_update',

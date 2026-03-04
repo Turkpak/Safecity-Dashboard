@@ -3,8 +3,9 @@ from ..common_imports import *
 class ListDistrictView(viewsets.ViewSet):
     queryset = District.objects.all()
     serializer_class = DistrictSerializer
-    permission_classes = [AllowAny]
-
+    permission_classes = [IsAuthenticated, HasSidebarPermission] 
+    sidebar_label = "Area Management"
+    sub_label = "District"
     def list(self, request, *args, **kwargs):
         try:
             district_id = request.query_params.get("id")
