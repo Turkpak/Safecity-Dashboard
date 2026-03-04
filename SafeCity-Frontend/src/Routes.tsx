@@ -1,7 +1,8 @@
 import { Switch, Route, useLocation } from "wouter";
 import { SplashScreen } from "@/components/layout/SplashScreen";
 import { SidebarProvider } from "@/contexts/SidebarContext";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import type { ReactNode } from "react";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Comparison from "@/pages/Comparison";
@@ -18,6 +19,21 @@ import StakeholderManagement from "@/pages/StakeholderManagement";
 import ProjectManagement from "@/pages/ProjectManagement";
 import UserManagement from "@/pages/UserManagement";
 import { useState, useEffect, useRef } from "react";
+
+// AuthGate: redirect to /auth when not authenticated (must be inside AuthProvider)
+function AuthGate({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  const [location, setLocation] = useLocation();
+
+  // Redirect to /auth if not authenticated (but allow /auth itself through)
+  if (!isAuthenticated && location !== "/auth") {
+    // Use a layout effect style: schedule the redirect and render nothing
+    setTimeout(() => setLocation("/auth"), 0);
+    return null;
+  }
+
+  return <>{children}</>;
+}
 
 function Router() {
   return (
@@ -101,9 +117,11 @@ export function AppRoutes() {
       {/* Router is always mounted to detect route changes */}
       <div style={{ visibility: showSplash ? "hidden" : "visible" }}>
         <AuthProvider>
-          <SidebarProvider>
-            <Router />
-          </SidebarProvider>
+          <AuthGate>
+            <SidebarProvider>
+              <Router />
+            </SidebarProvider>
+          </AuthGate>
         </AuthProvider>
       </div>
       {/* Splash screen overlays on top */}
