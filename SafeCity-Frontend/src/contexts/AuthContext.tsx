@@ -51,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     clearTokens();
     setUser(null);
+    localStorage.removeItem("userRole");
   }, [setUser]);
 
   useEffect(() => {

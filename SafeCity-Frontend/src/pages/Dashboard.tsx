@@ -19,7 +19,7 @@ import {
 import { useWindowSize } from "@/hooks/use-window-size";
 import { CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
-import { listDivisions, listDistricts, listTehsils, listProjects } from "@/api";
+import { listDivisions, listDistricts, listTehsils, listProjects, getProjectById } from "@/api";
 import type { Division, District, Tehsil, Project } from "@/api/types";
 import {
   ClipboardCheck,
@@ -58,7 +58,6 @@ import { CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { listProjects, getProjectById, type Project } from "@/api/project";
 
 // Enhanced installation progress data with sub-projects and planned vs actual
 interface PhaseProgress {

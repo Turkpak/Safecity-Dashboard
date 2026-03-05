@@ -79,12 +79,32 @@ const NAV_ITEMS: NavItem[] = [
   { icon: Settings, label: "Settings", href: "/settings", sidebar_label: "Settings" },
 ];
 
+/** Format role for display (e.g. "consultant" -> "Consultant") */
+function formatRole(role: string | undefined | null): string {
+  if (!role || !role.trim()) return "";
+  const r = role.trim();
+  return r.charAt(0).toUpperCase() + r.slice(1).toLowerCase();
+}
+
+/** Get initials from first_name + last_name (e.g. "Shafiqa Ahmad" -> "SA") */
+function getInitials(first: string | undefined, last: string | undefined): string {
+  const a = (first ?? "").trim();
+  const b = (last ?? "").trim();
+  if (a && b) return (a[0] + b[0]).toUpperCase();
+  if (a) return a.slice(0, 2).toUpperCase();
+  if (b) return b.slice(0, 2).toUpperCase();
+  return "?";
+}
+
 export function Sidebar() {
-  const [location] = useLocation();
-  const { user } = useAuth();
+  const [location, setLocation] = useLocation();
+  const { user, logout } = useAuth();
   const userRole =
     (user?.role ?? localStorage.getItem("userRole"))?.trim().toLowerCase() ??
     null;
+  const displayName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || "User";
+  const displayRole = formatRole(user?.role ?? user?.stakeholder_type ?? localStorage.getItem("userRole"));
+  const initials = getInitials(user?.first_name, user?.last_name);
   const { isCollapsed, toggleSidebar } = useSidebar();
   const [accordionValue, setAccordionValue] = useState<string | undefined>(
     undefined,
@@ -347,7 +367,11 @@ export function Sidebar() {
               <div>
                 <Link
                   href="/auth"
-                  onClick={() => localStorage.removeItem("userRole")}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    logout();
+                    setLocation("/auth");
+                  }}
                   className={cn(
                     "flex items-center rounded-lg bg-white/5 p-3 hover:bg-white/10 transition-all group pointer-events-auto",
                     isCollapsed ? "justify-center" : "justify-between gap-3",
@@ -360,25 +384,21 @@ export function Sidebar() {
                     )}
                   >
                     <div className="h-10 w-10 rounded-full bg-secondary/20 flex items-center justify-center text-secondary font-bold border border-secondary/30 flex-shrink-0">
-                      {userRole === "Client" ? "CL" : "AD"}
+                      {initials}
                     </div>
                     {!isCollapsed && (
-                      <div className="text-xs">
-                        <p className="font-semibold text-white">
-                          {userRole === "Client"
-                            ? "Client Authority"
-                            : "Admin Officer"}
+                      <div className="text-xs min-w-0">
+                        <p className="font-semibold text-white truncate">
+                          {displayName}
                         </p>
-                        <p className="text-white/40 group-hover:text-white/60 transition-colors">
-                          {userRole === "Client"
-                            ? "Governance Wing"
-                            : "Command Center"}
+                        <p className="text-white/40 group-hover:text-white/60 transition-colors truncate">
+                          {displayRole || "—"}
                         </p>
                       </div>
                     )}
                   </div>
                   {!isCollapsed && (
-                    <LogOut className="h-4 w-4 text-white/40 group-hover:text-white transition-colors" />
+                    <LogOut className="h-4 w-4 text-white/40 group-hover:text-white transition-colors flex-shrink-0" />
                   )}
                 </Link>
               </div>
@@ -386,16 +406,8 @@ export function Sidebar() {
             {isCollapsed && (
               <TooltipContent side="right">
                 <div className="text-xs">
-                  <p className="font-semibold">
-                    {userRole === "Client"
-                      ? "Client Authority"
-                      : "Admin Officer"}
-                  </p>
-                  <p className="text-muted-foreground">
-                    {userRole === "Client"
-                      ? "Governance Wing"
-                      : "Command Center"}
-                  </p>
+                  <p className="font-semibold">{displayName}</p>
+                  <p className="text-muted-foreground">{displayRole || "—"}</p>
                 </div>
               </TooltipContent>
             )}
