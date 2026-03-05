@@ -48,6 +48,10 @@ async function parseResponse<T>(res: Response): Promise<T> {
         : String(json.data);
     throw new Error(dataStr || message || `Request failed: ${res.status}`);
   }
+  // Backend may return raw array (e.g. GET user-permissions list)
+  if (Array.isArray(json)) {
+    return json as T;
+  }
   return json.data as T;
 }
 

@@ -67,6 +67,49 @@ export interface UserListItem {
   is_active: boolean;
 }
 
+/** Response from POST /api/create-user/ — includes created user with id */
+export interface CreateUserResponse {
+  user: { id: number; email: string; full_name: string; role?: string; [key: string]: unknown };
+  tokens: { access: string; refresh: string };
+}
+
+/** Payload for POST /api/user-permissions/ (assign page CRUD to a user) */
+export interface UserPermissionCreateInput {
+  user: number;
+  sidebar_label: string;
+  sub_label?: string | null;
+  can_view: boolean;
+  can_create: boolean;
+  can_update: boolean;
+  can_delete: boolean;
+}
+
+/** One permission item from GET /api/user-permissions/ (permissions array) */
+export interface UserPermissionItem {
+  id: number;
+  user: number;
+  user_email?: string;
+  user_full_name?: string;
+  sidebar_label: string;
+  sub_label: string | null;
+  can_view: boolean;
+  can_create: boolean;
+  can_update: boolean;
+  can_delete: boolean;
+  created_by?: number | null;
+  created_by_email?: string | null;
+  updated_by?: number | null;
+}
+
+/** One user with permissions from GET /api/user-permissions/ */
+export interface UserWithPermissions {
+  user_id: number;
+  full_name: string;
+  email: string;
+  role: string;
+  permissions: UserPermissionItem[];
+}
+
 // ---------------------------------------------------------------------------
 // Province
 // ---------------------------------------------------------------------------

@@ -71,7 +71,6 @@ const NAV_ITEMS: NavItem[] = [
     icon: UserCog,
     label: "User Management",
     href: "/user-management",
-    roles: ["super_admin"],
   },
   { icon: Settings, label: "Settings", href: "/settings" },
 ];

@@ -24,10 +24,10 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { listStakeholders, createUser, listUsers } from "@/api";
-import { useState, useRef } from "react";
+import { listStakeholders, createUser, listUsers, createUserPermission, getUsersWithPermissions, updateUserPermission } from "@/api";
+import { useState, useRef, useMemo } from "react";
 import { UserPlus, Users, ShieldAlert, ListChecks, UserCog } from "lucide-react";
-import type { UserCrudPermissions } from "@/api/types";
+import type { UserCrudPermissions, UserWithPermissions, UserPermissionItem } from "@/api/types";
 
 /** Normalize role from login (backend may return super_admin or Super Admin) */
 function isSuperAdminRole(role: string | undefined): boolean {
@@ -36,25 +36,21 @@ function isSuperAdminRole(role: string | undefined): boolean {
   return r === "super_admin" || r === "super admin";
 }
 
-/** Page rows for the Page Permissions table. Area Management is a single row covering Province, Division, District, Tehsil. */
-const PAGE_PERMISSIONS_ROWS: { id: string; label: string }[] = [
-  { id: "area_management", label: "Area Management (Province, Division, District, Tehsil)" },
-  { id: "stakeholders", label: "Stakeholders" },
-  { id: "project_management", label: "Project Management" },
-  { id: "citywise_progress", label: "Citywise Progress" },
-  { id: "city_comparison", label: "City Comparison" },
-  { id: "finance", label: "Finance & Budget" },
-  { id: "gis_layers", label: "GIS Layers" },
-  { id: "user_management", label: "User Management" },
-  { id: "settings", label: "Settings" },
+/** Rows for Step 2 (Add New User): match backend sidebar_label + sub_label. Used with POST /api/user-permissions/ */
+const ADD_USER_PERMISSION_ROWS: { sidebar_label: string; sub_label: string | null; displayLabel: string }[] = [
+  { sidebar_label: "Area Management", sub_label: "Province", displayLabel: "Area Management (Province)" },
+  { sidebar_label: "Area Management", sub_label: "Division", displayLabel: "Area Management (Division)" },
+  { sidebar_label: "Area Management", sub_label: "District", displayLabel: "Area Management (District)" },
+  { sidebar_label: "Area Management", sub_label: "Tehsil", displayLabel: "Area Management (Tehsil)" },
+  { sidebar_label: "Stakeholders", sub_label: null, displayLabel: "Stakeholders" },
+  { sidebar_label: "Project Management", sub_label: null, displayLabel: "Project Management" },
+  { sidebar_label: "Citywise Progress", sub_label: null, displayLabel: "Citywise Progress" },
+  { sidebar_label: "City Comparison", sub_label: null, displayLabel: "City Comparison" },
+  { sidebar_label: "Finance & Budget", sub_label: null, displayLabel: "Finance & Budget" },
+  { sidebar_label: "GIS Layers", sub_label: null, displayLabel: "GIS Layers" },
+  { sidebar_label: "User Management", sub_label: null, displayLabel: "User Management" },
+  { sidebar_label: "Settings", sub_label: null, displayLabel: "Settings" },
 ];
-
-const DEFAULT_PAGE_CRUD: UserCrudPermissions = {
-  create: true,
-  read: true,
-  update: true,
-  delete: false,
-};
 
 export default function UserManagement() {
   const { user } = useAuth();
@@ -64,15 +60,18 @@ export default function UserManagement() {
   const isSuperAdmin = isSuperAdminRole(user?.role ?? undefined) || isSuperAdminRole(localStorage.getItem("userRole") ?? undefined);
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  /** Add New User dialog: 1 = user details, 2 = page permissions */
+  const [addUserStep, setAddUserStep] = useState<1 | 2>(1);
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [stakeholderId, setStakeholderId] = useState<string>("");
-  /** Which user's page permissions we are editing (null = none selected) */
+  /** Step 2: per-row CRUD for the user being created. Index matches ADD_USER_PERMISSION_ROWS. */
+  const [newUserPermissions, setNewUserPermissions] = useState<Record<string, UserCrudPermissions>>({});
+  /** Selected user id for Page Permissions card; full user is derived from API data so refetch updates the table. */
   const [selectedUserIdForPermissions, setSelectedUserIdForPermissions] = useState<number | null>(null);
-  /** Per-user, per-page CRUD: userId -> pageId -> { create, read, update, delete } */
-  const [pagePermissionsByUser, setPagePermissionsByUser] = useState<Record<number, Record<string, UserCrudPermissions>>>({});
+  const [isUpdatingPermission, setIsUpdatingPermission] = useState(false);
 
   const { data: stakeholders = [] } = useQuery({
     queryKey: ["stakeholders"],
@@ -90,25 +89,16 @@ export default function UserManagement() {
     queryFn: listUsers,
   });
 
+  const { data: usersWithPermissions = [], isLoading: usersWithPermissionsLoading } = useQuery({
+    queryKey: ["users-with-permissions"],
+    queryFn: getUsersWithPermissions,
+  });
+
   const pagePermissionsCardRef = useRef<HTMLDivElement>(null);
 
-  const createUserMutation = useMutation({
-    mutationFn: createUser,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["stakeholders"] });
-      toast({ title: "Success", description: "User created successfully." });
-      resetForm();
-      setDialogOpen(false);
-    },
-    onError: (e: Error) => {
-      toast({
-        title: "Error",
-        description: e.message || "Failed to create user",
-        variant: "destructive",
-      });
-    },
-  });
+  function permissionRowKey(sidebar_label: string, sub_label: string | null) {
+    return `${sidebar_label}|${sub_label ?? ""}`;
+  }
 
   function resetForm() {
     setEmail("");
@@ -116,9 +106,31 @@ export default function UserManagement() {
     setLastName("");
     setPassword("");
     setStakeholderId("");
+    setAddUserStep(1);
+    setNewUserPermissions({});
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  /** Get CRUD for one row in Step 2 (new user permissions) */
+  function getNewUserPerm(sidebar_label: string, sub_label: string | null): UserCrudPermissions {
+    const key = permissionRowKey(sidebar_label, sub_label);
+    return newUserPermissions[key] ?? { create: false, read: false, update: false, delete: false };
+  }
+
+  /** Set one CRUD flag for one row in Step 2 */
+  function setNewUserPerm(
+    sidebar_label: string,
+    sub_label: string | null,
+    key: keyof UserCrudPermissions,
+    value: boolean
+  ) {
+    const rowKey = permissionRowKey(sidebar_label, sub_label);
+    setNewUserPermissions((prev) => {
+      const current = prev[rowKey] ?? { create: false, read: false, update: false, delete: false };
+      return { ...prev, [rowKey]: { ...current, [key]: value } };
+    });
+  }
+
+  const handleSubmitStep1 = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedEmail = email.trim();
     const trimmedFirst = firstName.trim();
@@ -143,17 +155,70 @@ export default function UserManagement() {
       toast({ title: "Validation Error", description: "Please select a role.", variant: "destructive" });
       return;
     }
+    setAddUserStep(2);
+  };
+
+  const [isCreatingWithPermissions, setIsCreatingWithPermissions] = useState(false);
+
+  const handleCreateUserWithPermissions = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedEmail = email.trim();
+    const trimmedFirst = firstName.trim();
+    const trimmedLast = lastName.trim();
     const selectedStakeholder = roleStakeholders.find((s) => String(s.id) === stakeholderId);
     const role = selectedStakeholder ? selectedStakeholder.stakeholder_type.toLowerCase() : "";
-    createUserMutation.mutate({
-      email: trimmedEmail,
-      first_name: trimmedFirst,
-      last_name: trimmedLast,
-      password,
-      role,
-      stakeholder: Number(stakeholderId),
-    });
+    setIsCreatingWithPermissions(true);
+    try {
+      const res = await createUser({
+        email: trimmedEmail,
+        first_name: trimmedFirst,
+        last_name: trimmedLast,
+        password,
+        role,
+        stakeholder: Number(stakeholderId),
+      });
+      const userId = res.user.id;
+      const permissionPromises: Promise<unknown>[] = [];
+      for (const row of ADD_USER_PERMISSION_ROWS) {
+        const p = getNewUserPerm(row.sidebar_label, row.sub_label);
+        const hasAny = (p.read ?? false) || (p.create ?? false) || (p.update ?? false) || (p.delete ?? false);
+        if (!hasAny) continue;
+        permissionPromises.push(
+          createUserPermission({
+            user: userId,
+            sidebar_label: row.sidebar_label,
+            sub_label: row.sub_label,
+            can_view: p.read ?? false,
+            can_create: p.create ?? false,
+            can_update: p.update ?? false,
+            can_delete: p.delete ?? false,
+          })
+        );
+      }
+      await Promise.all(permissionPromises);
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["stakeholders"] });
+      queryClient.invalidateQueries({ queryKey: ["users-with-permissions"] });
+      toast({ title: "Success", description: "User and permissions created successfully." });
+      resetForm();
+      setDialogOpen(false);
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to create user or permissions",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingWithPermissions(false);
+    }
   };
+
+  const handleAddUserSubmit = (e: React.FormEvent) => {
+    if (addUserStep === 1) handleSubmitStep1(e);
+    else handleCreateUserWithPermissions(e);
+  };
+
+  const isSubmitDisabled = addUserStep === 2 && isCreatingWithPermissions;
 
   const getStakeholderLabel = (id: number | null) => {
     if (id == null) return "—";
@@ -170,37 +235,81 @@ export default function UserManagement() {
     return role;
   };
 
-  /** Users that can have page permissions assigned (Contractor / Consultant only) */
-  const usersForPermissionAssignment = users.filter(
-    (u) => (u.role ?? "").trim().toLowerCase() !== "super_admin"
+  /** Users from GET user-permissions that have a role we show in the selector (consultant/contractor) */
+  const usersForPermissionView = usersWithPermissions.filter((u) => {
+    const r = (u.role ?? "").trim().toLowerCase();
+    return r === "consultant" || r === "contractor";
+  });
+
+  /** Selected user's full data (derived so refetch updates the table) */
+  const selectedUserWithPermissions = useMemo(
+    () => usersWithPermissions.find((u) => u.user_id === selectedUserIdForPermissions) ?? null,
+    [usersWithPermissions, selectedUserIdForPermissions]
   );
 
-  /** Get page permissions for the currently selected user (for editing in the table) */
-  const getPermissionsForSelectedUser = (pageId: string): UserCrudPermissions => {
-    if (selectedUserIdForPermissions == null) return DEFAULT_PAGE_CRUD;
-    const byPage = pagePermissionsByUser[selectedUserIdForPermissions];
-    return byPage?.[pageId] ?? DEFAULT_PAGE_CRUD;
-  };
+  /** Find permission for a page row (sidebar_label + sub_label) in the selected user's permissions */
+  function getPermissionForRow(
+    permissions: UserPermissionItem[],
+    sidebar_label: string,
+    sub_label: string | null
+  ): UserPermissionItem | undefined {
+    return permissions.find(
+      (p) =>
+        p.sidebar_label === sidebar_label &&
+        (p.sub_label ?? "") === (sub_label ?? "")
+    );
+  }
 
-  /** Update one CRUD flag for the selected user and page */
-  const setPermissionForSelectedUser = (
-    pageId: string,
-    key: keyof UserCrudPermissions,
+  /** Toggle one CRUD flag for the selected user and a page row; create or update via API */
+  async function handlePermissionToggle(
+    sidebar_label: string,
+    sub_label: string | null,
+    key: "can_view" | "can_create" | "can_update" | "can_delete",
     value: boolean
-  ) => {
-    if (selectedUserIdForPermissions == null) return;
-    setPagePermissionsByUser((prev) => {
-      const userPerms = prev[selectedUserIdForPermissions] ?? {};
-      const pagePerms = userPerms[pageId] ?? { ...DEFAULT_PAGE_CRUD };
-      return {
-        ...prev,
-        [selectedUserIdForPermissions]: {
-          ...userPerms,
-          [pageId]: { ...pagePerms, [key]: value },
-        },
-      };
-    });
-  };
+  ) {
+    if (selectedUserWithPermissions == null) return;
+    const perm = getPermissionForRow(
+      selectedUserWithPermissions.permissions,
+      sidebar_label,
+      sub_label
+    );
+    const userId = selectedUserWithPermissions.user_id;
+    setIsUpdatingPermission(true);
+    try {
+      if (perm) {
+        const payload = {
+          user: userId,
+          sidebar_label,
+          sub_label: sub_label ?? undefined,
+          can_view: key === "can_view" ? value : perm.can_view,
+          can_create: key === "can_create" ? value : perm.can_create,
+          can_update: key === "can_update" ? value : perm.can_update,
+          can_delete: key === "can_delete" ? value : perm.can_delete,
+        };
+        await updateUserPermission(perm.id, payload);
+      } else {
+        await createUserPermission({
+          user: userId,
+          sidebar_label,
+          sub_label,
+          can_view: key === "can_view" ? value : false,
+          can_create: key === "can_create" ? value : false,
+          can_update: key === "can_update" ? value : false,
+          can_delete: key === "can_delete" ? value : false,
+        });
+      }
+      await queryClient.invalidateQueries({ queryKey: ["users-with-permissions"] });
+      toast({ title: "Saved", description: "Page permission updated." });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to update permission",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingPermission(false);
+    }
+  }
 
   if (!isSuperAdmin) {
     return (
@@ -235,90 +344,164 @@ export default function UserManagement() {
         </div>
 
         {/* Add New User dialog */}
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog
+          open={dialogOpen}
+          onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) resetForm();
+          }}
+        >
           <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <UserPlus className="h-5 w-5" />
-                Add New User
+                Add New User{addUserStep === 2 ? " — Step 2 of 2" : ""}
               </DialogTitle>
-              <DialogDescription>
-                Create a new user and assign role (Contractor or Consultant). Page-level CRUD permissions are managed in the table below.
-              </DialogDescription>
+              {addUserStep === 2 && (
+                <DialogDescription>
+                  Set page permissions for this user. Read = can view, Create = add new, Update = edit, Delete = remove.
+                </DialogDescription>
+              )}
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="dialog-email">Email</Label>
-                  <Input
-                    id="dialog-email"
-                    type="email"
-                    placeholder="e.g. sana@psc.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                  />
+            <form onSubmit={handleAddUserSubmit} className="space-y-6">
+              {addUserStep === 1 && (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="dialog-email">Email</Label>
+                      <Input
+                        id="dialog-email"
+                        type="email"
+                        placeholder="e.g. sana@psc.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        autoComplete="email"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="dialog-role">Role</Label>
+                      <Select value={stakeholderId} onValueChange={setStakeholderId}>
+                        <SelectTrigger id="dialog-role">
+                          <SelectValue placeholder="Select role (Consultant / Contractor)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {roleStakeholders.map((s) => (
+                            <SelectItem key={s.id} value={String(s.id)}>
+                              {s.stakeholder_type}
+                              {s.stakeholder_title ? ` — ${s.stakeholder_title}` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="dialog-first_name">First name</Label>
+                      <Input
+                        id="dialog-first_name"
+                        placeholder="e.g. Sana"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        autoComplete="given-name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="dialog-last_name">Last name</Label>
+                      <Input
+                        id="dialog-last_name"
+                        placeholder="e.g. Admin"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        autoComplete="family-name"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="dialog-password">Password</Label>
+                    <Input
+                      id="dialog-password"
+                      type="password"
+                      placeholder="Min. 8 characters"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="new-password"
+                    />
+                  </div>
+                </>
+              )}
+
+              {addUserStep === 2 && (
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="min-w-[220px]">Page</TableHead>
+                        <TableHead className="text-center w-[80px]">Read</TableHead>
+                        <TableHead className="text-center w-[80px]">Create</TableHead>
+                        <TableHead className="text-center w-[80px]">Update</TableHead>
+                        <TableHead className="text-center w-[80px]">Delete</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {ADD_USER_PERMISSION_ROWS.map((row) => {
+                        const p = getNewUserPerm(row.sidebar_label, row.sub_label);
+                        return (
+                          <TableRow key={permissionRowKey(row.sidebar_label, row.sub_label)}>
+                            <TableCell className="font-medium">{row.displayLabel}</TableCell>
+                            <TableCell className="text-center">
+                              <Checkbox
+                                checked={p.read ?? false}
+                                onCheckedChange={(c) =>
+                                  setNewUserPerm(row.sidebar_label, row.sub_label, "read", !!c)
+                                }
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Checkbox
+                                checked={p.create ?? false}
+                                onCheckedChange={(c) =>
+                                  setNewUserPerm(row.sidebar_label, row.sub_label, "create", !!c)
+                                }
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Checkbox
+                                checked={p.update ?? false}
+                                onCheckedChange={(c) =>
+                                  setNewUserPerm(row.sidebar_label, row.sub_label, "update", !!c)
+                                }
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Checkbox
+                                checked={p.delete ?? false}
+                                onCheckedChange={(c) =>
+                                  setNewUserPerm(row.sidebar_label, row.sub_label, "delete", !!c)
+                                }
+                              />
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dialog-role">Role</Label>
-                  <Select value={stakeholderId} onValueChange={setStakeholderId}>
-                    <SelectTrigger id="dialog-role">
-                      <SelectValue placeholder="Select role (Consultant / Contractor)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {roleStakeholders.map((s) => (
-                        <SelectItem key={s.id} value={String(s.id)}>
-                          {s.stakeholder_type}
-                          {s.stakeholder_title ? ` — ${s.stakeholder_title}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="dialog-first_name">First name</Label>
-                  <Input
-                    id="dialog-first_name"
-                    placeholder="e.g. Sana"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    autoComplete="given-name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dialog-last_name">Last name</Label>
-                  <Input
-                    id="dialog-last_name"
-                    placeholder="e.g. Admin"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    autoComplete="family-name"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dialog-password">Password</Label>
-                <Input
-                  id="dialog-password"
-                  type="password"
-                  placeholder="Min. 8 characters"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="new-password"
-                />
-              </div>
+              )}
+
               <DialogFooter>
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setDialogOpen(false)}
+                  onClick={() => {
+                    if (addUserStep === 2) setAddUserStep(1);
+                    else setDialogOpen(false);
+                  }}
                 >
-                  Cancel
+                  {addUserStep === 2 ? "Back" : "Cancel"}
                 </Button>
-                <Button type="submit" disabled={createUserMutation.isPending}>
-                  {createUserMutation.isPending ? "Creating…" : "Create user"}
+                <Button type="submit" disabled={isSubmitDisabled}>
+                  {addUserStep === 1 ? "Next" : isSubmitDisabled ? "Creating…" : "Create user"}
                 </Button>
               </DialogFooter>
             </form>
@@ -388,7 +571,7 @@ export default function UserManagement() {
                                 }}
                               >
                                 <UserCog className="h-3.5 w-3.5" />
-                                Edit permissions
+                                View permissions
                               </Button>
                             )}
                             {isSuperAdminUser && <span className="text-muted-foreground text-xs">—</span>}
@@ -403,96 +586,140 @@ export default function UserManagement() {
           </CardContent>
         </Card>
 
-        {/* Page Permissions table — per user; select user then edit CRUD per page */}
+        {/* Page Permissions — select user (name + role) from GET /api/user-permissions/, show their permissions */}
         <Card ref={pagePermissionsCardRef}>
           <CardHeader>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-              <div className="space-y-1.5">
-                <CardTitle className="flex items-center gap-2">
-                  <ListChecks className="h-5 w-5" />
-                  Page permissions
-                </CardTitle>
-                
-              </div>
-              <div className="flex flex-nowrap items-center gap-3 shrink-0">
-                <Label htmlFor="permissions-user-select" className="text-sm font-medium whitespace-nowrap">
-                  Permissions for user:
-                </Label>
-                <Select
-                  value={selectedUserIdForPermissions != null ? String(selectedUserIdForPermissions) : "__none__"}
-                  onValueChange={(v) => setSelectedUserIdForPermissions(v === "__none__" ? null : Number(v))}
-                >
-                  <SelectTrigger id="permissions-user-select" className="h-9 w-[280px] max-w-full shrink">
-                    <SelectValue placeholder="Select user…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Select user…</SelectItem>
-                    {usersForPermissionAssignment.map((u) => (
-                      <SelectItem key={u.id} value={String(u.id)}>
-                        {u.full_name || u.email} ({formatRole(u.role)})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedUserIdForPermissions != null && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedUserIdForPermissions(null)}
-                    className="text-muted-foreground shrink-0 h-9"
-                  >
-                    Clear selection
-                  </Button>
-                )}
-              </div>
+            <div className="flex flex-col gap-4">
+              <CardTitle className="flex items-center gap-2">
+                <ListChecks className="h-5 w-5" />
+                Page permissions
+              </CardTitle>
+              <CardDescription>
+                Select a user by name and role to view and edit their page-level permissions (checkboxes).
+              </CardDescription>
+              {usersWithPermissionsLoading ? (
+                <p className="text-muted-foreground text-sm">Loading users and permissions…</p>
+              ) : (
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="space-y-2 min-w-[200px]">
+                    <Label htmlFor="permissions-name-select">Name</Label>
+                    <Select
+                      value={selectedUserIdForPermissions != null ? String(selectedUserIdForPermissions) : "__none__"}
+                      onValueChange={(v) => {
+                        setSelectedUserIdForPermissions(v === "__none__" ? null : Number(v));
+                      }}
+                    >
+                      <SelectTrigger id="permissions-name-select" className="w-[280px] max-w-full">
+                        <SelectValue placeholder="Select user by name…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Select user…</SelectItem>
+                        {usersForPermissionView.map((u) => (
+                          <SelectItem key={u.user_id} value={String(u.user_id)}>
+                            {u.full_name || u.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 min-w-[140px]">
+                    <Label htmlFor="permissions-role-display">Role</Label>
+                    <Input
+                      id="permissions-role-display"
+                      readOnly
+                      className="bg-muted w-[140px]"
+                      value={selectedUserWithPermissions ? formatRole(selectedUserWithPermissions.role) : "—"}
+                    />
+                  </div>
+                  {selectedUserIdForPermissions != null && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedUserIdForPermissions(null)}
+                      className="text-muted-foreground shrink-0 h-9"
+                    >
+                      Clear selection
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           </CardHeader>
           <CardContent>
-            {selectedUserIdForPermissions == null ? (
+            {selectedUserWithPermissions == null ? (
               <p className="text-muted-foreground py-8 text-center rounded-md border border-dashed">
-                Select a user above (or click &quot;Edit permissions&quot; in the Registered Users table) to manage their page-level CRUD.
+                Select a user by name above (or click &quot;View permissions&quot; in the Registered Users table) to view and edit their page permissions.
               </p>
             ) : (
               <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="min-w-[280px]">Page</TableHead>
-                      <TableHead className="text-center w-[90px]">Create</TableHead>
+                      <TableHead className="min-w-[220px]">Page</TableHead>
                       <TableHead className="text-center w-[90px]">Read</TableHead>
+                      <TableHead className="text-center w-[90px]">Create</TableHead>
                       <TableHead className="text-center w-[90px]">Update</TableHead>
                       <TableHead className="text-center w-[90px]">Delete</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {PAGE_PERMISSIONS_ROWS.map(({ id, label }) => {
-                      const perms = getPermissionsForSelectedUser(id);
+                    {ADD_USER_PERMISSION_ROWS.map((row) => {
+                      const perm = getPermissionForRow(
+                        selectedUserWithPermissions.permissions,
+                        row.sidebar_label,
+                        row.sub_label
+                      );
+                      const canView = perm?.can_view ?? false;
+                      const canCreate = perm?.can_create ?? false;
+                      const canUpdate = perm?.can_update ?? false;
+                      const canDelete = perm?.can_delete ?? false;
+                      const disabled = isUpdatingPermission;
                       return (
-                        <TableRow key={id}>
-                          <TableCell className="font-medium">{label}</TableCell>
+                        <TableRow key={`${row.sidebar_label}|${row.sub_label ?? ""}`}>
+                          <TableCell className="font-medium">{row.displayLabel}</TableCell>
                           <TableCell className="text-center">
-                            <Checkbox
-                              checked={perms.create ?? false}
-                              onCheckedChange={(c) => setPermissionForSelectedUser(id, "create", !!c)}
-                            />
+                            <div className="flex justify-center">
+                              <Checkbox
+                                checked={canView}
+                                disabled={disabled}
+                                onCheckedChange={(c) =>
+                                  handlePermissionToggle(row.sidebar_label, row.sub_label, "can_view", !!c)
+                                }
+                              />
+                            </div>
                           </TableCell>
                           <TableCell className="text-center">
-                            <Checkbox
-                              checked={perms.read ?? false}
-                              onCheckedChange={(c) => setPermissionForSelectedUser(id, "read", !!c)}
-                            />
+                            <div className="flex justify-center">
+                              <Checkbox
+                                checked={canCreate}
+                                disabled={disabled}
+                                onCheckedChange={(c) =>
+                                  handlePermissionToggle(row.sidebar_label, row.sub_label, "can_create", !!c)
+                                }
+                              />
+                            </div>
                           </TableCell>
                           <TableCell className="text-center">
-                            <Checkbox
-                              checked={perms.update ?? false}
-                              onCheckedChange={(c) => setPermissionForSelectedUser(id, "update", !!c)}
-                            />
+                            <div className="flex justify-center">
+                              <Checkbox
+                                checked={canUpdate}
+                                disabled={disabled}
+                                onCheckedChange={(c) =>
+                                  handlePermissionToggle(row.sidebar_label, row.sub_label, "can_update", !!c)
+                                }
+                              />
+                            </div>
                           </TableCell>
                           <TableCell className="text-center">
-                            <Checkbox
-                              checked={perms.delete ?? false}
-                              onCheckedChange={(c) => setPermissionForSelectedUser(id, "delete", !!c)}
-                            />
+                            <div className="flex justify-center">
+                              <Checkbox
+                                checked={canDelete}
+                                disabled={disabled}
+                                onCheckedChange={(c) =>
+                                  handlePermissionToggle(row.sidebar_label, row.sub_label, "can_delete", !!c)
+                                }
+                              />
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
