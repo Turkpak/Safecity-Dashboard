@@ -19,7 +19,7 @@ import {
 import { useWindowSize } from "@/hooks/use-window-size";
 import { CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
-import { listDivisions, listDistricts, listTehsils, listProjects, getProjectById } from "@/api";
+import { listDivisions, listDistricts, listTehsils } from "@/api";
 import type { Division, District, Tehsil, Project } from "@/api/types";
 import {
   ClipboardCheck,
@@ -58,6 +58,7 @@ import { CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { listProjects, getProjectById } from "@/api/project";
 
 // Enhanced installation progress data with sub-projects and planned vs actual
 interface PhaseProgress {
@@ -430,7 +431,7 @@ const getProgressRangeMeta = (overall: number): ProgressRangeMeta => {
 export default function Dashboard() {
   const [location, setLocation] = useLocation();
   const [viewType, setViewType] = useState<
-    "divisions" | "districts" | "tehsils" | ""
+    "divisions" | "districts" | "tehsils" | "projects" | ""
   >("divisions");
   const [selectedItemName, setSelectedItemName] = useState<string | null>(null);
   const [selectedItemType, setSelectedItemType] = useState<
@@ -453,6 +454,9 @@ export default function Dashboard() {
   const [progressType, setProgressType] = useState<"physical" | "financial">(
     "physical",
   );
+  // track project selection within tehsil view for KPI/Gantt
+  const [selectedProjectForDetails, setSelectedProjectForDetails] = useState<Project | null>(null);
+
   const { theme, toggleTheme } = useTheme();
   const { width } = useWindowSize();
   const isMobile = width < 640;
@@ -518,6 +522,13 @@ export default function Dashboard() {
     }, 800); // 800ms loading simulation
     return () => clearTimeout(timer);
   }, [viewType, selectedItemName, selectedItemType]);
+
+  // clear project selection when leaving tehsil view or projects view
+  useEffect(() => {
+    if (selectedItemType !== "tehsil" && viewType !== "projects") {
+      setSelectedProjectForDetails(null);
+    }
+  }, [selectedItemType, viewType]);
 
   // Filter options from API data
   const divisions = useMemo(
@@ -1562,7 +1573,7 @@ export default function Dashboard() {
                         value={viewType}
                         onValueChange={(value) => {
                           setViewType(
-                            value as "divisions" | "districts" | "tehsils" | "",
+                            value as "divisions" | "districts" | "tehsils" | "projects" | "",
                           );
                           setSelectedItemName(null);
                           setSelectedItemType(null);
@@ -1631,6 +1642,22 @@ export default function Dashboard() {
                               All Tehsils
                             </span>
                             <span className="sm:hidden">Tehsils</span>
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-1.5 sm:space-x-2">
+                          <RadioGroupItem
+                            value="projects"
+                            id="projects"
+                            className="h-4 w-4 sm:h-5 sm:w-5"
+                          />
+                          <Label
+                            htmlFor="projects"
+                            className="text-xs sm:text-sm font-medium text-foreground cursor-pointer"
+                          >
+                            <span className="hidden sm:inline">
+                              All Projects
+                            </span>
+                            <span className="sm:hidden">Projects</span>
                           </Label>
                         </div>
                       </RadioGroup>
@@ -2090,6 +2117,31 @@ export default function Dashboard() {
                         Select a project to view details
                       </p>
                     </div>
+
+                    {/* dropdown to pick project for KPI/Gantt */}
+                    {tehsilProjects.length > 0 && (
+                      <div className="mb-4 w-64">
+                        <Select
+                          value={selectedProjectForDetails ? String(selectedProjectForDetails.id) : ""}
+                          onValueChange={(val) => {
+                            const p = tehsilProjects.find((x) => String(x.id) === val) || null;
+                            setSelectedProjectForDetails(p);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Choose project" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {tehsilProjects.map((project) => (
+                              <SelectItem key={project.id} value={String(project.id)}>
+                                {project.project_name || `Project ${project.id}`}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
                     {tehsilProjects.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {tehsilProjects.map((project, index) => {
@@ -2114,9 +2166,8 @@ export default function Dashboard() {
                               }
                               overallProgress={progress}
                               onClick={() => {
-                                setLocation(
-                                  `/project/${tehsilSlug}/${project.id}`,
-                                );
+                                // instead of navigating off-dashboard, show details inline
+                                setSelectedProjectForDetails(project);
                               }}
                               color={CARD_COLORS[index % CARD_COLORS.length]}
                             />
@@ -2131,6 +2182,29 @@ export default function Dashboard() {
                           </p>
                         </CardContent>
                       </Card>
+                    )}
+
+                    {/* details/pseudo-gantt for selected project */}
+                    {selectedProjectForDetails && (
+                      <MilestoneDetailsPanel
+                        milestoneTitle={`${selectedProjectForDetails.project_name} - Project Gantt`}
+                        phase={{
+                          actual: selectedProjectForDetails.activities?.reduce((sum, act) => sum + act.percent_complete, 0) / (selectedProjectForDetails.activities?.length || 1) || 0,
+                          planned: 100,
+                          subProjects: selectedProjectForDetails.activities?.map(activity => ({
+                            id: activity.id.toString(),
+                            name: activity.activity_name,
+                            actualProgress: activity.percent_complete,
+                            plannedProgress: 100,
+                            weight: 1 / (selectedProjectForDetails.activities?.length || 1),
+                            startDate: activity.start_date,
+                            finishDate: activity.finish_date,
+                            milestones: [],
+                          })) || [],
+                        }}
+                        phaseColor="#3b82f6"
+                        onClear={() => setSelectedProjectForDetails(null)}
+                      />
                     )}
                   </div>
                 </div>
@@ -2560,6 +2634,81 @@ export default function Dashboard() {
               );
             })()
           ) : null)}
+
+        {!selectedItemName &&
+          viewType === "projects" &&
+          (isLoading ? (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <Skeleton className="h-7 w-48 mb-2" />
+                  <Skeleton className="h-4 w-80" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Card key={i} className="p-6">
+                    <Skeleton className="h-6 w-32 mb-3" />
+                    <Skeleton className="h-10 w-20 mb-2" />
+                    <Skeleton className="h-2 w-full rounded-full" />
+                  </Card>
+                ))}
+              </div>
+              {renderSkeletonLoader()}
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold font-heading mb-1">
+                    All Projects
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Select a project to view its Gantt chart and details
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {apiProjects.map((project, index) => {
+                  const budget = parseFloat(project.total_budget_allocated ?? "0");
+                  const utilized = parseFloat(project.budget_utilized ?? "0");
+                  const progress = budget > 0 ? Math.min(100, Math.round((utilized / budget) * 100)) : 0;
+                  return (
+                    <HierarchyCard
+                      key={project.id}
+                      title={project.project_name || `Project ${project.id}`}
+                      overallProgress={progress}
+                      onClick={() => setSelectedProjectForDetails(project)}
+                      color={CARD_COLORS[index % CARD_COLORS.length]}
+                    />
+                  );
+                })}
+              </div>
+
+              {selectedProjectForDetails && (
+                <MilestoneDetailsPanel
+                  milestoneTitle={`${selectedProjectForDetails.project_name} - Project Gantt`}
+                  phase={{
+                    actual: selectedProjectForDetails.activities?.reduce((sum, act) => sum + act.percent_complete, 0) / (selectedProjectForDetails.activities?.length || 1) || 0,
+                    planned: 100,
+                    subProjects: selectedProjectForDetails.activities?.map(activity => ({
+                      id: activity.id.toString(),
+                      name: activity.activity_name,
+                      actualProgress: activity.percent_complete,
+                      plannedProgress: 100,
+                      weight: 1 / (selectedProjectForDetails.activities?.length || 1),
+                      startDate: activity.start_date,
+                      finishDate: activity.finish_date,
+                      milestones: [],
+                    })) || [],
+                  }}
+                  phaseColor="#3b82f6"
+                  onClear={() => setSelectedProjectForDetails(null)}
+                />
+              )}
+            </div>
+          ))}
       </div>
 
       {/* Success Dialog */}

@@ -6,18 +6,18 @@ class ProjectActivityDeleteView(viewsets.ViewSet):
     permission_classes = [AllowAny]
 
     def destroy(self, request, *args, **kwargs):
-        project_id = kwargs.get('pk')
+        activity_id = kwargs.get('pk')
 
         try:
-            myproject = Project.objects.get(id=project_id)
-        except Province.DoesNotExist:
+            activity = ProjectActivity.objects.get(id=activity_id)
+        except ProjectActivity.DoesNotExist:
             return ApiResponse(
                 status=status.HTTP_404_NOT_FOUND,
                 message="Project Activity not found.",
                 http_status=status.HTTP_404_NOT_FOUND
             ).create_response()       
         try:
-            myproject.delete()
+            activity.delete()
             return ApiResponse(
                 status=status.HTTP_200_OK,
                 message="Project Activity deleted successfully.",

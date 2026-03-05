@@ -28,7 +28,9 @@ class ListProjectView(viewsets.ViewSet):
 
             else:
                 queryset = Project.objects.select_related(
-                    "province", "division", "district", "tehsil", "stakeholder"
+                    "province", "division", "district", "tehsil"
+                ).prefetch_related(
+                    "stakeholder", "activities"
                 ).all()
                 serializer = ProjectSerializer(queryset, many=True)
                 return ApiResponse(

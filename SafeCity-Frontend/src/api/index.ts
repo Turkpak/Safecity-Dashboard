@@ -16,3 +16,4 @@ export * from "./stakeholder";
 export * from "./project";
 export * from "./pictorialArchive";
 export * from "./user";
+export * from "./projectActivity";

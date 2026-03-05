@@ -27,10 +27,9 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { usePermissions } from "@/hooks/usePermissions";
 import {
   Tooltip,
   TooltipContent,
@@ -38,73 +37,56 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-interface NavSubItem {
-  label: string;
-  href: string;
-  icon: any;
-  /** Backend sidebar_label + sub_label for permission check */
-  sidebar_label: string;
-  sub_label: string;
-}
-
 interface NavItem {
   icon: any;
   label: string;
   href?: string;
   roles?: string[];
-  /** Backend sidebar_label for permission check (top-level or parent) */
-  sidebar_label?: string;
-  subItems?: NavSubItem[];
+  subItems?: { label: string; href: string; icon: any }[];
 }
 
 const NAV_ITEMS: NavItem[] = [
   {
     icon: Navigation2,
     label: "Area Management",
-    sidebar_label: "Area Management",
     subItems: [
-      { icon: MapPin, label: "Province", href: "/province-management", sidebar_label: "Area Management", sub_label: "Province" },
-      { icon: MapPin, label: "Division", href: "/division-management", sidebar_label: "Area Management", sub_label: "Division" },
-      { icon: MapPin, label: "District", href: "/district-management", sidebar_label: "Area Management", sub_label: "District" },
-      { icon: MapPin, label: "Tehsil", href: "/tehsil-management", sidebar_label: "Area Management", sub_label: "Tehsil" },
+      { icon: MapPin, label: "Province", href: "/province-management" },
+      { icon: MapPin, label: "Division", href: "/division-management" },
+      { icon: MapPin, label: "District", href: "/district-management" },
+      { icon: MapPin, label: "Tehsil", href: "/tehsil-management" },
     ],
   },
-  { icon: Users, label: "Stakeholders", href: "/stakeholder-management", sidebar_label: "Stakeholders" },
-  { icon: FolderKanban, label: "Project Management", href: "/project-management", sidebar_label: "Project Management" },
-  { icon: LayoutDashboard, label: "Citywise Progress", href: "/", sidebar_label: "Citywise Progress" },
-  { icon: BarChart3, label: "City Comparison", href: "/comparison", sidebar_label: "City Comparison" },
-  { icon: LucideBanknote, label: "Finance & Budget", href: "/finance", sidebar_label: "Finance & Budget" },
-  { icon: MapIcon, label: "GIS Layers", href: "/gis", sidebar_label: "GIS Layers" },
-  { icon: UserCog, label: "User Management", href: "/user-management", sidebar_label: "User Management" },
-  { icon: Settings, label: "Settings", href: "/settings", sidebar_label: "Settings" },
+  { icon: Users, label: "Stakeholders", href: "/stakeholder-management" },
+  {
+    icon: FolderKanban,
+    label: "Project Management",
+    href: "/project-management",
+  },
+  {
+    icon: FolderKanban,
+    label: "Project Activities",
+    href: "/project-activity-management",
+  },
+  { icon: LayoutDashboard, label: "Citywise Progress", href: "/" },
+  { icon: BarChart3, label: "City Comparison", href: "/comparison" },
+  { icon: LucideBanknote, label: "Finance & Budget", href: "/finance" },
+  { icon: MapIcon, label: "GIS Layers", href: "/gis" },
+
+  {
+    icon: UserCog,
+    label: "User Management",
+    href: "/user-management",
+    roles: ["super_admin"],
+  },
+  { icon: Settings, label: "Settings", href: "/settings" },
 ];
 
-/** Format role for display (e.g. "consultant" -> "Consultant") */
-function formatRole(role: string | undefined | null): string {
-  if (!role || !role.trim()) return "";
-  const r = role.trim();
-  return r.charAt(0).toUpperCase() + r.slice(1).toLowerCase();
-}
-
-/** Get initials from first_name + last_name (e.g. "Shafiqa Ahmad" -> "SA") */
-function getInitials(first: string | undefined, last: string | undefined): string {
-  const a = (first ?? "").trim();
-  const b = (last ?? "").trim();
-  if (a && b) return (a[0] + b[0]).toUpperCase();
-  if (a) return a.slice(0, 2).toUpperCase();
-  if (b) return b.slice(0, 2).toUpperCase();
-  return "?";
-}
-
 export function Sidebar() {
-  const [location, setLocation] = useLocation();
-  const { user, logout } = useAuth();
+  const [location] = useLocation();
+  const { user } = useAuth();
   const userRole =
     (user?.role ?? localStorage.getItem("userRole"))?.trim().toLowerCase() ??
     null;
-  const displayName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || "User";
-  const displayRole = formatRole(user?.role ?? user?.stakeholder_type ?? localStorage.getItem("userRole"));
-  const initials = getInitials(user?.first_name, user?.last_name);
   const { isCollapsed, toggleSidebar } = useSidebar();
   const [accordionValue, setAccordionValue] = useState<string | undefined>(
     undefined,
@@ -131,27 +113,9 @@ export function Sidebar() {
     }
   }, [location]);
 
-  const { canView } = usePermissions();
-
-  const visibleNavItems = useMemo(() => {
-    return NAV_ITEMS.filter((item) => {
-      if (item.roles && (!userRole || !item.roles.includes(userRole))) return false;
-      if (item.subItems) {
-        const visibleSubs = item.subItems.filter((sub) =>
-          canView(sub.sidebar_label, sub.sub_label)
-        );
-        return visibleSubs.length > 0;
-      }
-      if (item.sidebar_label) return canView(item.sidebar_label, null);
-      return true;
-    }).map((item) => {
-      if (!item.subItems) return item;
-      const visibleSubs = item.subItems.filter((sub) =>
-        canView(sub.sidebar_label, sub.sub_label)
-      );
-      return { ...item, subItems: visibleSubs };
-    });
-  }, [canView, userRole]);
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) => !item.roles || (userRole && item.roles.includes(userRole)),
+  );
 
   const NavContent = () => (
     <div className="flex h-full flex-col gap-4">
@@ -367,11 +331,7 @@ export function Sidebar() {
               <div>
                 <Link
                   href="/auth"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    logout();
-                    setLocation("/auth");
-                  }}
+                  onClick={() => localStorage.removeItem("userRole")}
                   className={cn(
                     "flex items-center rounded-lg bg-white/5 p-3 hover:bg-white/10 transition-all group pointer-events-auto",
                     isCollapsed ? "justify-center" : "justify-between gap-3",
@@ -384,21 +344,25 @@ export function Sidebar() {
                     )}
                   >
                     <div className="h-10 w-10 rounded-full bg-secondary/20 flex items-center justify-center text-secondary font-bold border border-secondary/30 flex-shrink-0">
-                      {initials}
+                      {userRole === "Client" ? "CL" : "AD"}
                     </div>
                     {!isCollapsed && (
-                      <div className="text-xs min-w-0">
-                        <p className="font-semibold text-white truncate">
-                          {displayName}
+                      <div className="text-xs">
+                        <p className="font-semibold text-white">
+                          {userRole === "Client"
+                            ? "Client Authority"
+                            : "Admin Officer"}
                         </p>
-                        <p className="text-white/40 group-hover:text-white/60 transition-colors truncate">
-                          {displayRole || "—"}
+                        <p className="text-white/40 group-hover:text-white/60 transition-colors">
+                          {userRole === "Client"
+                            ? "Governance Wing"
+                            : "Command Center"}
                         </p>
                       </div>
                     )}
                   </div>
                   {!isCollapsed && (
-                    <LogOut className="h-4 w-4 text-white/40 group-hover:text-white transition-colors flex-shrink-0" />
+                    <LogOut className="h-4 w-4 text-white/40 group-hover:text-white transition-colors" />
                   )}
                 </Link>
               </div>
@@ -406,8 +370,16 @@ export function Sidebar() {
             {isCollapsed && (
               <TooltipContent side="right">
                 <div className="text-xs">
-                  <p className="font-semibold">{displayName}</p>
-                  <p className="text-muted-foreground">{displayRole || "—"}</p>
+                  <p className="font-semibold">
+                    {userRole === "Client"
+                      ? "Client Authority"
+                      : "Admin Officer"}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {userRole === "Client"
+                      ? "Governance Wing"
+                      : "Command Center"}
+                  </p>
                 </div>
               </TooltipContent>
             )}

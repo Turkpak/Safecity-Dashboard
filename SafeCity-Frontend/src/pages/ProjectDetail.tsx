@@ -29,6 +29,7 @@ import {
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { SubProject } from "@/components/dashboard/SubProjectCard";
+import { ProjectGanttChart } from "@/components/dashboard/GanttChart";
 
 // Enhanced installation progress data with sub-projects and planned vs actual
 interface PhaseProgress {
@@ -737,6 +738,12 @@ export default function ProjectDetail() {
               />
             );
           })()}
+          {selectedProject && (
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold mb-2">Project Gantt Chart</h3>
+              <ProjectGanttChart projectId={selectedProject.key || selectedProject.id} />
+            </div>
+          )}
           </div>
       </div>
     </Layout>

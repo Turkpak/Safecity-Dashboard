@@ -256,6 +256,24 @@ export interface ProjectActivity {
   percent_complete: number;
 }
 
+export interface ProjectActivityCreateInput {
+  project: number;
+  activity_id: string;
+  activity_name: string;
+  start_date?: string | null;
+  finish_date?: string | null;
+  percent_complete?: number;
+}
+
+export interface ProjectActivityUpdateInput {
+  project?: number;
+  activity_id?: string;
+  activity_name?: string;
+  start_date?: string | null;
+  finish_date?: string | null;
+  percent_complete?: number;
+}
+
 export interface Project {
   id: number;
   stakeholder: number;
