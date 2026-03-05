@@ -3,7 +3,8 @@ from ..common_imports import *
 class StakeholderUpdateView(viewsets.ViewSet):
     queryset = Stakeholder.objects.all()
     serializer_class = StakeholderSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, HasSidebarPermission] 
+    sidebar_label = "Stakeholders"
 
     def update(self, request, *args, **kwargs):
         data = request.data

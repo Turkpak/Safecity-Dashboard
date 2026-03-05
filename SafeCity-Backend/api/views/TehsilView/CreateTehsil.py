@@ -3,7 +3,9 @@ from ..common_imports import *
 class TehsilCreateView(viewsets.ViewSet):
     queryset = Tehsil.objects.all()
     serializer_class = TehsilSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, HasSidebarPermission] 
+    sidebar_label = "Area Management"
+    sub_label = "Tehsil"
 
     def create(self, request, *args, **kwargs):
         data = request.data

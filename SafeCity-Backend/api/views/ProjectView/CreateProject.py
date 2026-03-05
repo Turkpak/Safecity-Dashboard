@@ -3,7 +3,8 @@ from ..common_imports import *
 class ProjectCreateView(viewsets.ViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, HasSidebarPermission] 
+    sidebar_label = "Project Management"
 
     def create(self, request, *args, **kwargs):
         try:

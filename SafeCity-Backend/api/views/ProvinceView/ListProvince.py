@@ -3,7 +3,9 @@ from ..common_imports import *
 class ListProvinceView(viewsets.ViewSet):
     queryset = Province.objects.all()
     serializer_class = ProvinceSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, HasSidebarPermission] 
+    sidebar_label = "Area Management"
+    sub_label = "Province"
 
     def list(self, request, *args, **kwargs):
         try:

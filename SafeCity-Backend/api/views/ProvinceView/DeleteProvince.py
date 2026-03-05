@@ -1,15 +1,10 @@
-from ...utils import ApiResponse
-from rest_framework import viewsets, status, serializers
-from rest_framework.permissions import AllowAny
-from ...models import *
-from ...serializers import *
-from django.db import IntegrityError
-from django.db.models import ProtectedError
-
+from ..common_imports import *
 class ProvinceDeleteView(viewsets.ViewSet):
     queryset = Province.objects.all()
     serializer_class = ProvinceSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, HasSidebarPermission] 
+    sidebar_label = "Area Management"
+    sub_label = "Province"
 
     def destroy(self, request, *args, **kwargs):
         province_id = kwargs.get('pk')

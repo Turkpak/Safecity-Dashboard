@@ -6,6 +6,7 @@ from django.core.validators import FileExtensionValidator
 from django.contrib.gis.db import models as gis_models
 from .utils import project_doc_file_path, project_image_file_path
 from dateutil.relativedelta import relativedelta
+from django.conf import settings
 
 from django.contrib.auth.models import (
     AbstractBaseUser,
@@ -385,3 +386,34 @@ class PictorialArchive(models.Model):
 
     def __str__(self):
         return f"{self.project.project_name} - {self.image_date}"
+
+class UserPermission(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    sidebar_label = models.CharField(max_length=100)  # e.g., "Project Management"
+    sub_label = models.CharField(max_length=255, blank=True, null=True)
+    can_view = models.BooleanField(default=False)
+    can_create = models.BooleanField(default=False)
+    can_update = models.BooleanField(default=False)
+    can_delete = models.BooleanField(default=False)
+
+    # Track who gave/updated the permission
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="permissions_created"
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="permissions_updated"
+    )
+
+    class Meta:
+        unique_together = ('user', 'sidebar_label', 'sub_label')
+
+    def __str__(self):
+        return f"{self.user.email} - {self.sidebar_label}"

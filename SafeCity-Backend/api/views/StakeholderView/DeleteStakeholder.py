@@ -3,7 +3,8 @@ from ..common_imports import *
 class StakeholderDeleteView(viewsets.ViewSet):
     queryset = Stakeholder.objects.all()
     serializer_class = StakeholderSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, HasSidebarPermission] 
+    sidebar_label = "Stakeholders"
 
     def destroy(self, request, *args, **kwargs):
         Stakeholder_id = kwargs.get('pk')

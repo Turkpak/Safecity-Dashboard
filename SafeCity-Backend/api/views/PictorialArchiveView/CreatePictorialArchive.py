@@ -11,7 +11,7 @@ class PictorialArchiveCreateView(viewsets.ViewSet):
             serializer = PictorialArchiveSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
 
-            pictorial = serializer.save()   # 🔥 THIS handles image automatically
+            pictorial = serializer.save()   
 
             return ApiResponse(
                 status=status.HTTP_201_CREATED,

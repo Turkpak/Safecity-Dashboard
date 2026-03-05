@@ -3,7 +3,9 @@ from ..common_imports import *
 class DistrictCreateView(viewsets.ViewSet):
     queryset = District.objects.all()
     serializer_class = DistrictSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, HasSidebarPermission] 
+    sidebar_label = "Area Management"
+    sub_label = "District"
 
     def create(self, request, *args, **kwargs):
         data = request.data

@@ -3,7 +3,8 @@ from ..common_imports import *
 class ProjectDeleteView(viewsets.ViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, HasSidebarPermission] 
+    sidebar_label = "Project Management"
 
     def destroy(self, request, *args, **kwargs):
         project_id = kwargs.get('pk')
