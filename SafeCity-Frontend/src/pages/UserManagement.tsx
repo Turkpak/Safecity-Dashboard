@@ -412,9 +412,7 @@ export default function UserManagement() {
                   <ListChecks className="h-5 w-5" />
                   Page permissions
                 </CardTitle>
-                <CardDescription>
-                  Select the user for whom you are assigning permissions. Then use the checkboxes to set Create, Read, Update, and Delete per page. Area Management covers Province, Division, District, and Tehsil.
-                </CardDescription>
+                
               </div>
               <div className="flex flex-nowrap items-center gap-3 shrink-0">
                 <Label htmlFor="permissions-user-select" className="text-sm font-medium whitespace-nowrap">
