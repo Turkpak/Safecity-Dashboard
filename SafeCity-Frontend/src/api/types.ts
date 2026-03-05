@@ -20,20 +20,22 @@ export interface LoginCredentials {
 }
 
 export interface LoginResponse {
-  msg: { login: string; verified: boolean };
+  msg?: { login: string; verified: boolean };
   email: string;
   first_name: string;
   last_name: string;
   id: number;
-  token: string;
-  refresh: string;
-  access: string;
+  token?: string;
+  refresh?: string;
+  access?: string;
   is_admin?: boolean;
   /** From backend: super_admin | contractor | consultant */
   role?: string;
-  stakeholder_id: number | null;
-  stakeholder_type: string | null;
-  is_active: boolean;
+  stakeholder_id?: number | null;
+  stakeholder_type?: string | null;
+  is_active?: boolean;
+  /** Page-level CRUD permissions from login (set by super_admin in User Management) */
+  permissions?: UserPermissionItem[];
 }
 
 /** CRUD permissions assignable by Super Admin when creating a user (optional; backend can adopt later) */

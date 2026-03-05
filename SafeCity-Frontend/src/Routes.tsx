@@ -2,6 +2,7 @@ import { Switch, Route, useLocation } from "wouter";
 import { SplashScreen } from "@/components/layout/SplashScreen";
 import { SidebarProvider } from "@/contexts/SidebarContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { PermissionGate } from "@/components/PermissionGate";
 import type { ReactNode } from "react";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
@@ -119,7 +120,9 @@ export function AppRoutes() {
         <AuthProvider>
           <AuthGate>
             <SidebarProvider>
-              <Router />
+              <PermissionGate>
+                <Router />
+              </PermissionGate>
             </SidebarProvider>
           </AuthGate>
         </AuthProvider>

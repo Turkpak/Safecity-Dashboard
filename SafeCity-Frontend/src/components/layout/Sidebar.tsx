@@ -27,9 +27,10 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   Tooltip,
   TooltipContent,
@@ -37,42 +38,45 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+interface NavSubItem {
+  label: string;
+  href: string;
+  icon: any;
+  /** Backend sidebar_label + sub_label for permission check */
+  sidebar_label: string;
+  sub_label: string;
+}
+
 interface NavItem {
   icon: any;
   label: string;
   href?: string;
   roles?: string[];
-  subItems?: { label: string; href: string; icon: any }[];
+  /** Backend sidebar_label for permission check (top-level or parent) */
+  sidebar_label?: string;
+  subItems?: NavSubItem[];
 }
 
 const NAV_ITEMS: NavItem[] = [
   {
     icon: Navigation2,
     label: "Area Management",
+    sidebar_label: "Area Management",
     subItems: [
-      { icon: MapPin, label: "Province", href: "/province-management" },
-      { icon: MapPin, label: "Division", href: "/division-management" },
-      { icon: MapPin, label: "District", href: "/district-management" },
-      { icon: MapPin, label: "Tehsil", href: "/tehsil-management" },
+      { icon: MapPin, label: "Province", href: "/province-management", sidebar_label: "Area Management", sub_label: "Province" },
+      { icon: MapPin, label: "Division", href: "/division-management", sidebar_label: "Area Management", sub_label: "Division" },
+      { icon: MapPin, label: "District", href: "/district-management", sidebar_label: "Area Management", sub_label: "District" },
+      { icon: MapPin, label: "Tehsil", href: "/tehsil-management", sidebar_label: "Area Management", sub_label: "Tehsil" },
     ],
   },
-  { icon: Users, label: "Stakeholders", href: "/stakeholder-management" },
-  {
-    icon: FolderKanban,
-    label: "Project Management",
-    href: "/project-management",
-  },
-  { icon: LayoutDashboard, label: "Citywise Progress", href: "/" },
-  { icon: BarChart3, label: "City Comparison", href: "/comparison" },
-  { icon: LucideBanknote, label: "Finance & Budget", href: "/finance" },
-  { icon: MapIcon, label: "GIS Layers", href: "/gis" },
-
-  {
-    icon: UserCog,
-    label: "User Management",
-    href: "/user-management",
-  },
-  { icon: Settings, label: "Settings", href: "/settings" },
+  { icon: Users, label: "Stakeholders", href: "/stakeholder-management", sidebar_label: "Stakeholders" },
+  { icon: FolderKanban, label: "Project Management", href: "/project-management", sidebar_label: "Project Management" },
+  { icon: LayoutDashboard, label: "Citywise Progress", href: "/", sidebar_label: "Citywise Progress" },
+  { icon: BarChart3, label: "City Comparison", href: "/comparison", sidebar_label: "City Comparison" },
+  { icon: LucideBanknote, label: "Finance & Budget", href: "/finance", sidebar_label: "Finance & Budget" },
+  { icon: MapIcon, label: "GIS Layers", href: "/gis", sidebar_label: "GIS Layers" },
+  { icon: UserCog, label: "User Management", href: "/user-management", sidebar_label: "User Management" },
+  { icon: Settings, label: "Settings", href: "/settings", sidebar_label: "Settings" },
 ];
 
 export function Sidebar() {
@@ -107,9 +111,27 @@ export function Sidebar() {
     }
   }, [location]);
 
-  const visibleNavItems = NAV_ITEMS.filter(
-    (item) => !item.roles || (userRole && item.roles.includes(userRole)),
-  );
+  const { canView } = usePermissions();
+
+  const visibleNavItems = useMemo(() => {
+    return NAV_ITEMS.filter((item) => {
+      if (item.roles && (!userRole || !item.roles.includes(userRole))) return false;
+      if (item.subItems) {
+        const visibleSubs = item.subItems.filter((sub) =>
+          canView(sub.sidebar_label, sub.sub_label)
+        );
+        return visibleSubs.length > 0;
+      }
+      if (item.sidebar_label) return canView(item.sidebar_label, null);
+      return true;
+    }).map((item) => {
+      if (!item.subItems) return item;
+      const visibleSubs = item.subItems.filter((sub) =>
+        canView(sub.sidebar_label, sub.sub_label)
+      );
+      return { ...item, subItems: visibleSubs };
+    });
+  }, [canView, userRole]);
 
   const NavContent = () => (
     <div className="flex h-full flex-col gap-4">

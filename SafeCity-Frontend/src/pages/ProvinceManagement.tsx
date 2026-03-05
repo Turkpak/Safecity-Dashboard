@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Edit2, Trash2, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   listProvinces,
   createProvince,
@@ -22,6 +23,10 @@ export default function ProvinceManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const perm = usePermissions().getPermission("Area Management", "Province");
+  const canCreate = perm.can_create;
+  const canUpdate = perm.can_update;
+  const canDelete = perm.can_delete;
 
   const { data: provinces = [], isLoading } = useQuery({
     queryKey: ["provinces"],
@@ -105,49 +110,62 @@ export default function ProvinceManagement() {
           <p className="text-muted-foreground text-sm">Create a new province or edit an existing one.</p>
         </div>
 
-        <Card className="border-none shadow-sm overflow-hidden">
-          <div className="h-1 bg-secondary w-full" />
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
-              Basic Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-              <div className="space-y-2">
-                <Label htmlFor="province-name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Province Name <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="province-name"
-                  placeholder="e.g. Punjab"
-                  value={provinceName}
-                  onChange={(e) => setProvinceName(e.target.value)}
-                  className="h-10"
-                />
+        {(canCreate || (canUpdate && editingId !== null)) && (
+          <Card className="border-none shadow-sm overflow-hidden">
+            <div className="h-1 bg-secondary w-full" />
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+                Basic Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                <div className="space-y-2">
+                  <Label htmlFor="province-name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Province Name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="province-name"
+                    placeholder="e.g. Punjab"
+                    value={provinceName}
+                    onChange={(e) => setProvinceName(e.target.value)}
+                    className="h-10"
+                  />
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {canCreate && editingId === null && (
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={createMutation.isPending}
+                      className="bg-secondary hover:bg-secondary/90 text-white w-full h-10"
+                    >
+                      <Plus className="h-4 w-4 mr-2" /> Create Province
+                    </Button>
+                  )}
+                  {canUpdate && editingId !== null && (
+                    <>
+                      <Button
+                        onClick={handleSubmit}
+                        disabled={updateMutation.isPending}
+                        className="bg-secondary hover:bg-secondary/90 text-white w-full h-10"
+                      >
+                        Update Province
+                      </Button>
+                      <Button variant="outline" onClick={handleCancel} className="w-full h-10">
+                        Cancel
+                      </Button>
+                    </>
+                  )}
+                  {editingId === null && canCreate && (
+                    <Button variant="outline" onClick={() => setProvinceName("")} className="w-full h-10">
+                      Clear
+                    </Button>
+                  )}
+                </div>
               </div>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Button
-                  onClick={handleSubmit}
-                  disabled={createMutation.isPending || updateMutation.isPending}
-                  className="bg-secondary hover:bg-secondary/90 text-white w-full h-10"
-                >
-                  {editingId !== null ? "Update Province" : <><Plus className="h-4 w-4 mr-2" /> Create Province</>}
-                </Button>
-                {editingId !== null && (
-                  <Button variant="outline" onClick={handleCancel} className="w-full h-10">
-                    Cancel
-                  </Button>
-                )}
-                {editingId === null && (
-                  <Button variant="outline" onClick={() => setProvinceName("")} className="w-full h-10">
-                    Clear
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -202,23 +220,28 @@ export default function ProvinceManagement() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEdit(province)}
-                              className="h-8 border border-muted hover:bg-muted whitespace-nowrap"
-                            >
-                              <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(province.id)}
-                              disabled={deleteMutation.isPending}
-                              className="h-8 border border-red-100 text-red-600 hover:bg-red-50 hover:text-red-700 whitespace-nowrap"
-                            >
-                              <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
-                            </Button>
+                            {canUpdate && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEdit(province)}
+                                className="h-8 border border-muted hover:bg-muted whitespace-nowrap"
+                              >
+                                <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(province.id)}
+                                disabled={deleteMutation.isPending}
+                                className="h-8 border border-red-100 text-red-600 hover:bg-red-50 hover:text-red-700 whitespace-nowrap"
+                              >
+                                <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+                              </Button>
+                            )}
+                            {!canUpdate && !canDelete && <span className="text-muted-foreground text-sm">—</span>}
                           </div>
                         </TableCell>
                       </TableRow>
