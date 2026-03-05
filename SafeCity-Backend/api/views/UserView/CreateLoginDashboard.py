@@ -28,6 +28,10 @@ class UserLoginDashboardCreateView(viewsets.ViewSet):
             if user and user.check_password(password) and user.is_active:
                 login(request, user)  # manually log in
                 auth_data = utils.get_tokens_for_user(user)
+
+                permissions = UserPermission.objects.filter(user=user)
+                permissions_data = UserPermissionSerializer(permissions, many=True).data
+
                 verified = user.is_verified
             
                 res = {
@@ -42,6 +46,7 @@ class UserLoginDashboardCreateView(viewsets.ViewSet):
                     'token': auth_data['access'],
                     'refresh': auth_data['refresh'],
                     'role': user.role,
+                    'permissions': permissions_data,
                     'stakeholder_id': user.stakeholder.id if user.stakeholder else None,
                     'stakeholder_type': user.stakeholder.stakeholder_type if user.stakeholder else None,
                     'is_active': user.is_active,

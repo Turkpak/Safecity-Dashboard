@@ -7,6 +7,7 @@ from django.contrib.gis.db import models as gis_models
 from .utils import project_doc_file_path, project_image_file_path
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
+# from xerparser.xer import Reader
 
 from django.contrib.auth.models import (
     AbstractBaseUser,
@@ -221,6 +222,31 @@ class Project(models.Model):
 
     def __str__(self):
         return self.project_name
+    def parse_xer_file(self):
+        if not self.xer_file:
+            return
+
+        try:
+            # Lazy import inside function
+            from xerparser import XER
+        except ImportError:
+            # xerparser not installed; skip parsing
+            return
+
+        xer = XER(self.xer_file.path)
+
+        # Optional: clear old activities
+        self.activities.all().delete()
+
+        for act in xer.activities:
+            ProjectActivity.objects.create(
+                project=self,
+                activity_id=act.activity_id,
+                activity_name=act.activity_name,
+                start_date=act.start_date,
+                finish_date=act.finish_date,
+                percent_complete=getattr(act, "phys_complete_pct", 0) or 0
+            )
 
     # def save(self, *args, **kwargs):
     #     try:
@@ -249,11 +275,17 @@ class Project(models.Model):
 
         super().save(*args, **kwargs)
 
+        # ✅ Parse XER after saving
+        if self.xer_file:
+            if is_new or not self.activities.exists():
+                self.parse_xer_file()
+
         # Only parse when XER exists
         # if self.xer_file:
         #     # Optional: prevent duplicate parsing
         #     if is_new or not self.activities.exists():
         #         self.parse_xer_file()
+    
 
 class ProjectActivity(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="activities")

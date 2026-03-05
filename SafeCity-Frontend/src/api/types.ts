@@ -201,6 +201,16 @@ export interface ListProjectResponse {
   features: ListProjectFeature[];
 }
 
+export interface ProjectActivity {
+  id: number;
+  project: number;
+  activity_id: string;
+  activity_name: string;
+  start_date: string | null;
+  finish_date: string | null;
+  percent_complete: number;
+}
+
 export interface Project {
   id: number;
   stakeholder: number;
@@ -227,6 +237,7 @@ export interface Project {
   geom?: unknown;
   created_at: string;
   updated_at: string;
+  activities?: ProjectActivity[];
 }
 
 export interface ProjectCreateInput {

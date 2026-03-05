@@ -225,7 +225,7 @@ class ProjectSerializer(GeoFeatureModelSerializer):
             'total_budget_allocated', 'budget_utilized',
             'budget_variance', 'budget_remaining',
             'xer_file', 'boundary_file', 'geom',
-            'created_at', 'updated_at', 'activities', 'schedule_tasks'
+            'created_at', 'updated_at', 'activities'
         ]
 
     # ---------- Readable Names ----------
