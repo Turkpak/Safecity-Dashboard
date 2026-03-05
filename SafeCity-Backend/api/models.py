@@ -7,6 +7,7 @@ from django.contrib.gis.db import models as gis_models
 from .utils import project_doc_file_path, project_image_file_path
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
+# from xerparser.xer import Reader
 
 from django.contrib.auth.models import (
     AbstractBaseUser,
@@ -125,42 +126,6 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
             'access': str(refresh.access_token)
         }
     
-# # --------------------------------------------------------
-# # User Manager Model
-# # --------------------------------------------------------
-
-# class MyUserManager(BaseUserManager):
-#     def create_user(self, email, company_name, password=None):
-#         """
-#         Creates and saves a User with the given email, date of
-#         birth and password.
-#         """
-#         if not email:
-#             raise ValueError('Users must have an email address')
-
-#         user = self.model(
-#             email=self.normalize_email(email),
-#             company_name=company_name,
-#         )
-
-#         user.set_password(password)
-#         user.save(using=self._db)
-#         return user
-
-#     def create_superuser(self, email, company_name, password=None):
-#         """
-#         Creates and saves a superuser with the given email, date of
-#         birth and password.
-#         """
-#         user = self.create_user(
-#             email,
-#             password=password,
-#             company_name=company_name,
-#         )
-#         user.is_admin = True
-#         user.save(using=self._db)
-#         return user
-    
 # --------------------------------------------------------
 # Stakeholder Model
 # --------------------------------------------------------
@@ -183,77 +148,6 @@ class Stakeholder(models.Model):
         ('disable', 'Disable'),
     )
     status = models.CharField(max_length=255, choices=status_choices, default='active')
-
-# --------------------------------------------------------
-# Custom User Model
-# --------------------------------------------------------
-
-# class MyUser(AbstractBaseUser):
-#     email = models.EmailField(
-#         max_length=255,
-#         unique=True,
-#     )
-#     stakeholder = models.ForeignKey(Stakeholder, on_delete=models.DO_NOTHING, null=True, blank=True)
-#     first_name = models.CharField(max_length=255)
-#     last_name = models.CharField(max_length=255)
-#     company_name = models.CharField(max_length=255)
-#     # companyLogo  = models.URLField(null=True,blank=True)
-#     companyLogo = models.ImageField(
-#         # upload_to=project_image_file_path,
-#         null=True,
-#         blank=True
-#     )
-#     is_active = models.BooleanField(default=True)
-#     country = models.CharField(max_length=200, null=True, blank=True)
-#     address = models.CharField(max_length=400, null=True, blank=True)
-#     city = models.CharField(max_length=200, null=True, blank=True)
-#     zipcode = models.CharField(max_length=200, null=True, blank=True)
-#     is_admin = models.BooleanField(default=False)
-#     is_verified = models.BooleanField(default=False)
-#     profileImage  =  models.ImageField(
-#         # upload_to=project_image_file_path,
-#         null=True,
-#         blank=True
-#     )
-
-#     objects = MyUserManager()
-
-#     USERNAME_FIELD = 'email'
-#     REQUIRED_FIELDS = ['company_name']
-
-#     def __str__(self):
-#         return self.email
-
-#     def has_perm(self, perm, obj=None):
-#         "Does the user have a specific permission?"
-#         # Simplest possible answer: Yes, always
-#         return True
-
-#     def has_module_perms(self, app_label):
-#         "Does the user have permissions to view the app `app_label`?"
-#         # Simplest possible answer: Yes, always
-#         return True
-
-#     @property
-#     def is_staff(self):
-#         "Is the user a member of staff?"
-#         # Simplest possible answer: All admins are staff
-#         return self.is_admin
-
-#     @property
-#     def get_full_name(self):
-#         '''
-#         Returns the first_name plus the last_name, with a space in between.
-#         '''
-#         full_name = '%s %s' % (self.first_name, self.last_name)
-#         return full_name.strip()
-
-#     def tokens(self):
-#         refresh = RefreshToken.for_user(self)
-#         return {
-#             'refresh': str(refresh),
-#             'access': str(refresh.access_token)
-#         }
 
 # --------------------------------------------------------
 # Provices Administrative Divisions
@@ -328,6 +222,31 @@ class Project(models.Model):
 
     def __str__(self):
         return self.project_name
+    def parse_xer_file(self):
+        if not self.xer_file:
+            return
+
+        try:
+            # Lazy import inside function
+            from xerparser import XER
+        except ImportError:
+            # xerparser not installed; skip parsing
+            return
+
+        xer = XER(self.xer_file.path)
+
+        # Optional: clear old activities
+        self.activities.all().delete()
+
+        for act in xer.activities:
+            ProjectActivity.objects.create(
+                project=self,
+                activity_id=act.activity_id,
+                activity_name=act.activity_name,
+                start_date=act.start_date,
+                finish_date=act.finish_date,
+                percent_complete=getattr(act, "phys_complete_pct", 0) or 0
+            )
 
     # def save(self, *args, **kwargs):
     #     try:
@@ -356,11 +275,17 @@ class Project(models.Model):
 
         super().save(*args, **kwargs)
 
+        # ✅ Parse XER after saving
+        if self.xer_file:
+            if is_new or not self.activities.exists():
+                self.parse_xer_file()
+
         # Only parse when XER exists
         # if self.xer_file:
         #     # Optional: prevent duplicate parsing
         #     if is_new or not self.activities.exists():
         #         self.parse_xer_file()
+    
 
 class ProjectActivity(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="activities")

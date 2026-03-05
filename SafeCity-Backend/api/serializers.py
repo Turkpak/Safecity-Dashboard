@@ -98,6 +98,9 @@ class UserPermissionSerializer(serializers.ModelSerializer):
             'updated_by',
             'updated_by_email',
         ]
+        extra_kwargs = {
+            'sub_label': {'required': False, 'allow_null': True, 'allow_blank': True},
+        }
 
 class UserWithPermissionsSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
@@ -192,6 +195,7 @@ class ProjectActivitySerializer(serializers.ModelSerializer):
             'finish_date',
             'percent_complete'
         ]
+
 # --------------------------------------------------------
 # Project
 # --------------------------------------------------------
@@ -206,7 +210,7 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         queryset=Stakeholder.objects.all(),
         required=False
     )
-    activities = ProjectActivitySerializer(many=True, read_only=True) 
+    activities = ProjectActivitySerializer(many=True, read_only=True)
 
     class Meta:
         model = Project

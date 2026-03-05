@@ -57,6 +57,8 @@ import { useTheme } from "@/hooks/use-theme";
 import { CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { listProjects, getProjectById, type Project } from "@/api/project";
 
 // Enhanced installation progress data with sub-projects and planned vs actual
 interface PhaseProgress {
