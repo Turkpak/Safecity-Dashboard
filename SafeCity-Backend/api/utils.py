@@ -271,3 +271,88 @@ class StandardResultsSetPagination(PageNumberPagination):
             'results': data
         })
 
+"""
+XER File Parser using PyP6XER
+Extracts task/activity information from MS Project .xer files
+"""
+from typing import List, Dict, Any
+from datetime import datetime
+
+
+def parse_xer_file(file_path: str) -> List[Dict[str, Any]]:
+    """
+    Parse XER file and extract activities for Gantt chart.
+    
+    Args:
+        file_path: Path to .xer file
+    
+    Returns:
+        List of activities with id, name, start_date, finish_date, percent_complete
+    """
+    try:
+        from pyp6xer import Xer
+    except ImportError:
+        raise ImportError("PyP6XER not installed. Run: pip install PyP6XER")
+    
+    activities = []
+    
+    try:
+        # Parse XER file
+        xer = Xer(file_path)
+        
+        # Extract activities from the XER object
+        for activity in xer.activities:
+            try:
+                activity_dict = {
+                    'id': str(activity.activity_id),
+                    'label': activity.activity_name or f"Activity {activity.activity_id}",
+                    'start': activity.start_date.isoformat() if activity.start_date else None,
+                    'end': activity.finish_date.isoformat() if activity.finish_date else None,
+                    'progress': (activity.phys_complete_pct or 0) / 100.0,  # Convert % to decimal
+                }
+                activities.append(activity_dict)
+            except Exception as e:
+                # Skip problematic activities
+                print(f"Error parsing activity: {e}")
+                continue
+        
+        # Sort by start date
+        activities.sort(key=lambda x: x['start'] or "")
+        
+        return activities
+    
+    except Exception as e:
+        raise ValueError(f"Failed to parse XER file: {str(e)}")
+
+
+def get_xer_gantt_data(project_id: int) -> Dict[str, Any]:
+    """
+    Get Gantt data from project's XER file.
+    
+    Args:
+        project_id: Project ID
+    
+    Returns:
+        Dict with tasks list for Gantt chart
+    """
+    from .models import Project
+    
+    try:
+        project = Project.objects.get(id=project_id)
+        
+        if not project.xer_file:
+            return {'tasks': [], 'message': 'No XER file attached to project'}
+        
+        # Parse XER file
+        tasks = parse_xer_file(project.xer_file.path)
+        
+        return {
+            'tasks': tasks,
+            'project_name': project.project_name,
+            'message': f'Loaded {len(tasks)} activities from XER file'
+        }
+    
+    except Project.DoesNotExist:
+        raise ValueError(f"Project {project_id} not found")
+    except Exception as e:
+        raise ValueError(f"Error loading XER data: {str(e)}")
