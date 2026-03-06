@@ -15,6 +15,9 @@ import {
   updateProjectActivity,
   deleteProjectActivity,
   listProjects,
+  listPictorialArchives,
+  createPictorialArchive,
+  deletePictorialArchive,
 } from "@/api";
 import { ProjectGanttChart } from "@/components/dashboard/GanttChart";
 import type {
@@ -22,7 +25,16 @@ import type {
   ProjectActivityCreateInput,
   ProjectActivityUpdateInput,
   Project,
+  PictorialArchive,
+  PictorialArchiveCreateInput,
 } from "@/api/types";
+
+function resolveMediaUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const base = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+  return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+}
 
 export default function ProjectActivityManagement() {
   const { toast } = useToast();
@@ -40,6 +52,11 @@ export default function ProjectActivityManagement() {
   const [finishDate, setFinishDate] = useState("");
   const [percentComplete, setPercentComplete] = useState<string>("");
 
+  // pictorial archive form state
+  const [archiveDate, setArchiveDate] = useState("");
+  const [archiveDescription, setArchiveDescription] = useState("");
+  const [archiveImage, setArchiveImage] = useState<File | null>(null);
+
   const { data: projects = [] } = useQuery({
     queryKey: ["projects"],
     queryFn: listProjects,
@@ -48,6 +65,12 @@ export default function ProjectActivityManagement() {
   const { data: activities = [], isLoading: activitiesLoading } = useQuery({
     queryKey: ["projectActivities", selectedProjectId],
     queryFn: () => listProjectActivities(selectedProjectId ?? undefined),
+    enabled: selectedProjectId != null,
+  });
+
+  const { data: pictorialArchives = [], isLoading: archivesLoading } = useQuery({
+    queryKey: ["pictorialArchives", selectedProjectId],
+    queryFn: () => listPictorialArchives(selectedProjectId ?? undefined),
     enabled: selectedProjectId != null,
   });
 
@@ -60,6 +83,31 @@ export default function ProjectActivityManagement() {
     },
     onError: (e: Error) => {
       toast({ title: "Error", description: e.message || "Failed to create activity", variant: "destructive" });
+    },
+  });
+
+  const createArchiveMutation = useMutation({
+    mutationFn: (payload: PictorialArchiveCreateInput) => createPictorialArchive(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pictorialArchives", selectedProjectId] });
+      toast({ title: "Success", description: "Pictorial archive added." });
+      setArchiveDate("");
+      setArchiveDescription("");
+      setArchiveImage(null);
+    },
+    onError: (e: Error) => {
+      toast({ title: "Error", description: e.message || "Failed to add pictorial archive", variant: "destructive" });
+    },
+  });
+
+  const deleteArchiveMutation = useMutation({
+    mutationFn: (id: number) => deletePictorialArchive(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pictorialArchives", selectedProjectId] });
+      toast({ title: "Deleted", description: "Pictorial archive removed." });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Error", description: e.message || "Failed to delete pictorial archive", variant: "destructive" });
     },
   });
 
@@ -130,6 +178,33 @@ export default function ProjectActivityManagement() {
   const handleDelete = (id: number) => {
     if (window.confirm("Delete this activity?")) {
       deleteMutation.mutate(id);
+    }
+  };
+
+  const handleArchiveSubmit = () => {
+    if (selectedProjectId == null) {
+      toast({ title: "Error", description: "Select a project first", variant: "destructive" });
+      return;
+    }
+    if (!archiveDate) {
+      toast({ title: "Error", description: "Select an image date", variant: "destructive" });
+      return;
+    }
+    if (!archiveImage) {
+      toast({ title: "Error", description: "Select an image file", variant: "destructive" });
+      return;
+    }
+    createArchiveMutation.mutate({
+      project: selectedProjectId,
+      image: archiveImage,
+      image_date: archiveDate,
+      description: archiveDescription.trim() || undefined,
+    });
+  };
+
+  const handleArchiveDelete = (a: PictorialArchive) => {
+    if (window.confirm("Delete this pictorial archive entry?")) {
+      deleteArchiveMutation.mutate(a.id);
     }
   };
 
@@ -321,6 +396,140 @@ export default function ProjectActivityManagement() {
             </div>
           </Card>
         </div>
+
+        <Card className="border-none shadow-sm overflow-hidden">
+          <div className="h-1 bg-primary w-full" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+              Pictorial Archive (Daily Progress)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Image date <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  type="date"
+                  value={archiveDate}
+                  onChange={(e) => setArchiveDate(e.target.value)}
+                  className="h-10"
+                  disabled={selectedProjectId == null}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Description
+                </Label>
+                <Input
+                  value={archiveDescription}
+                  onChange={(e) => setArchiveDescription(e.target.value)}
+                  placeholder="Optional note…"
+                  className="h-10"
+                  disabled={selectedProjectId == null}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Image <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setArchiveImage(e.target.files?.[0] ?? null)}
+                  className="h-10"
+                  disabled={selectedProjectId == null}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleArchiveSubmit}
+                disabled={selectedProjectId == null || createArchiveMutation.isPending}
+                className="bg-primary hover:bg-primary/90 text-white h-10"
+              >
+                <Plus className="h-4 w-4 mr-2" /> Add Photo
+              </Button>
+              {archiveImage && (
+                <Button
+                  variant="outline"
+                  className="h-10"
+                  onClick={() => setArchiveImage(null)}
+                  disabled={selectedProjectId == null}
+                >
+                  Clear file
+                </Button>
+              )}
+            </div>
+
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="w-16">#</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Preview</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {selectedProjectId == null ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-20 text-center text-muted-foreground">
+                        Select a project to manage its daily progress photos.
+                      </TableCell>
+                    </TableRow>
+                  ) : archivesLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-20 text-center text-muted-foreground">
+                        Loading…
+                      </TableCell>
+                    </TableRow>
+                  ) : pictorialArchives.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-20 text-center text-muted-foreground">
+                        No pictorial archive entries yet.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    [...pictorialArchives]
+                      .sort((a, b) => String(b.image_date).localeCompare(String(a.image_date)))
+                      .map((a, idx) => (
+                        <TableRow key={a.id}>
+                          <TableCell className="font-medium">{idx + 1}</TableCell>
+                          <TableCell className="text-sm">{a.image_date}</TableCell>
+                          <TableCell>
+                            <a href={resolveMediaUrl(a.image)} target="_blank" rel="noreferrer">
+                              <img
+                                src={resolveMediaUrl(a.image)}
+                                alt={a.description || a.project_name || `archive-${a.id}`}
+                                className="h-10 w-16 object-cover rounded border"
+                              />
+                            </a>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {a.description || "—"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleArchiveDelete(a)}
+                              disabled={deleteArchiveMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
 
         {selectedProjectId && (
           <ProjectGanttChart projectId={selectedProjectId} />

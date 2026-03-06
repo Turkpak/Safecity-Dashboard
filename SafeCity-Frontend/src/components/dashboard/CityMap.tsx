@@ -446,6 +446,10 @@ export function CityMap({
                   weight: 3,
                   dashArray: '10, 10'
                 }}
+                onEachFeature={(feature, layer) => {
+                  const name = feature.properties?.project_name;
+                  if (name != null && name !== '') layer.bindPopup(String(name));
+                }}
               />
             </LayersControl.Overlay>
           )}

@@ -344,6 +344,7 @@ export interface ProjectUpdateInput {
 export interface PictorialArchive {
   id: number;
   project: number;
+  project_name?: string;
   image: string;
   image_date: string;
   description: string;

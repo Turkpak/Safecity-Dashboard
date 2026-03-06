@@ -37,6 +37,26 @@ function normalizeProjectGeom(geom: unknown): object | null {
   return null;
 }
 
+/** Build a GeoJSON FeatureCollection from all projects that have geom (for map layer by division/district/tehsil) */
+function buildProjectsFeatureCollection(projects: Project[]): { type: "FeatureCollection"; features: Array<{ type: "Feature"; geometry: unknown; properties?: Record<string, unknown> }> } | null {
+  const features: Array<{ type: "Feature"; geometry: unknown; properties?: Record<string, unknown> }> = [];
+  for (const p of projects) {
+    const normalized = normalizeProjectGeom(p.geom);
+    if (!normalized) continue;
+    const n = normalized as { type: string; features?: Array<{ type: string; geometry?: unknown; properties?: Record<string, unknown> }>; geometry?: unknown; properties?: Record<string, unknown> };
+    const props = { id: p.id, project_name: p.project_name ?? `Project #${p.id}` };
+    if (n.type === "FeatureCollection" && Array.isArray(n.features)) {
+      for (const f of n.features) {
+        if (f.geometry) features.push({ type: "Feature", geometry: f.geometry, properties: { ...(f.properties || {}), ...props } });
+      }
+    } else if (n.type === "Feature" && n.geometry) {
+      features.push({ type: "Feature", geometry: n.geometry, properties: { ...(n.properties || {}), ...props } });
+    }
+  }
+  if (features.length === 0) return null;
+  return { type: "FeatureCollection", features };
+}
+
 export default function GISLayers() {
   const [selectedCity, setSelectedCity] = useState("lahore");
   const [showLegend, setShowLegend] = useState(true);
@@ -117,9 +137,10 @@ export default function GISLayers() {
     [filteredProjects, selectedProjectId]
   );
 
-  const projectBoundaryGeo = useMemo(
-    () => (selectedProject?.geom ? normalizeProjectGeom(selectedProject.geom) : null),
-    [selectedProject]
+  /** Combined GeoJSON of all filtered projects (by division/district/tehsil) — same list API as project-management; shows geojson/shapefile boundaries on map */
+  const allFilteredProjectsGeo = useMemo(
+    () => buildProjectsFeatureCollection(filteredProjects),
+    [filteredProjects]
   );
 
   const handleExportMap = () => {
@@ -273,9 +294,9 @@ export default function GISLayers() {
               showStats={false}
               showSurveillanceLayers={false}
               legendProjects={filteredProjects}
-              filterCenter={!projectBoundaryGeo && selectedDivision !== "all" ? mapView.center : undefined}
-              filterZoom={!projectBoundaryGeo && selectedDivision !== "all" ? mapView.zoom : undefined}
-              geoData={projectBoundaryGeo ?? undefined}
+              filterCenter={!allFilteredProjectsGeo && selectedDivision !== "all" ? mapView.center : undefined}
+              filterZoom={!allFilteredProjectsGeo && selectedDivision !== "all" ? mapView.zoom : undefined}
+              geoData={allFilteredProjectsGeo ?? undefined}
             />
           </div>
         </div>

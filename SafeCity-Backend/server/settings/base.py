@@ -22,7 +22,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 SECRETS_FILE = BASE_DIR / "secrets.json"
 if SECRETS_FILE.exists():
     with open(SECRETS_FILE) as f:
-        secrets = json.load(f)
+        try:
+            secrets = json.load(f)
+        except json.JSONDecodeError:
+            # Fall back to empty secrets so local dev can still boot.
+            secrets = {}
 else:
     secrets = {}
 
