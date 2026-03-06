@@ -55,6 +55,7 @@ router.register(r'create-project-activity', ProjectActivityCreateView, basename=
 router.register(r'list-project-activity', ListProjectActivityView, basename='list-project-activity')
 router.register(r'update-project-activity', ProjectActivityUpdateView, basename='update-project-activity')
 router.register(r'delete-project-activity', ProjectActivityDeleteView, basename='delete-project-activity')
+# router.register(r'project-gantt', ProjectGanttView, basename='project-gantt')
 
 
 #--------------------------------- Pictorial Archive View ---------------------------------
@@ -68,6 +69,7 @@ urlpatterns = [
     path('api/', include(router.urls)),
 
     path('', include(router.urls)),
+    path('project-gantt/<int:project_id>/', ProjectGanttView.as_view(), name='project-gantt'),
 ]
 
 if settings.DEBUG:

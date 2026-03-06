@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getProjectXerGanttData } from "@/api/projectActivity";
+import { getProjectGanttData } from "@/api/projectActivity";
 
 interface GanttTask {
   id: string;
@@ -24,42 +24,27 @@ export function ProjectGanttChart({ projectId }: GanttChartProps) {
   }>({ start: null, end: null });
 
   useEffect(() => {
-    const fetchGanttData = async () => {
-      try {
-        setLoading(true);
-        const fetchedTasks = await getProjectXerGanttData(projectId);
+  const fetchGanttData = async () => {
+    try {
+      setLoading(true);
+      const fetchedTasks = await getProjectGanttData(projectId);
 
-        if (fetchedTasks.length > 0) {
-          const dates = fetchedTasks
-            .map((t: GanttTask) => [
-              t.start ? new Date(t.start) : null,
-              t.end ? new Date(t.end) : null,
-            ])
-            .flat()
-            .filter((d): d is Date => d !== null);
+      console.log("Fetched tasks:", fetchedTasks);
 
-          if (dates.length > 0) {
-            setDateRange({
-              start: new Date(Math.min(...dates.map((d) => d.getTime()))),
-              end: new Date(Math.max(...dates.map((d) => d.getTime()))),
-            });
-          }
-        }
-
-        setTasks(fetchedTasks);
-        setError(null);
-      } catch (err) {
-        console.error("Failed to load Gantt data:", err);
-        setError(err instanceof Error ? err.message : "Failed to load XER data");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (projectId) {
-      fetchGanttData();
+      setTasks(fetchedTasks);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to load Gantt data:", err);
+      setError(err instanceof Error ? err.message : "Failed to load XER data");
+    } finally {
+      setLoading(false);
     }
-  }, [projectId]);
+  };
+
+  if (projectId) {
+    fetchGanttData();
+  }
+}, [projectId]);
 
   if (loading) {
     return (
@@ -86,7 +71,9 @@ export function ProjectGanttChart({ projectId }: GanttChartProps) {
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
-            {error ? `Error: ${error}` : "No activities to display"}
+            {error
+              ? `Error: ${error}`
+              : "No schedule activities found in the XER file"}
           </div>
         </CardContent>
       </Card>

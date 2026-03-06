@@ -324,7 +324,7 @@ export default function ProjectManagement() {
     setProjectDescription(project.project_description ?? "");
     setStartingDate(project.project_starting_date ? project.project_starting_date.slice(0, 10) : "");
     setReferenceNumber(project.project_reference_no ?? "");
-    setStakeholderIds(project.stakeholder ? [String(project.stakeholder)] : []);
+    setStakeholderIds(project.stakeholder?.map(String) || []);
     setSelectedProvinceId(String(project.province));
     setSelectedDivisionId(String(project.division));
     setSelectedDistrictId(String(project.district));
@@ -406,7 +406,7 @@ export default function ProjectManagement() {
         updateProjectMutation.mutate({
           id: editingProject.id,
           payload: {
-            stakeholder: Number(stakeholderIds[0]),
+            stakeholder: stakeholderIds.map(Number),
             project_name: projectName.trim() || null,
             project_description: projectDescription.trim() || null,
             project_starting_date: startingDate || null,
@@ -423,7 +423,7 @@ export default function ProjectManagement() {
         });
       } else {
         createProjectMutation.mutate({
-          stakeholder: Number(stakeholderIds[0]),
+          stakeholder: stakeholderIds.map(Number),
           project_name: projectName.trim() || null,
           project_description: projectDescription.trim() || null,
           project_starting_date: startingDate || null,

@@ -210,7 +210,7 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         queryset=Stakeholder.objects.all(),
         required=False
     )
-    activities = ProjectActivitySerializer(many=True, read_only=True)
+    # activities = ProjectActivitySerializer(many=True, read_only=True)
 
     class Meta:
         model = Project
@@ -225,7 +225,7 @@ class ProjectSerializer(GeoFeatureModelSerializer):
             'total_budget_allocated', 'budget_utilized',
             'budget_variance', 'budget_remaining',
             'xer_file', 'boundary_file', 'geom',
-            'created_at', 'updated_at', 'activities'
+            'created_at', 'updated_at'
         ]
 
     # ---------- Readable Names ----------
@@ -281,7 +281,13 @@ class ProjectSerializer(GeoFeatureModelSerializer):
             except Exception as e:
                 raise serializers.ValidationError({"boundary_file": f"Invalid GeoJSON: {e}"})
 
-        project.save()
+        try:
+            project.save()
+        except Exception as e:
+            # wrap any low-level database errors as serializer validation failures
+            raise serializers.ValidationError({
+                "xer_file": f"Failed to parse XER file: {e}"
+            })
         return project
 
     # ---------- Update ----------
@@ -313,10 +319,30 @@ class ProjectSerializer(GeoFeatureModelSerializer):
             except Exception as e:
                 raise serializers.ValidationError({"boundary_file": f"Invalid GeoJSON: {e}"})
 
-        instance.save()
+        try:
+            instance.save()
+        except Exception as e:
+            raise serializers.ValidationError({
+                "xer_file": f"Failed to parse XER file: {e}"
+            })
         return instance
 
+class SubActivitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectActivity
+        fields = ['id', 'title', 'planned_progress', 'actual_progress', 'start_date', 'end_date', 'owner']
 
+class ActivitySerializer(serializers.ModelSerializer):
+    children = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectActivity
+        fields = ['id', 'title', 'weight', 'status', 'children']
+
+    def get_children(self, obj):
+        # Fetch sub-activities where parent == this activity
+        sub_activities = ProjectActivity.objects.filter(parent=obj)
+        return SubActivitySerializer(sub_activities, many=True).data
 # --------------------------------------------------------
 # Pictorial Archive
 # --------------------------------------------------------
