@@ -1,6 +1,6 @@
 // ProjectActivityManagement.tsx
 import { Layout } from "@/components/layout/Layout";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Search } from "lucide-react";
 import { listProjects, getProjectGanttData } from "@/api";
 import { useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface GanttTask {
   id: string;
@@ -25,6 +32,7 @@ export default function ProjectActivityManagement() {
   const [ganttTasks, setGanttTasks] = useState<GanttTask[]>([]);
   const [loadingGantt, setLoadingGantt] = useState(false);
   const parseDate = (d: string | null) => (d ? new Date(d.replace(" ", "T")) : null);
+  const [selectedDelayLog, setSelectedDelayLog] = useState<string[] | null>(null);
   // Fetch projects
   const { data: projects = [] } = useQuery({
     queryKey: ["projects"],
@@ -43,7 +51,12 @@ useEffect(() => {
     try {
       const tasks = await getProjectGanttData(selectedProjectId);
       console.log("Fetched tasks:", tasks);
-      setGanttTasks(tasks);
+      const tasksWithProgress = tasks.map((t: any) => ({
+        ...t,
+        progress: t.progress ?? Math.random() * 0.8
+      }));
+
+      setGanttTasks(tasksWithProgress);
     } catch (err) {
       console.error("Error fetching Gantt tasks:", err);
       setGanttTasks([]);
@@ -91,6 +104,19 @@ const getTaskWidth = (start: string | null, end: string | null) => {
   const progressColors = ["bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-lime-500", "bg-green-500"];
   const getProgressColor = (progress: number) => progressColors[Math.min(Math.floor(progress * 4), 4)];
 
+  const monthsArray = useMemo(() => {
+  const months = [];
+  const current = new Date(dateRange.start);
+
+  current.setDate(1);
+
+  while (current <= dateRange.end) {
+    months.push(new Date(current));
+    current.setMonth(current.getMonth() + 1);
+  }
+
+  return months;
+}, [dateRange]);
   return (
     <Layout title="Project Activities">
       <div className="flex flex-col gap-8 max-w-[1400px] mx-auto pb-20">
@@ -166,38 +192,82 @@ const getTaskWidth = (start: string | null, end: string | null) => {
                   <div className="min-w-max">
                     {/* Header */}
                     <div className="mb-4 flex items-start">
-                      <div className="w-48 flex-shrink-0" />
-                      <div className="flex-1 text-xs text-muted-foreground">
-                        {dateRange.start.toLocaleDateString("en-US", { month: "short", year: "numeric" })} →{" "}
-                        {dateRange.end.toLocaleDateString("en-US", { month: "short", year: "numeric" })}
-                      </div>
-                    </div>
+  <div className="w-48 flex-shrink-0" />
+
+  <div className="flex-1 grid grid-flow-col auto-cols-[120px] text-xs text-center">
+
+    {monthsArray.map((d, i) => (
+      <div key={i} className="border-l py-1 font-medium">
+        {d.toLocaleDateString("en-US", { month: "short" })}
+        <div className="text-[10px] text-muted-foreground">
+          {d.getFullYear()}
+        </div>
+      </div>
+    ))}
+
+  </div>
+
+</div>
 
                     {/* Tasks */}
-                    <div className="space-y-3">
-                      {filteredTasks.map((task) => (
-                        <div key={task.id} className="flex items-center gap-2">
-                          <div className="w-48 flex-shrink-0">
-                            <div className="text-xs font-semibold truncate">{task.label}</div>
-                            <div className="text-xs text-muted-foreground">{task.id}</div>
-                          </div>
-                          <div className="flex-1 relative h-10 bg-muted/30 rounded-md border border-muted">
-                            <div
-                              className={`absolute h-full rounded-md ${getProgressColor(task.progress)} opacity-75 top-0 left-0 flex items-center px-2`}
-                              style={{
-                                left: `${getTaskPosition(task.start)}%`,
-                                width: `${getTaskWidth(task.start, task.end)}%`,
-                              }}
-                            >
-                              <span className="text-white text-xs font-bold">{Math.round(task.progress * 100)}%</span>
-                            </div>
-                          </div>
-                          <div className="w-32 flex-shrink-0 text-xs text-muted-foreground">
-                            <div>{task.start ? new Date(task.start).toLocaleDateString() : "—"}</div>
-                            <div>{task.end ? new Date(task.end).toLocaleDateString() : "—"}</div>
-                          </div>
-                        </div>
-                      ))}
+                    <div className="space-y-4">
+                      {filteredTasks.slice(0,150).map((task) => {
+  const plannedLeft = getTaskPosition(task.start);
+  const plannedWidth = getTaskWidth(task.start, task.end);
+  const actualWidth = plannedWidth * task.progress;
+
+  // Calculate delay log
+  const today = new Date();
+  const endDate = task.end ? new Date(task.end) : null;
+  const delayLog =
+    endDate && task.progress < 1 && endDate < today
+      ? [`Task delayed by ${Math.ceil((today.getTime() - endDate.getTime()) / (1000*60*60*24))} days`]
+      : [];
+
+  return (
+    <div key={task.id} className="flex items-center gap-2">
+      {/* Activity Name */}
+      <div className="w-48 flex-shrink-0">
+        <div className="text-xs font-semibold truncate">{task.label}</div>
+        <div className="text-xs text-muted-foreground">{task.id}</div>
+      </div>
+
+      {/* Timeline */}
+      <div className="flex-1 relative h-12 bg-muted/30 rounded-md border border-muted">
+        {/* Planned Bar */}
+        <div
+          className="absolute h-4 bg-red-400 rounded top-1"
+          style={{ left: `${plannedLeft}%`, width: `${plannedWidth}%` }}
+        />
+
+        {/* Actual Progress Bar */}
+        <div
+          className="absolute h-4 bg-red-700 rounded top-6 flex items-center px-2 cursor-pointer"
+          style={{ left: `${plannedLeft}%`, width: `${actualWidth}%` }}
+          onClick={() => delayLog.length && setSelectedDelayLog(delayLog)}
+        >
+          <span className="text-white text-[10px] font-bold">{Math.round(task.progress * 100)}%</span>
+        </div>
+
+        {/* Delay Overlay (optional) */}
+        {delayLog.length > 0 && (
+          <div
+            className="absolute h-full bg-red-900 opacity-50 cursor-pointer z-10"
+            style={{ left: `${plannedLeft + actualWidth}%`, width: `${plannedWidth - actualWidth}%` }}
+            onClick={() => setSelectedDelayLog(delayLog)}
+          />
+        )}
+      </div>
+
+      {/* Dates */}
+      <div className="w-32 flex-shrink-0 text-xs text-muted-foreground">
+        <div>{task.start ? new Date(task.start).toLocaleDateString() : "—"}</div>
+        <div>{task.end ? new Date(task.end).toLocaleDateString() : "—"}</div>
+      </div>
+    </div>
+  );
+})}
+
                     </div>
 
                     {/* Legend */}
@@ -216,6 +286,21 @@ const getTaskWidth = (start: string | null, end: string | null) => {
           </Card>
         )}
       </div>
+      {/* Delay Modal */}
+      {selectedDelayLog && (
+        <Dialog open={true} onOpenChange={() => setSelectedDelayLog(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delay Log</DialogTitle>
+            </DialogHeader>
+            <ul className="list-disc pl-6">
+              {selectedDelayLog.map((log, i) => (
+                <li key={i}>{log}</li>
+              ))}
+            </ul>
+          </DialogContent>
+        </Dialog>
+      )}
     </Layout>
   );
 }

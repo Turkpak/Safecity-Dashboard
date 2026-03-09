@@ -283,14 +283,15 @@ def parse_xer(file_path):
 
                 values = line.split("\t")[1:]
                 row = dict(zip(fields, values))
-
+                print(row.keys())
                 activities.append({
                     "activity_id": row.get("task_id"),
                     "activity_name": row.get("task_name"),
                     "start_date": row.get("early_start_date") or row.get("target_start_date"),
                     "end_date": row.get("early_end_date") or row.get("target_end_date"),
+                    "progress": float(row.get("phys_complete_pct") or 0) / 100
                 })
-
+                print(f"Activity: {row.get('task_name')}, Progress: {row.get('phys_complete_pct')}, Progress (decimal): {float(row.get('phys_complete_pct') or 0) / 100}")
     return activities
 
 def get_xer_gantt_data(project_id):
