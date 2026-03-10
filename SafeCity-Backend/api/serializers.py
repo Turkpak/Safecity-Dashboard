@@ -4,6 +4,7 @@ from .models import *
 from django.contrib.gis.geos import GEOSGeometry
 import json
 from django.contrib.auth import get_user_model
+from .utils import parse_xer
 # --------------------------------------------------------
 # MyUser Serializer
 # --------------------------------------------------------
@@ -186,15 +187,7 @@ class StakeholderSerializer(serializers.ModelSerializer):
 class ProjectActivitySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectActivity
-        fields = [
-            'id',
-            'project',
-            'activity_id',
-            'activity_name',
-            'start_date',
-            'finish_date',
-            'percent_complete'
-        ]
+        fields = ["id", "activity_id", "activity_name", "start_date", "end_date", "progress"]
 
 # --------------------------------------------------------
 # Project
@@ -210,8 +203,10 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         queryset=Stakeholder.objects.all(),
         required=False
     )
-    # activities = ProjectActivitySerializer(many=True, read_only=True)
-
+    activities = ProjectActivitySerializer(many=True, read_only=True)
+    project_starting_date = serializers.DateField(
+        input_formats=["%Y-%m-%d", "%Y-%m-%d %H:%M"]
+    )
     class Meta:
         model = Project
         geo_field = "geom"
@@ -225,7 +220,7 @@ class ProjectSerializer(GeoFeatureModelSerializer):
             'total_budget_allocated', 'budget_utilized',
             'budget_variance', 'budget_remaining',
             'xer_file', 'boundary_file', 'geom',
-            'created_at', 'updated_at'
+            'created_at', 'updated_at', "activities"
         ]
 
     # ---------- Readable Names ----------
@@ -265,6 +260,8 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         # Assign XER file
         if xer_file:
             project.xer_file = xer_file
+            project.save()
+            self._save_activities(project)  # 🔥 Parse XER and save activities
 
         # Handle GeoJSON
         if boundary_file:
@@ -281,13 +278,7 @@ class ProjectSerializer(GeoFeatureModelSerializer):
             except Exception as e:
                 raise serializers.ValidationError({"boundary_file": f"Invalid GeoJSON: {e}"})
 
-        try:
-            project.save()
-        except Exception as e:
-            # wrap any low-level database errors as serializer validation failures
-            raise serializers.ValidationError({
-                "xer_file": f"Failed to parse XER file: {e}"
-            })
+        project.save()
         return project
 
     # ---------- Update ----------
@@ -304,7 +295,12 @@ class ProjectSerializer(GeoFeatureModelSerializer):
 
         if xer_file:
             instance.xer_file = xer_file
+            instance.save()
+            # Delete old activities and parse new ones
+            instance.activities.all().delete()
+            self._save_activities(instance)
 
+        # Handle GeoJSON
         if boundary_file:
             try:
                 boundary_file.seek(0)
@@ -319,13 +315,34 @@ class ProjectSerializer(GeoFeatureModelSerializer):
             except Exception as e:
                 raise serializers.ValidationError({"boundary_file": f"Invalid GeoJSON: {e}"})
 
-        try:
-            instance.save()
-        except Exception as e:
-            raise serializers.ValidationError({
-                "xer_file": f"Failed to parse XER file: {e}"
-            })
+        instance.save()
         return instance
+
+    # ---------- Private: Parse XER and save tasks ----------
+    def _save_activities(self, project):
+        if not project.xer_file:
+            return
+
+        activities = parse_xer(project.xer_file.path)
+
+        for act in activities:
+            start = act.get("start_date")
+            end = act.get("end_date")
+
+            if start:
+                start = start.split(" ")[0]
+
+            if end:
+                end = end.split(" ")[0]
+
+            ProjectActivity.objects.create(
+                project=project,
+                activity_id=act.get("activity_id"),
+                activity_name=act.get("activity_name"),
+                start_date=start,
+                end_date=end,
+                progress=act.get("progress", 0)
+            )
 
 class SubActivitySerializer(serializers.ModelSerializer):
     class Meta:

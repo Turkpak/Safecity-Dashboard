@@ -222,61 +222,7 @@ class Project(models.Model):
 
     def __str__(self):
         return self.project_name
-    # def parse_xer_file(self):
-    #     """Populate ``ProjectActivity`` records from the attached XER file.
 
-    #     The old implementation used the **xerparser** library directly which
-    #     would raise on newer exports ("No properties" etc.).  We now delegate
-    #     to :func:`api.utils.parse_xer_file` which itself has a fallback
-    #     manual parser.  Any errors are swallowed so the model save() call does
-    #     not fail; activities simply remain empty.
-    #     """
-    #     if not self.xer_file:
-    #         return
-
-    #     from django.utils.dateparse import parse_date
-    #     from .utils import parse_xer_file as _parse
-
-    #     try:
-    #         tasks = _parse(self.xer_file.path)
-    #     except Exception:
-    #         tasks = []
-
-    #     # wipe previous entries and recreate
-    #     self.activities.all().delete()
-    #     for t in tasks:
-    #         # convert to sensible defaults
-    #         start = parse_date(t.get("start")) if t.get("start") else None
-    #         finish = parse_date(t.get("end")) if t.get("end") else None
-    #         if not start or not finish:
-    #             # skip rows that can't satisfy NOT NULL constraints
-    #             continue
-    #         try:
-    #             progress_val = float(t.get("progress", 0) or 0) * 100
-    #         except Exception:
-    #             progress_val = 0
-
-    #         ProjectActivity.objects.create(
-    #             project=self,
-    #             activity_id=str(t.get("id", "")),
-    #             activity_name=str(t.get("label", "")),
-    #             start_date=start,
-    #             finish_date=finish,
-    #             percent_complete=progress_val,
-    #         )
-
-    # def save(self, *args, **kwargs):
-    #     try:
-    #         total = float(self.total_budget_allocated or 0)
-    #         utilized = float(self.budget_utilized or 0)
-    #     except ValueError:
-    #         total = 0
-    #         utilized = 0
-
-    #     self.budget_variance = total - utilized
-    #     self.budget_remaining = max(total - utilized, 0)
-
-    #     super().save(*args, **kwargs)
     def save(self, *args, **kwargs):
         is_new = self.pk is None
 
@@ -292,27 +238,19 @@ class Project(models.Model):
 
         super().save(*args, **kwargs)
 
-        # ✅ Parse XER after saving.  Always rerun parsing so that replacing
-        # the file updates the cached activity records.  Errors inside
-        # ``parse_xer_file`` are caught there, so we don't need additional
-        # protection here.
-        # if self.xer_file:
-        #     self.parse_xer_file()
-
-        # Only parse when XER exists
-        # if self.xer_file:
-        #     # Optional: prevent duplicate parsing
-        #     if is_new or not self.activities.exists():
-        #         self.parse_xer_file()
-    
-
 class ProjectActivity(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="activities")
-    activity_id = models.CharField(max_length=100)
-    activity_name = models.CharField(max_length=255)
-    start_date = models.DateField()
-    finish_date = models.DateField()
-    percent_complete = models.FloatField(default=0)
+    activity_id = models.CharField(max_length=100, null=True, blank=True)
+    activity_name = models.CharField(max_length=255, null=True, blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    progress = models.FloatField(default=0)  # 0-1 decimal
+
+    class Meta:
+        ordering = ["start_date"]
+
+    def __str__(self):
+        return f"{self.activity_name} ({self.project.project_name})"
     
 # --------------------------------------------------------
 # Pictorial Archive

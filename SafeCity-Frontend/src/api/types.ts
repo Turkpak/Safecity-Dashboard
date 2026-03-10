@@ -254,6 +254,7 @@ export interface ProjectActivity {
   start_date: string | null;
   finish_date: string | null;
   percent_complete: number;
+  parent?: string | null; // optional for hierarchical relationships
 }
 
 export interface ProjectActivityCreateInput {
