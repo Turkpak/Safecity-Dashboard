@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search } from "lucide-react";
-import { listProjects, getProjectGanttData } from "@/api";
+import { listProjects, getProjectGanttData, updateProjectActivity } from "@/api";
 import { useEffect } from "react";
 import {
   Dialog,
@@ -19,11 +19,13 @@ import {
 } from "@/components/ui/dialog";
 
 interface GanttTask {
-  id: string;
+  id: string;             // database PK used for updates
+  activity_id?: string;   // original identifier from XER or source, optional
   label: string;
   start: string | null;
   end: string | null;
   progress: number;
+  parent?: string; // optional, used for sub-activities if provided by backend
 }
 
 export default function ProjectActivityManagement() {
@@ -31,8 +33,21 @@ export default function ProjectActivityManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [ganttTasks, setGanttTasks] = useState<GanttTask[]>([]);
   const [loadingGantt, setLoadingGantt] = useState(false);
-  const parseDate = (d: string | null) => (d ? new Date(d.replace(" ", "T")) : null);
+  const parseDate = (d: string | null) => (d ? new Date(d) : null);
   const [selectedDelayLog, setSelectedDelayLog] = useState<string[] | null>(null);
+
+  // track which rows are expanded (showing details/sub-activities)
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+
+  // storing user updates locally so we can render them separately
+  const [updates, setUpdates] = useState<Record<string, { start: string | null; end: string | null }>>({});
+
+  // currently editing task (for modal)
+  const [editingTask, setEditingTask] = useState<{
+    id: string;
+    start: string | null;
+    end: string | null;
+  } | null>(null);
   // Fetch projects
   const { data: projects = [] } = useQuery({
     queryKey: ["projects"],
@@ -42,36 +57,69 @@ export default function ProjectActivityManagement() {
   // Fetch Gantt tasks whenever project changes
 useEffect(() => {
   const fetchGantt = async () => {
-    console.log("Fetching Gantt for projectId:", selectedProjectId);
     if (!selectedProjectId) {
       setGanttTasks([]);
       return;
     }
+
     setLoadingGantt(true);
+
     try {
       const tasks = await getProjectGanttData(selectedProjectId);
-      console.log("Fetched tasks:", tasks);
-      const tasksWithProgress = tasks.map((t: any) => ({
-        ...t,
-        progress: t.progress ?? Math.random() * 0.8
-      }));
-
-      setGanttTasks(tasksWithProgress);
+      setGanttTasks(tasks);
     } catch (err) {
-      console.error("Error fetching Gantt tasks:", err);
+      console.error(err);
       setGanttTasks([]);
     } finally {
       setLoadingGantt(false);
     }
   };
+
   fetchGantt();
 }, [selectedProjectId]);
-
 const filteredTasks = ganttTasks.filter(
   (t) =>
     t.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
     String(t.id).toLowerCase().includes(searchQuery.toLowerCase())
 );
+
+// optionally build a child map for hierarchical tasks
+const childMap = useMemo(() => {
+  const m: Record<string, GanttTask[]> = {};
+  filteredTasks.forEach((t) => {
+    if (t.parent) {
+      m[t.parent] = m[t.parent] || [];
+      m[t.parent].push(t);
+    }
+  });
+  return m;
+}, [filteredTasks]);
+
+// mix in updated versions: for each original task, if we have an update and
+// the dates differ, create a second entry flagged with `isUpdated`
+interface DisplayTask extends GanttTask {
+  isUpdated?: boolean;
+  indent?: number; // for rendering children
+}
+
+const displayTasks: DisplayTask[] = [];
+filteredTasks.forEach((t) => {
+  if (t.parent) return; // skip, children will be inserted under parent
+  displayTasks.push(t);
+  const upd = updates[t.id];
+  if (upd && (upd.start !== t.start || upd.end !== t.end)) {
+    displayTasks.push({ ...t, start: upd.start, end: upd.end, isUpdated: true });
+  }
+  if (expandedTasks.has(t.id) && childMap[t.id]) {
+    childMap[t.id].forEach((child) => {
+      displayTasks.push({ ...child, indent: 1 });
+      const upd2 = updates[child.id];
+      if (upd2 && (upd2.start !== child.start || upd2.end !== child.end)) {
+        displayTasks.push({ ...child, start: upd2.start, end: upd2.end, isUpdated: true, indent: 1 });
+      }
+    });
+  }
+});
 
   // Gantt helpers
   const dateRange = (() => {
@@ -192,7 +240,12 @@ const getTaskWidth = (start: string | null, end: string | null) => {
                   <div className="min-w-max">
                     {/* Header */}
                     <div className="mb-4 flex items-start">
-  <div className="w-48 flex-shrink-0" />
+  <div className="w-48 flex-shrink-0 flex items-center">
+    <span className="text-xs font-semibold">Activity</span>
+  </div>
+  <div className="w-20 flex-shrink-0 flex items-center justify-center">
+    <span className="text-xs font-semibold">Action</span>
+  </div>
 
   <div className="flex-1 grid grid-flow-col auto-cols-[120px] text-xs text-center">
 
@@ -211,67 +264,111 @@ const getTaskWidth = (start: string | null, end: string | null) => {
 
                     {/* Tasks */}
                     <div className="space-y-4">
-                      {filteredTasks.slice(0,150).map((task) => {
-  const plannedLeft = getTaskPosition(task.start);
-  const plannedWidth = getTaskWidth(task.start, task.end);
-  const actualWidth = plannedWidth * task.progress;
+                      {displayTasks.slice(0,150).map((task, index) => {
+                        const rows: JSX.Element[] = [];
+                        const plannedLeft = getTaskPosition(task.start);
+                        const plannedWidth = getTaskWidth(task.start, task.end);
+                        const actualWidth = plannedWidth * task.progress;
 
-  // Calculate delay log
-  const today = new Date();
-  const endDate = task.end ? new Date(task.end) : null;
-  const delayLog =
-    endDate && task.progress < 1 && endDate < today
-      ? [`Task delayed by ${Math.ceil((today.getTime() - endDate.getTime()) / (1000*60*60*24))} days`]
-      : [];
+                        const today = new Date();
+                        const endDate = task.end ? new Date(task.end) : null;
+                        const delayLog =
+                          endDate && task.progress < 1 && endDate < today
+                            ? [`Task delayed by ${Math.ceil((today.getTime() - endDate.getTime()) / (1000*60*60*24))} days`]
+                            : [];
 
-  return (
-    <div key={task.id} className="flex items-center gap-2">
-      {/* Activity Name */}
-      <div className="w-48 flex-shrink-0">
-        <div className="text-xs font-semibold truncate">{task.label}</div>
-        <div className="text-xs text-muted-foreground">{task.id}</div>
-      </div>
+                        const isUpdated = !!(task as any).isUpdated;
 
-      {/* Timeline */}
-      <div className="flex-1 relative h-12 bg-muted/30 rounded-md border border-muted">
-        {/* Planned Bar */}
-        <div
-          className="absolute h-4 bg-red-400 rounded top-1"
-          style={{ left: `${plannedLeft}%`, width: `${plannedWidth}%` }}
-        />
+                        rows.push(
+                          <div
+                            key={`${task.id}-${index}-${isUpdated ? 'u' : 'p'}`}
+                            className="flex items-center gap-2"
+                          >
+                            {/* Activity Name + expand arrow only on first (planned) record */}
+                            <div className={`w-48 flex-shrink-0 flex items-center gap-1 ${task.indent ? 'pl-4' : ''}`}>
+                              {!isUpdated && childMap[task.id] && childMap[task.id].length > 0 && (
+                                <button
+                                  onClick={() => {
+                                    const copy = new Set(expandedTasks);
+                                    copy.has(task.id) ? copy.delete(task.id) : copy.add(task.id);
+                                    setExpandedTasks(copy);
+                                  }}
+                                  className="text-xs"
+                                >
+                                  {expandedTasks.has(task.id) ? '▾' : '▸'}
+                                </button>
+                              )}
+                              <div className={`text-xs font-semibold truncate ${isUpdated ? 'italic text-muted-foreground' : ''}`}>
+  {task.label}{task.activity_id ? ` (${task.activity_id})` : ''}
+</div>
+                            </div>
 
-        {/* Actual Progress Bar */}
-        <div
-          className="absolute h-4 bg-red-700 rounded top-6 flex items-center px-2 cursor-pointer"
-          style={{ left: `${plannedLeft}%`, width: `${actualWidth}%` }}
-          onClick={() => delayLog.length && setSelectedDelayLog(delayLog)}
-        >
-          <span className="text-white text-[10px] font-bold">{Math.round(task.progress * 100)}%</span>
-        </div>
+                            {/* spacer for action column */}
+                            <div className="w-20 flex-shrink-0" />
 
-        {/* Delay Overlay (optional) */}
-        {delayLog.length > 0 && (
-          <div
-            className="absolute h-full bg-red-900 opacity-50 cursor-pointer z-10"
-            style={{ left: `${plannedLeft + actualWidth}%`, width: `${plannedWidth - actualWidth}%` }}
-            onClick={() => setSelectedDelayLog(delayLog)}
-          />
-        )}
-      </div>
+                            {/* Timeline */}
+                            <div className="flex-1 relative h-12 bg-muted/30 rounded-md border border-muted">
+                              {/* Planned Bar */}
+                              <div
+                                className={`absolute h-4 ${isUpdated ? 'bg-blue-400' : 'bg-red-400'} rounded top-1`}
+                                style={{ left: `${plannedLeft}%`, width: `${plannedWidth}%` }}
+                              />
 
-      {/* Dates */}
-      <div className="w-32 flex-shrink-0 text-xs text-muted-foreground">
-        <div>{task.start ? new Date(task.start).toLocaleDateString() : "—"}</div>
-        <div>{task.end ? new Date(task.end).toLocaleDateString() : "—"}</div>
-      </div>
-    </div>
-  );
-})}
+                              {/* Actual Progress Bar */}
+                              <div
+                                className="absolute h-4 bg-red-700 rounded top-6 flex items-center px-2 cursor-pointer"
+                                style={{ left: `${plannedLeft}%`, width: `${actualWidth}%` }}
+                                onClick={() => delayLog.length && setSelectedDelayLog(delayLog)}
+                              >
+                                <span className="text-white text-[10px] font-bold">{Math.round(task.progress * 100)}%</span>
+                              </div>
+
+                              {/* Delay Overlay (optional) */}
+                              {delayLog.length > 0 && (
+                                <div
+                                  className="absolute h-full bg-red-900 opacity-50 cursor-pointer z-10"
+                                  style={{ left: `${plannedLeft + actualWidth}%`, width: `${plannedWidth - actualWidth}%` }}
+                                  onClick={() => setSelectedDelayLog(delayLog)}
+                                />
+                              )}
+                            </div>
+
+                            {/* Dates */}
+                            <div className="w-32 flex-shrink-0 text-xs text-muted-foreground">
+                              <div>{task.start ? new Date(task.start).toLocaleDateString() : "—"}</div>
+                              <div>{task.end ? new Date(task.end).toLocaleDateString() : "—"}</div>
+                            </div>
+
+                            {/* Action button only on planned row */}
+                            {!isUpdated && (
+                              <div className="w-20 flex-shrink-0">
+                                <button
+                                  className="text-xs underline text-primary"
+                                  onClick={() => setEditingTask({ id: task.id, start: task.start, end: task.end })}
+                                >
+                                  Action
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+
+
+                        return rows;
+                      })}
 
                     </div>
 
                     {/* Legend */}
-                    <div className="mt-6 flex gap-4 text-xs">
+                    <div className="mt-6 flex flex-wrap gap-6 text-xs">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded bg-red-400" />
+                        <span>Planned</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded bg-blue-400" />
+                        <span>Updated</span>
+                      </div>
                       {["0-20%", "20-40%", "40-60%", "60-80%", "80-100%"].map((label, i) => (
                         <div key={i} className="flex items-center gap-2">
                           <div className={`w-4 h-4 rounded ${progressColors[i]}`} />
@@ -298,6 +395,75 @@ const getTaskWidth = (start: string | null, end: string | null) => {
                 <li key={i}>{log}</li>
               ))}
             </ul>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Edit activity modal */}
+      {editingTask && (
+        <Dialog open={true} onOpenChange={() => setEditingTask(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Update Activity Dates</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="flex flex-col">
+                <Label htmlFor="edit-start">Start Date</Label>
+                <Input
+                  id="edit-start"
+                  type="date"
+                  value={editingTask.start || ""}
+                  onChange={(e) =>
+                    setEditingTask((prev) => prev && { ...prev, start: e.target.value || null })
+                  }
+                />
+              </div>
+              <div className="flex flex-col">
+                <Label htmlFor="edit-end">End Date</Label>
+                <Input
+                  id="edit-end"
+                  type="date"
+                  value={editingTask.end || ""}
+                  onChange={(e) =>
+                    setEditingTask((prev) => prev && { ...prev, end: e.target.value || null })
+                  }
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  className="px-4 py-2 bg-gray-200 rounded"
+                  onClick={() => setEditingTask(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-4 py-2 bg-primary text-white rounded"
+                  onClick={async () => {
+                    if (!editingTask) return;
+                    try {
+                      await updateProjectActivity(Number(editingTask.id), {
+                        start_date: editingTask.start,
+                        end_date: editingTask.end,
+                      });
+                      // store local update so original values remain
+                      setUpdates((u) => ({
+                        ...u,
+                        [editingTask.id]: {
+                          start: editingTask.start,
+                          end: editingTask.end,
+                        },
+                      }));
+                    } catch (e) {
+                      console.error("update failed", e);
+                    } finally {
+                      setEditingTask(null);
+                    }
+                  }}
+                >
+                  Update
+                </button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       )}

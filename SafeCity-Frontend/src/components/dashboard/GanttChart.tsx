@@ -1,8 +1,13 @@
 // ProjectGanttChart.tsx
 import { useEffect, useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { getProjectGanttData } from "@/api";
+import { listProjects, getProjectGanttData } from "@/api";
 
 interface GanttTask {
   id: string;
@@ -14,11 +19,24 @@ interface GanttTask {
 }
 
 interface ProjectGanttChartProps {
-  projectId: number;
+  projectId?: number;          // optional so wrapper can supply a selector
   searchQuery?: string;
 }
 
-export function ProjectGanttChart({ projectId, searchQuery = "" }: ProjectGanttChartProps) {
+export function ProjectGanttChart({ projectId: propProjectId, searchQuery = "" }: ProjectGanttChartProps) {
+  // allow internal selection when no projectId is passed
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
+    propProjectId != null ? propProjectId : null
+  );
+  const [searchQueryLocal, setSearchQueryLocal] = useState(searchQuery);
+
+  // fetch list of projects only when we need a selector
+  const { data: projects = [] } = useQuery({
+    queryKey: ["projects"],
+    queryFn: listProjects,
+    enabled: propProjectId == null,
+  });
+
   const [tasks, setTasks] = useState<GanttTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,9 +45,13 @@ export function ProjectGanttChart({ projectId, searchQuery = "" }: ProjectGanttC
 
   useEffect(() => {
     const fetchGantt = async () => {
+      if (!selectedProjectId) {
+        setTasks([]);
+        return;
+      }
       try {
         setLoading(true);
-        const fetchedTasks = await getProjectGanttData(projectId);
+        const fetchedTasks = await getProjectGanttData(selectedProjectId);
 
         const today = new Date();
         const tasksWithDelay = fetchedTasks.map((t: any) => {
@@ -58,7 +80,7 @@ export function ProjectGanttChart({ projectId, searchQuery = "" }: ProjectGanttC
     };
 
     fetchGantt();
-  }, [projectId]);
+  }, [selectedProjectId]);
 
   const totalDays = Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / (1000*60*60*24)) + 1;
 
@@ -89,15 +111,65 @@ export function ProjectGanttChart({ projectId, searchQuery = "" }: ProjectGanttC
 
   const filteredTasks = tasks.filter(
     (t) =>
-      t.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.id.toLowerCase().includes(searchQuery.toLowerCase())
+      t.label.toLowerCase().includes(searchQueryLocal.toLowerCase()) ||
+      t.id.toLowerCase().includes(searchQueryLocal.toLowerCase())
   );
+
+  // if we are in selector mode and no project chosen yet, prompt user
+  if (!propProjectId && !selectedProjectId) {
+    return <div className="py-8 text-center text-muted-foreground">Please select a project above to view the Gantt chart.</div>;
+  }
 
   if (loading) return <div>Loading...</div>;
   if (error || filteredTasks.length === 0) return <div>No tasks found.</div>;
 
   return (
     <>
+      {/* selector UI only when propProjectId wasn't provided */}
+      {!propProjectId && (
+        <Card className="border-none shadow-sm overflow-hidden mb-4">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+              Select Project
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="project-select" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Project <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={selectedProjectId ? String(selectedProjectId) : ""}
+                  onValueChange={(v) => setSelectedProjectId(v ? Number(v) : null)}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Choose project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={String(p.id)}>
+                        {p.project_name || `#${p.id}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="relative w-full sm:w-72 mt-4 md:mt-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Filter activities..."
+                  className="pl-10 h-10"
+                  value={searchQueryLocal}
+                  onChange={(e) => setSearchQueryLocal(e.target.value)}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="mt-8">
         <CardHeader>
           <CardTitle>Project Timeline (Gantt Chart)</CardTitle>
