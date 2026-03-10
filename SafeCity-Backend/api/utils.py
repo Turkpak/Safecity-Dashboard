@@ -259,7 +259,10 @@ class StandardResultsSetPagination(PageNumberPagination):
         })
 def parse_xer(file_path):
 
-    activities = []
+    wbs = {}
+    tasks = []
+    dependencies = []
+
     current_table = None
     fields = []
 
@@ -268,32 +271,51 @@ def parse_xer(file_path):
         for line in file:
             line = line.strip()
 
-            # Detect table
             if line.startswith("%T"):
-                parts = line.split("\t")
-                if len(parts) > 1:
-                    current_table = parts[1]
+                current_table = line.split("\t")[1]
 
-            # Detect fields
             elif line.startswith("%F"):
                 fields = line.split("\t")[1:]
 
-            # Read records
-            elif line.startswith("%R") and current_table == "TASK":
+            elif line.startswith("%R"):
 
                 values = line.split("\t")[1:]
                 row = dict(zip(fields, values))
-                print(row.keys())
-                activities.append({
-                    "activity_id": row.get("task_id"),
-                    "activity_name": row.get("task_name"),
-                    "start_date": row.get("early_start_date") or row.get("target_start_date"),
-                    "end_date": row.get("early_end_date") or row.get("target_end_date"),
-                    "progress": float(row.get("phys_complete_pct") or 0) / 100
-                })
-                print(f"Activity: {row.get('task_name')}, Progress: {row.get('phys_complete_pct')}, Progress (decimal): {float(row.get('phys_complete_pct') or 0) / 100}")
-    return activities
 
+                # WBS hierarchy
+                if current_table == "PROJWBS":
+
+                    wbs[row["wbs_id"]] = {
+                        "name": row.get("wbs_name"),
+                        "parent": row.get("parent_wbs_id")
+                    }
+
+                # Activities
+                elif current_table == "TASK":
+
+                    tasks.append({
+                        "activity_id": row.get("task_id"),
+                        "activity_name": row.get("task_name"),
+                        "wbs_id": row.get("wbs_id"),
+                        "start_date": row.get("early_start_date") or row.get("target_start_date"),
+                        "end_date": row.get("early_end_date") or row.get("target_end_date"),
+                        "progress": float(row.get("phys_complete_pct") or 0) / 100
+                    })
+
+                # Dependencies
+                elif current_table == "TASKPRED":
+
+                    dependencies.append({
+                        "task_id": row.get("task_id"),
+                        "pred_task_id": row.get("pred_task_id"),
+                        "type": row.get("pred_type")
+                    })
+
+    return {
+        "wbs": wbs,
+        "tasks": tasks,
+        "dependencies": dependencies
+    }
 def get_xer_gantt_data(project_id):
 
     from .models import Project   # adjust if needed

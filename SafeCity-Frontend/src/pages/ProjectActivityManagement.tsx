@@ -85,14 +85,22 @@ const filteredTasks = ganttTasks.filter(
 
 // optionally build a child map for hierarchical tasks
 const childMap = useMemo(() => {
-  const m: Record<string, GanttTask[]> = {};
-  filteredTasks.forEach((t) => {
-    if (t.parent) {
-      m[t.parent] = m[t.parent] || [];
-      m[t.parent].push(t);
+  const map: Record<string, GanttTask[]> = {};
+
+  filteredTasks.forEach((task) => {
+    if (task.parent) {
+      if (!map[task.parent]) {
+        map[task.parent] = [];
+      }
+      map[task.parent].push(task);
     }
   });
-  return m;
+
+  Object.keys(map).forEach((k) => {
+    map[k].sort((a, b) => (a.start || "").localeCompare(b.start || ""));
+  });
+
+  return map;
 }, [filteredTasks]);
 
 // mix in updated versions: for each original task, if we have an update and
@@ -101,23 +109,42 @@ interface DisplayTask extends GanttTask {
   isUpdated?: boolean;
   indent?: number; // for rendering children
 }
+function addChildren(
+  parentId: string,
+  indent: number,
+  display: DisplayTask[],
+  childMap: Record<string, GanttTask[]>,
+  expanded: Set<string>
+) {
+  if (!childMap[parentId]) return;
 
+  childMap[parentId].forEach((child) => {
+    display.push({ ...child, indent });
+
+    if (expanded.has(child.id)) {
+      addChildren(child.id, indent + 1, display, childMap, expanded);
+    }
+  });
+}
 const displayTasks: DisplayTask[] = [];
+
 filteredTasks.forEach((t) => {
-  if (t.parent) return; // skip, children will be inserted under parent
+  if (t.parent) return; // root tasks only
+
   displayTasks.push(t);
+
   const upd = updates[t.id];
   if (upd && (upd.start !== t.start || upd.end !== t.end)) {
-    displayTasks.push({ ...t, start: upd.start, end: upd.end, isUpdated: true });
-  }
-  if (expandedTasks.has(t.id) && childMap[t.id]) {
-    childMap[t.id].forEach((child) => {
-      displayTasks.push({ ...child, indent: 1 });
-      const upd2 = updates[child.id];
-      if (upd2 && (upd2.start !== child.start || upd2.end !== child.end)) {
-        displayTasks.push({ ...child, start: upd2.start, end: upd2.end, isUpdated: true, indent: 1 });
-      }
+    displayTasks.push({
+      ...t,
+      start: upd.start,
+      end: upd.end,
+      isUpdated: true
     });
+  }
+
+  if (expandedTasks.has(t.id)) {
+    addChildren(t.id, 1, displayTasks, childMap, expandedTasks);
   }
 });
 
@@ -285,7 +312,7 @@ const getTaskWidth = (start: string | null, end: string | null) => {
                             className="flex items-center gap-2"
                           >
                             {/* Activity Name + expand arrow only on first (planned) record */}
-                            <div className={`w-48 flex-shrink-0 flex items-center gap-1 ${task.indent ? 'pl-4' : ''}`}>
+                            <div className="w-48 flex-shrink-0 flex items-center gap-1" style={{ paddingLeft: `${(task.indent || 0) * 16}px` }}>
                               {!isUpdated && childMap[task.id] && childMap[task.id].length > 0 && (
                                 <button
                                   onClick={() => {

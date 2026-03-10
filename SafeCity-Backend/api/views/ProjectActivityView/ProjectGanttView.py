@@ -49,6 +49,7 @@ class ProjectGanttView(APIView):
                 "id",
                 "activity_id",
                 "activity_name",
+                "parent_id",
                 "start_date",
                 "end_date",
                 "progress"

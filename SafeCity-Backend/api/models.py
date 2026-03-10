@@ -239,12 +239,20 @@ class Project(models.Model):
         super().save(*args, **kwargs)
 
 class ProjectActivity(models.Model):
+
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="activities")
     activity_id = models.CharField(max_length=100, null=True, blank=True)
     activity_name = models.CharField(max_length=255, null=True, blank=True)
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        related_name="children",
+        on_delete=models.CASCADE
+    )
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
-    progress = models.FloatField(default=0)  # 0-1 decimal
+    progress = models.FloatField(default=0)
 
     class Meta:
         ordering = ["start_date"]
