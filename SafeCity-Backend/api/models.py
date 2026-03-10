@@ -222,31 +222,48 @@ class Project(models.Model):
 
     def __str__(self):
         return self.project_name
-    def parse_xer_file(self):
-        if not self.xer_file:
-            return
+    # def parse_xer_file(self):
+    #     """Populate ``ProjectActivity`` records from the attached XER file.
 
-        try:
-            # Lazy import inside function
-            from xerparser import XER
-        except ImportError:
-            # xerparser not installed; skip parsing
-            return
+    #     The old implementation used the **xerparser** library directly which
+    #     would raise on newer exports ("No properties" etc.).  We now delegate
+    #     to :func:`api.utils.parse_xer_file` which itself has a fallback
+    #     manual parser.  Any errors are swallowed so the model save() call does
+    #     not fail; activities simply remain empty.
+    #     """
+    #     if not self.xer_file:
+    #         return
 
-        xer = XER(self.xer_file.path)
+    #     from django.utils.dateparse import parse_date
+    #     from .utils import parse_xer_file as _parse
 
-        # Optional: clear old activities
-        self.activities.all().delete()
+    #     try:
+    #         tasks = _parse(self.xer_file.path)
+    #     except Exception:
+    #         tasks = []
 
-        for act in xer.activities:
-            ProjectActivity.objects.create(
-                project=self,
-                activity_id=act.activity_id,
-                activity_name=act.activity_name,
-                start_date=act.start_date,
-                finish_date=act.finish_date,
-                percent_complete=getattr(act, "phys_complete_pct", 0) or 0
-            )
+    #     # wipe previous entries and recreate
+    #     self.activities.all().delete()
+    #     for t in tasks:
+    #         # convert to sensible defaults
+    #         start = parse_date(t.get("start")) if t.get("start") else None
+    #         finish = parse_date(t.get("end")) if t.get("end") else None
+    #         if not start or not finish:
+    #             # skip rows that can't satisfy NOT NULL constraints
+    #             continue
+    #         try:
+    #             progress_val = float(t.get("progress", 0) or 0) * 100
+    #         except Exception:
+    #             progress_val = 0
+
+    #         ProjectActivity.objects.create(
+    #             project=self,
+    #             activity_id=str(t.get("id", "")),
+    #             activity_name=str(t.get("label", "")),
+    #             start_date=start,
+    #             finish_date=finish,
+    #             percent_complete=progress_val,
+    #         )
 
     # def save(self, *args, **kwargs):
     #     try:
@@ -275,10 +292,12 @@ class Project(models.Model):
 
         super().save(*args, **kwargs)
 
-        # ✅ Parse XER after saving
-        if self.xer_file:
-            if is_new or not self.activities.exists():
-                self.parse_xer_file()
+        # ✅ Parse XER after saving.  Always rerun parsing so that replacing
+        # the file updates the cached activity records.  Errors inside
+        # ``parse_xer_file`` are caught there, so we don't need additional
+        # protection here.
+        # if self.xer_file:
+        #     self.parse_xer_file()
 
         # Only parse when XER exists
         # if self.xer_file:

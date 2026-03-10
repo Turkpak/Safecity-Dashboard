@@ -741,7 +741,7 @@ export default function ProjectDetail() {
           {selectedProject && (
             <div className="mt-6">
               <h3 className="text-lg font-semibold mb-2">Project Gantt Chart</h3>
-              <ProjectGanttChart projectId={selectedProject.key || selectedProject.id} />
+              <ProjectGanttChart projectId={selectedProject.id} />
             </div>
           )}
           </div>

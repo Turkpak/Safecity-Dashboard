@@ -12,4 +12,4 @@ from django.db import IntegrityError
 from django.db.models import ProtectedError
 from rest_framework.parsers import MultiPartParser, FormParser
 from ..permissions import *
-from api.utils import get_xer_gantt_data
+# from ..utils.xer_parser import get_xer_gantt_data

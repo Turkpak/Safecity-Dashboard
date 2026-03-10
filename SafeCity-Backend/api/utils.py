@@ -2,6 +2,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 import jwt
 from builtins import dict
 import string
+from typing import List, Dict, Any
 from django.http import JsonResponse
 from rest_framework.response import Response
 from rest_framework import status as http_status
@@ -80,24 +81,17 @@ def project_image_file_path(instance, filename):
     )
 
 def project_doc_file_path(instance, filename):
+
     ext = filename.split('.')[-1].lower()
     filename = f"{uuid.uuid4()}.{ext}"
 
-    # Format each level with the title in brackets
-    province = f"{instance.province.province_name} (Province)" if instance.province else "No Province"
-    division = f"{instance.division.division_name} (Division)" if instance.division else "No Division"
-    district = f"{instance.district.district_name} (District)" if instance.district else "No District"
-    tehsil = f"{instance.tehsil.tehsil_name} (Tehsil)" if instance.tehsil else "No Tehsil"
-    project = f"{instance.project_name} (Project)" if instance.project_name else "No Project"
+    # Project name with ID
+    project_name = f"{instance.id}-{slugify(instance.project_name)}" if instance.project_name else "no-project"
 
-    # Slugify to make folder names filesystem-friendly
-    province = slugify(province)
-    division = slugify(division)
-    district = slugify(district)
-    tehsil = slugify(tehsil)
-    project = slugify(project)[:50]  # limit project folder length
+    # Date folder
+    date_folder = instance.created_at.strftime("%Y-%m-%d") if instance.created_at else datetime.now().strftime("%Y-%m-%d")
 
-    # Decide subfolder based on file type
+    # File type folder
     if ext == "xer":
         subfolder = "xer"
     elif ext in ["geojson", "json"]:
@@ -105,18 +99,11 @@ def project_doc_file_path(instance, filename):
     else:
         subfolder = "others"
 
-    # Use created_at date if available, else today
-    date_folder = instance.created_at.strftime("%Y-%m-%d") if instance.created_at else datetime.now().strftime("%Y-%m-%d")
-
     return os.path.join(
         "projects",
-        province,
-        division,
-        district,
-        tehsil,
-        project,
-        subfolder,
+        project_name,
         date_folder,
+        subfolder,
         filename
     )
 
@@ -270,89 +257,54 @@ class StandardResultsSetPagination(PageNumberPagination):
             'count': self.page.paginator.count,
             'results': data
         })
+def parse_xer(file_path):
 
-"""
-XER File Parser using PyP6XER
-Extracts task/activity information from MS Project .xer files
-"""
-from typing import List, Dict, Any
-from datetime import datetime
-
-
-def parse_xer_file(file_path: str) -> List[Dict[str, Any]]:
-    """
-    Parse XER file and extract activities for Gantt chart.
-    
-    Args:
-        file_path: Path to .xer file
-    
-    Returns:
-        List of activities with id, name, start_date, finish_date, percent_complete
-    """
-    try:
-        from pyp6xer import Xer
-    except ImportError:
-        raise ImportError("PyP6XER not installed. Run: pip install PyP6XER")
-    
     activities = []
-    
-    try:
-        # Parse XER file
-        xer = Xer(file_path)
-        
-        # Extract activities from the XER object
-        for activity in xer.activities:
-            try:
-                activity_dict = {
-                    'id': str(activity.activity_id),
-                    'label': activity.activity_name or f"Activity {activity.activity_id}",
-                    'start': activity.start_date.isoformat() if activity.start_date else None,
-                    'end': activity.finish_date.isoformat() if activity.finish_date else None,
-                    'progress': (activity.phys_complete_pct or 0) / 100.0,  # Convert % to decimal
-                }
-                activities.append(activity_dict)
-            except Exception as e:
-                # Skip problematic activities
-                print(f"Error parsing activity: {e}")
-                continue
-        
-        # Sort by start date
-        activities.sort(key=lambda x: x['start'] or "")
-        
-        return activities
-    
-    except Exception as e:
-        raise ValueError(f"Failed to parse XER file: {str(e)}")
+    current_table = None
+    fields = []
 
+    with open(file_path, "r", encoding="utf-8", errors="ignore") as file:
 
-def get_xer_gantt_data(project_id: int) -> Dict[str, Any]:
-    """
-    Get Gantt data from project's XER file.
-    
-    Args:
-        project_id: Project ID
-    
-    Returns:
-        Dict with tasks list for Gantt chart
-    """
-    from .models import Project
-    
-    try:
-        project = Project.objects.get(id=project_id)
-        
-        if not project.xer_file:
-            return {'tasks': [], 'message': 'No XER file attached to project'}
-        
-        # Parse XER file
-        tasks = parse_xer_file(project.xer_file.path)
-        
-        return {
-            'tasks': tasks,
-            'project_name': project.project_name,
-            'message': f'Loaded {len(tasks)} activities from XER file'
-        }
-    
-    except Project.DoesNotExist:
-        raise ValueError(f"Project {project_id} not found")
-    except Exception as e:
-        raise ValueError(f"Error loading XER data: {str(e)}")
+        for line in file:
+            line = line.strip()
+
+            # Detect table
+            if line.startswith("%T"):
+                parts = line.split("\t")
+                if len(parts) > 1:
+                    current_table = parts[1]
+
+            # Detect fields
+            elif line.startswith("%F"):
+                fields = line.split("\t")[1:]
+
+            # Read records
+            elif line.startswith("%R") and current_table == "TASK":
+
+                values = line.split("\t")[1:]
+                row = dict(zip(fields, values))
+                print(row.keys())
+                activities.append({
+                    "activity_id": row.get("task_id"),
+                    "activity_name": row.get("task_name"),
+                    "start_date": row.get("early_start_date") or row.get("target_start_date"),
+                    "end_date": row.get("early_end_date") or row.get("target_end_date"),
+                    "progress": float(row.get("phys_complete_pct") or 0) / 100
+                })
+                print(f"Activity: {row.get('task_name')}, Progress: {row.get('phys_complete_pct')}, Progress (decimal): {float(row.get('phys_complete_pct') or 0) / 100}")
+    return activities
+
+def get_xer_gantt_data(project_id):
+
+    from .models import Project   # adjust if needed
+
+    project = Project.objects.get(id=project_id)
+
+    if not project.xer_file:
+        return []
+
+    xer_path = project.xer_file.path
+
+    activities = parse_xer(xer_path)
+
+    return activities

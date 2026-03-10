@@ -6,14 +6,17 @@ import type {
 } from "./types";
 
 const CREATE_PATH = "create-project-activity/";
-const LIST_PATH = "list-project-activity/";
+const LIST_PATH = "list-project/";
 const UPDATE_PATH = "update-project-activity/";
 const DELETE_PATH = "delete-project-activity/";
 
 export async function listProjectActivities(
   projectId?: number,
 ): Promise<ProjectActivity[]> {
-  const params = projectId != null ? { project_id: String(projectId) } : undefined;
+  // backend expects the "project" query parameter on the simple
+  // /api/gantt-data/ or /api/list-project-activity/ route (see
+  // ListProjectActivityView.list()).
+  const params = projectId != null ? { project: String(projectId) } : undefined;
   const data = await get<ProjectActivity[] | ProjectActivity[]>(LIST_PATH, params);
   if (!data) return [];
   if (Array.isArray(data)) return data;
@@ -51,11 +54,19 @@ export interface GanttResponse {
 }
 
 export async function getProjectGanttData(projectId: number): Promise<GanttTask[]> {
-  const data = await get<GanttResponse>(`${LIST_PATH}gantt-data/`, { project_id: String(projectId) });
-  return data?.tasks || [];
-}
+  if (!projectId) return [];
 
-export async function getProjectXerGanttData(projectId: number): Promise<GanttTask[]> {
-  const data = await get<GanttResponse>(`${LIST_PATH}xer-gantt-data/`, { project_id: String(projectId) });
-  return data?.tasks || [];
+  const data = await get<any>(`project-gantt/${projectId}/`);
+  console.log("Response from API:", data);
+
+  // Handle if API returns array directly
+  const tasksArray = Array.isArray(data) ? data : data.data || [];
+
+  return tasksArray.map((act: any) => ({
+    id: String(act.activity_id),
+    label: act.activity_name || `#${act.activity_id}`,
+    start: act.start_date || null,
+    end: act.end_date || act.start_date || null,
+    progress: 0,
+  }));
 }
