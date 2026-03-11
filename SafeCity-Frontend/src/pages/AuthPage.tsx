@@ -11,13 +11,7 @@ import {
     ArrowRight,
     Eye,
     EyeOff,
-    Map as MapIcon,
-    ChevronRight,
-    TrendingUp,
-    BarChart3,
     CheckCircle2,
-    Briefcase,
-    ShieldCheck
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -74,13 +68,13 @@ export default function AuthPage() {
     };
 
     return (
-        <div className="min-h-screen w-full flex bg-white font-sans overflow-hidden">
-            {/* LEFT SIDE: Project Information & Progress "Advertisement" Panel */}
+        <div className="min-h-screen w-full flex flex-col lg:flex-row bg-white font-sans overflow-x-hidden overflow-y-auto">
+            {/* LEFT SIDE: Project Information & Progress "Advertisement" Panel — stacks above form on mobile */}
             <motion.div
                 initial={{ x: -100, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 transition={{ duration: 0.8, ease: "circOut" }}
-                className="hidden lg:flex w-[55%] bg-primary relative overflow-hidden flex-col justify-between p-16 text-white"
+                className="flex w-full lg:w-[55%] bg-primary relative overflow-hidden flex-col justify-between p-6 sm:p-10 lg:p-16 text-white shrink-0"
             >
                 {/* Visual Background Noise */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -89,63 +83,34 @@ export default function AuthPage() {
                     <div className="absolute inset-0 bg-grid-pattern opacity-[0.07] [mask-image:radial-gradient(ellipse_at_center,black_70%,transparent_100%)]" />
                 </div>
 
-                {/* Top Branding Section */}
-                <div className="relative z-10 flex items-center gap-5">
+                {/* Top Branding Section — visible on all screen sizes */}
+                <div className="relative z-10 flex items-center gap-3 sm:gap-5">
                     <motion.div
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         transition={{ delay: 0.2, duration: 0.5 }}
-                        className="h-16 w-16 bg-white rounded-2xl flex items-center justify-center p-3 shadow-[0_0_40px_rgba(255,255,255,0.15)]"
+                        className="h-12 w-12 sm:h-14 sm:w-14 lg:h-16 lg:w-16 bg-white rounded-xl sm:rounded-2xl flex items-center justify-center p-2 sm:p-3 shadow-[0_0_40px_rgba(255,255,255,0.15)] flex-shrink-0"
                     >
                         <img src="/Assets/psca logo.png" alt="PSCA" className="h-full w-full object-contain" />
                     </motion.div>
-                    <div>
-                        <h1 className="text-2xl font-heading font-bold tracking-tight text-white">Punjab Safe Cities Authority</h1>
-                        <p className="text-secondary font-bold text-[11px] uppercase tracking-[0.25em]">Project Progress Monitoring</p>
+                    <div className="min-w-0">
+                        <h1 className="text-lg sm:text-xl lg:text-2xl font-heading font-bold tracking-tight text-white">Punjab Safe Cities Authority</h1>
+                        <p className="text-secondary font-bold text-[10px] sm:text-[11px] uppercase tracking-[0.25em]">Project Progress Monitoring</p>
                     </div>
                 </div>
 
-                {/* Main "Dashboard Advertisement" Content */}
-                <div className="relative z-10 max-w-xl">
+                {/* Main "Dashboard Advertisement" Content — slogan centered */}
+                <div className="relative z-10 flex flex-1 items-center justify-center text-center">
                     <motion.div
                         initial={{ y: 30, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ delay: 0.4, duration: 0.7 }}
+                        className="max-w-xl w-full"
                     >
-
-                        <h2 className="text-6xl font-heading font-bold mb-8 leading-[1.05] tracking-tight">
+                        <h2 className="text-3xl sm:text-4xl lg:text-6xl font-heading font-bold leading-[1.05] tracking-tight">
                             Smart Governance. <br />
                             <span className="text-secondary italic">Secure</span> Communities.
                         </h2>
-
-                        <p className="text-white/80 text-lg mb-12 leading-relaxed font-medium border-l-4 border-secondary pl-6">
-                            The central dashboard for monitoring real-time project implementation across every tehsil in Punjab. Track milestones, analyze data, and ensure timely completion of critical infrastructure.
-                        </p>
-
-                        <div className="grid grid-cols-2 gap-x-12 gap-y-10">
-                            {[
-                                { icon: TrendingUp, title: "Milestone Tracking", desc: "Live progress metrics for every project phase." },
-                                { icon: MapIcon, title: "140+ Tehsils", desc: "Unified monitoring for localized project status." },
-                                { icon: BarChart3, title: "Data Analytics", desc: "Comparative performance metrics across districts." },
-                                { icon: ShieldCheck, title: "Quality Assurance", desc: "Verifying project compliance with official standards." }
-                            ].map((item, idx) => (
-                                <motion.div
-                                    key={idx}
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: 0.6 + (idx * 0.1), duration: 0.5 }}
-                                    className="flex items-start gap-4 group"
-                                >
-                                    <div className="h-12 w-12 rounded-2xl bg-white/10 flex items-center justify-center flex-shrink-0 group-hover:bg-secondary/20 transition-colors border border-white/5 group-hover:border-secondary/30 shadow-lg">
-                                        <item.icon className="h-6 w-6 text-secondary" />
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-[15px] text-white group-hover:text-secondary transition-colors">{item.title}</h4>
-                                        <p className="text-[11px] text-white/50 mt-1.5 leading-normal">{item.desc}</p>
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </div>
                     </motion.div>
                 </div>
 
@@ -163,16 +128,16 @@ export default function AuthPage() {
                 <div className="absolute inset-0 bg-grid-pattern opacity-[0.02] pointer-events-none lg:hidden" />
 
                 <div className="w-full max-w-sm relative z-10">
-                    {/* Mobile Only Header */}
-                    <div className="lg:hidden flex flex-col items-center mb-12 text-center">
+                    {/* Mobile/tablet: compact header when left panel is stacked above (logo lives in left panel); keeps form title visible */}
+                    <div className="lg:hidden flex flex-col items-center mb-8 text-center">
                         <motion.div
                             whileHover={{ scale: 1.05 }}
-                            className="h-20 w-20 bg-primary rounded-[22px] flex items-center justify-center p-4 shadow-2xl mb-5"
+                            className="h-14 w-14 bg-primary/10 border-2 border-primary/20 rounded-2xl flex items-center justify-center p-2.5 shadow-sm mb-3"
                         >
-                            <img src="/Assets/psca logo.png" alt="PSCA" className="h-full w-full object-contain brightness-0 invert" />
+                            <img src="/Assets/psca logo.png" alt="PSCA" className="h-full w-full object-contain" />
                         </motion.div>
-                        <h1 className="text-3xl font-heading font-bold text-primary tracking-tight">PSCA Safe City</h1>
-                        <p className="text-secondary font-bold text-[10px] font-bold uppercase tracking-[0.25em] mt-2">Project Progress Monitoring</p>
+                        <h1 className="text-xl font-heading font-bold text-primary tracking-tight">PSCA Safe City</h1>
+                        <p className="text-secondary font-bold text-[10px] uppercase tracking-[0.25em] mt-1">Project Progress Monitoring</p>
                     </div>
 
                     <div className="mb-12">
