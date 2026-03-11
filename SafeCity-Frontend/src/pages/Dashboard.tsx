@@ -36,6 +36,7 @@ import {
   ChevronUp,
   Search,
   DollarSign,
+  FolderKanban,
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -820,6 +821,18 @@ export default function Dashboard() {
     return null;
   }, [selectedItemId, selectedItemType, apiProjects]);
 
+  // Projects in the currently selected geography (division / district / tehsil) for "Best Performing Projects" cards
+  const projectsInSelectedGeography = useMemo((): Project[] => {
+    if (!selectedItemId || !selectedItemType) return [];
+    if (selectedItemType === "division") {
+      return apiProjects.filter((p) => p.division === selectedItemId);
+    }
+    if (selectedItemType === "district") {
+      return apiProjects.filter((p) => p.district === selectedItemId);
+    }
+    return apiProjects.filter((p) => p.tehsil === selectedItemId);
+  }, [selectedItemId, selectedItemType, apiProjects]);
+
   // Get aggregated data based on view type (all projects)
   const aggregatedData = useMemo(() => {
     return getAggregatedDataFromProjects(apiProjects);
@@ -1035,12 +1048,20 @@ export default function Dashboard() {
     };
   };
 
+  // Valid InstallationCard colors for project cards
+  const PROJECT_CARD_COLORS: Array<
+    "blue" | "green" | "orange" | "purple" | "red" | "yellow"
+  > = ["blue", "green", "orange", "purple", "red", "yellow"];
+
   // Render aggregated charts function
   const renderAggregatedCharts = (
     title: string,
     data: CityInstallationData,
+    projectsInGeography?: Project[],
   ) => {
     const isAggregatedView = title.startsWith("All Punjab");
+    const useProjectCards =
+      Array.isArray(projectsInGeography) && projectsInGeography.length > 0;
 
     // Calculate overall planned and actual from all phases
     let totalPlanned = 0;
@@ -1113,6 +1134,11 @@ export default function Dashboard() {
         ? (absFinancialVariance / totalForFinancialPie) * 100
         : 0;
 
+    const isSelectedProjectInThisScope =
+      useProjectCards &&
+      !!selectedProjectForDetails &&
+      projectsInGeography!.some((p) => p.id === selectedProjectForDetails.id);
+
     // Selected milestone (if any) for this current view
     const selectedPhaseMeta = selectedMilestoneKey
       ? installationPhases.find((p) => p.key === selectedMilestoneKey)
@@ -1143,10 +1169,13 @@ export default function Dashboard() {
                 Progress breakdown for {title}
               </p>
             </div>
-            {selectedMilestoneKey && (
+            {(selectedMilestoneKey || isSelectedProjectInThisScope) && (
               <button
                 type="button"
-                onClick={() => setSelectedMilestoneKey(null)}
+                onClick={() => {
+                  setSelectedMilestoneKey(null);
+                  if (useProjectCards) setSelectedProjectForDetails(null);
+                }}
                 className="h-9 px-4 rounded-xl border border-border/60 bg-background hover:bg-muted/40 text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0"
               >
                 Clear
@@ -1154,30 +1183,72 @@ export default function Dashboard() {
             )}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-            {installationPhases.map((phase) => {
-              const progress = data[phase.key];
-              const progressValue = getProgressValue(progress);
-              const hasDetails = hasDetailedProgress(progress);
+            {useProjectCards
+              ? projectsInGeography!.map((project, index) => {
+                  const total = parseFloat(
+                    project.total_budget_allocated || "0",
+                  ) || 0;
+                  const utilized =
+                    parseFloat(project.budget_utilized || "0") || 0;
+                  const percentage =
+                    total > 0 ? Math.round((utilized / total) * 100) : 0;
+                  const displayName =
+                    project.project_name || `Project ${project.id}`;
+                  return (
+                    <InstallationCard
+                      key={`${title}-project-${project.id}`}
+                      title={displayName}
+                      percentage={percentage}
+                      icon={FolderKanban}
+                      color={PROJECT_CARD_COLORS[index % PROJECT_CARD_COLORS.length]}
+                      actualProgress={percentage}
+                      plannedProgress={100}
+                      selected={selectedProjectForDetails?.id === project.id}
+                      onClick={() => {
+                        setSelectedMilestoneKey(null);
+                        setSelectedProjectForDetails((prev) =>
+                          prev?.id === project.id ? null : project,
+                        );
+                      }}
+                    />
+                  );
+                })
+              : installationPhases.map((phase) => {
+                  const progress = data[phase.key];
+                  const progressValue = getProgressValue(progress);
+                  const hasDetails = hasDetailedProgress(progress);
 
-              return (
-                <InstallationCard
-                  key={`${title}-${phase.key}`}
-                  title={phase.title}
-                  percentage={progressValue}
-                  icon={phase.icon}
-                  color={phase.color as unknown as "green"}
-                  actualProgress={hasDetails ? progress.actual : undefined}
-                  plannedProgress={hasDetails ? progress.planned : undefined}
-                  selected={selectedMilestoneKey === phase.key}
-                  onClick={() => {
-                    setSelectedMilestoneKey((prev) =>
-                      prev === phase.key ? null : phase.key,
-                    );
-                  }}
-                />
-              );
-            })}
+                  return (
+                    <InstallationCard
+                      key={`${title}-${phase.key}`}
+                      title={phase.title}
+                      percentage={progressValue}
+                      icon={phase.icon}
+                      color={phase.color as unknown as "green"}
+                      actualProgress={hasDetails ? progress.actual : undefined}
+                      plannedProgress={hasDetails ? progress.planned : undefined}
+                      selected={selectedMilestoneKey === phase.key}
+                      onClick={() => {
+                        setSelectedMilestoneKey((prev) =>
+                          prev === phase.key ? null : phase.key,
+                        );
+                      }}
+                    />
+                  );
+                })}
           </div>
+
+          {/* Selected project details (Gantt / WBS / S-curves) for Division/District views */}
+          {isSelectedProjectInThisScope && (
+            <div className="mt-6">
+              <MilestoneDetailsPanel
+                milestoneTitle={`${selectedProjectForDetails!.project_name || `Project ${selectedProjectForDetails!.id}`} - Project Gantt`}
+                phase={selectedProjectPhase}
+                phaseColor="#3b82f6"
+                onClear={() => setSelectedProjectForDetails(null)}
+              />
+            </div>
+          )}
         </div>
 
         {/* Financial Progress Pie Charts (hide when a milestone KPI is selected) */}
@@ -2155,6 +2226,7 @@ export default function Dashboard() {
                       {renderAggregatedCharts(
                         selectedItemName + " Division",
                         singleItemData,
+                        projectsInSelectedGeography,
                       )}
                     </>
                   ) : (
@@ -2266,6 +2338,7 @@ export default function Dashboard() {
                       {renderAggregatedCharts(
                         selectedItemName + " District",
                         singleItemData,
+                        projectsInSelectedGeography,
                       )}
                     </>
                   ) : (
