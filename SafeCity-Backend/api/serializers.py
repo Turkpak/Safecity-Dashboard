@@ -185,9 +185,13 @@ class StakeholderSerializer(serializers.ModelSerializer):
         fields = ['id', 'stakeholder_type', 'stakeholder_title', 'status']
 
 class ProjectActivitySerializer(serializers.ModelSerializer):
+    project_name = serializers.SerializerMethodField()
     class Meta:
         model = ProjectActivity
-        fields = ["id", "activity_id", "activity_name", "start_date", "end_date", "progress"]
+        fields = ["id", "project", "project_name", "activity_id", "activity_name", "start_date", "end_date", "progress"]
+    
+    def get_project_name(self, obj):
+        return obj.project.project_name
 
 # --------------------------------------------------------
 # Project
@@ -320,14 +324,35 @@ class ProjectSerializer(GeoFeatureModelSerializer):
 
     # ---------- Private: Parse XER and save tasks ----------
     def _save_activities(self, project):
-        if not project.xer_file:
-            return
 
-        activities = parse_xer(project.xer_file.path)
+        data = parse_xer(project.xer_file.path)
 
-        for act in activities:
-            start = act.get("start_date")
-            end = act.get("end_date")
+        wbs = data["wbs"]
+        tasks = data["tasks"]
+
+        wbs_objects = {}
+
+        # Create WBS nodes
+        for wbs_id, w in wbs.items():
+
+            parent = wbs_objects.get(w["parent"])
+
+            obj = ProjectActivity.objects.create(
+                project=project,
+                activity_id=wbs_id,
+                activity_name=w["name"],
+                parent=parent
+            )
+
+            wbs_objects[wbs_id] = obj
+
+        # Create tasks
+        for task in tasks:
+
+            parent = wbs_objects.get(task["wbs_id"])
+
+            start = task["start_date"]
+            end = task["end_date"]
 
             if start:
                 start = start.split(" ")[0]
@@ -337,13 +362,13 @@ class ProjectSerializer(GeoFeatureModelSerializer):
 
             ProjectActivity.objects.create(
                 project=project,
-                activity_id=act.get("activity_id"),
-                activity_name=act.get("activity_name"),
+                activity_id=task["activity_id"],
+                activity_name=task["activity_name"],
+                parent=parent,
                 start_date=start,
                 end_date=end,
-                progress=act.get("progress", 0)
+                progress=task["progress"]
             )
-
 class SubActivitySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectActivity

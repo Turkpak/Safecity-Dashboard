@@ -43,10 +43,12 @@ export async function deleteProjectActivity(id: number): Promise<void> {
 
 export interface GanttTask {
   id: string;
+  activity_id?: string;
   label: string;
   start: string | null;
   end: string | null;
   progress: number;
+  parent?: string;
 }
 
 export interface GanttResponse {
@@ -71,6 +73,6 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
     end: act.end_date || act.start_date || null,
     progress: act.progress ?? 0,
     // optionally include a parent id if backend supplies it
-    ...(act.parent != null && { parent: String(act.parent) }),
+    parent: act.parent_id ? String(act.parent_id) : undefined,
   }));
 }
