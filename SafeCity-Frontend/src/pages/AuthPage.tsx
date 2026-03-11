@@ -105,7 +105,7 @@ export default function AuthPage() {
                         initial={{ y: 30, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ delay: 0.4, duration: 0.7 }}
-                        className="max-w-xl w-full"
+                        className="max-w-xl w-full mt-8 sm:mt-12 lg:mt-16"
                     >
                         <h2 className="text-3xl sm:text-4xl lg:text-6xl font-heading font-bold leading-[1.05] tracking-tight">
                             Smart Governance. <br />
