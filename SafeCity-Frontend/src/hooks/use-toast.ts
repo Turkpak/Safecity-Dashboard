@@ -7,12 +7,14 @@ import type {
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
+const TOAST_DURATION_MS = 2000
 
 type ToasterToast = ToastProps & {
   id: string
   title?: React.ReactNode
   description?: React.ReactNode
   action?: ToastActionElement
+  duration?: number
 }
 
 const actionTypes = {
@@ -160,6 +162,11 @@ function toast({ ...props }: Toast) {
       },
     },
   })
+
+  const duration = props.duration ?? TOAST_DURATION_MS
+  if (duration > 0) {
+    setTimeout(() => dispatch({ type: "DISMISS_TOAST", toastId: id }), duration)
+  }
 
   return {
     id: id,

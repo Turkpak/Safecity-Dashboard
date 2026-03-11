@@ -108,7 +108,9 @@ export default function ProjectManagement() {
   const [currentStep, setCurrentStep] = useState(1);
   const [editingProject, setEditingProject] = useState<ApiProject | null>(null);
   const [selectedProjectForView, setSelectedProjectForView] = useState<ApiProject | null>(null);
+  const [projectsPage, setProjectsPage] = useState(1);
 
+  const PROJECTS_PER_PAGE = 3;
   const { data: projectsData = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["projects"],
     queryFn: listProjects,
@@ -449,6 +451,18 @@ export default function ProjectManagement() {
     }
   };
 
+  const totalProjectsPages = Math.ceil(projectsData.length / PROJECTS_PER_PAGE) || 1;
+  const paginatedProjects = useMemo(() => {
+    const start = (projectsPage - 1) * PROJECTS_PER_PAGE;
+    return projectsData.slice(start, start + PROJECTS_PER_PAGE);
+  }, [projectsData, projectsPage, PROJECTS_PER_PAGE]);
+
+  useEffect(() => {
+    if (projectsPage > totalProjectsPages && totalProjectsPages > 0) {
+      setProjectsPage(totalProjectsPages);
+    }
+  }, [projectsPage, totalProjectsPages]);
+
   return (
     <Layout title="Project Management">
       <div className="space-y-8">
@@ -484,8 +498,9 @@ export default function ProjectManagement() {
             </CardContent>
           </Card>
         ) : (
+          <>
           <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-            {projectsData.map((project: ApiProject) => {
+            {paginatedProjects.map((project: ApiProject) => {
               const isSelected = selectedProjectForView?.id === project.id;
               return (
                 <Card
@@ -567,6 +582,34 @@ export default function ProjectManagement() {
               );
             })}
           </div>
+          {totalProjectsPages > 1 && (
+            <div className="flex items-center justify-center gap-4 pt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setProjectsPage((p) => Math.max(1, p - 1))}
+                disabled={projectsPage <= 1}
+                className="gap-1.5"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground min-w-[100px] text-center">
+                Page {projectsPage} of {totalProjectsPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setProjectsPage((p) => Math.min(totalProjectsPages, p + 1))}
+                disabled={projectsPage >= totalProjectsPages}
+                className="gap-1.5"
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          </>
         )}
 
         {/* Detail panel: selected project info in the space beneath the cards */}

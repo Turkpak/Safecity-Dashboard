@@ -62,7 +62,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      isAuthenticated: !!user && !!getAccessToken(),
+      // Token is the source of truth for API authentication.
+      // User details may load slightly later (or be missing in storage during first login).
+      isAuthenticated: !!getAccessToken(),
       setUser,
       logout,
     }),
@@ -74,6 +76,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  // In dev (Fast Refresh / HMR), components can temporarily render outside providers.
+  // Returning a safe fallback prevents the entire app from crashing.
+  if (!ctx) {
+    return {
+      user: null,
+      isAuthenticated: false,
+      setUser: () => {},
+      logout: () => {},
+    } satisfies AuthContextValue;
+  }
   return ctx;
 }

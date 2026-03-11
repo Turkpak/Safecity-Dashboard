@@ -7,9 +7,7 @@ const LOGIN_PATH = "login-user/";
 export async function login(credentials: LoginCredentials): Promise<LoginResponse> {
   const data = await post<LoginResponse>(LOGIN_PATH, credentials);
   const access = data.access ?? data.token;
-  if (access && data.refresh) {
-    setTokens(access, data.refresh);
-  }
+  if (access) setTokens(access, data.refresh);
   return data;
 }
 

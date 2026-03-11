@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import html2pdf from "html2pdf.js";
+import { getAccessToken } from "@/api/client";
 // import LogManager from "../LogManager";
 // Updated CSS styles embedded in component
 const styles = `
@@ -137,7 +138,11 @@ const API_URL = import.meta.env.VITE_API_URL;  // ✅ Correct way in Vite
           setCameraLoading(false);
           return;
         }
-        const res = await fetch(`${API_URL}/camera`);
+        const token = getAccessToken();
+        const res = await fetch(`${API_URL}/camera`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          credentials: "include",
+        });
         const json = await res.json();
         const cameras = Array.isArray(json?.cameras) ? json.cameras : (Array.isArray(json) ? json : []);
         const found = cameras.find((cam) => cam?._id === id);
@@ -165,7 +170,11 @@ const API_URL = import.meta.env.VITE_API_URL;  // ✅ Correct way in Vite
             setData([]);
             return;
           }
-          const res=await fetch(`${API_URL}/schedule`);
+          const token = getAccessToken();
+          const res = await fetch(`${API_URL}/schedule`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            credentials: "include",
+          });
           const json=await res.json();
           console.log(json);
           // Normalize various possible API shapes into our expected array-of-projects
