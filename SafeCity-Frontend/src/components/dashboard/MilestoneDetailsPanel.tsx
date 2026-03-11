@@ -90,147 +90,36 @@ type GanttTask = {
   weight: number;
   status: "ahead" | "behind" | "ontrack";
   children?: GanttTask[];
+  // Optional overrides used when we generate tasks from API-driven milestones
+  progressOverride?: number; // 0..100
+  plannedOverride?: number; // 0..100
 };
 
-// Delay log data structure
-export type DelayLog = {
+// Delay logs were previously hardcoded in the UI. We keep the types as no-op
+// placeholders so the rest of the component compiles, but the feature is disabled.
+type DelayLog = {
   id: string;
   taskId: string;
   loggedBy: string;
   reason: string;
-  delayDuration: number; // in days
-  loggedAt: string; // ISO date string (when log was created)
-  delayDate: string; // ISO date string (when delay occurred)
-  monthIndex: number; // Which month the delay occurred (for filtering)
-  imageUrl?: string; // Optional image URL (base64 or URL) for delay evidence
+  delayDuration: number;
+  loggedAt: string;
+  delayDate: string;
+  monthIndex: number;
+  imageUrl?: string;
 };
 
-// Delay log form data
 type DelayLogFormData = {
   loggedBy: string;
   reason: string;
   delayDuration: string;
-  delayDate: string; // ISO date string
+  delayDate: string;
   imageFile: File | null;
-  imagePreview: string | null; // base64 preview
+  imagePreview: string | null;
 };
 
-// Hardcoded delay reasons for realistic delay logs (Physical Progress)
-const DELAY_REASONS = [
-  "Weather conditions delayed site work",
-  "Material delivery delayed due to supply chain issues",
-  "Equipment malfunction requiring repairs",
-  "Permit approval pending from authorities",
-  "Site access issues due to local restrictions",
-  "Resource unavailability - skilled labor shortage",
-  "Design changes requiring rework",
-  "Quality inspection delays",
-  "Coordination issues with other contractors",
-  "Unexpected site conditions discovered",
-  "Budget approval pending",
-  "Technical issues with equipment installation",
-];
-
-// Financial-specific delay reasons (Financial Progress)
-const FINANCIAL_DELAY_REASONS = [
-  "Budget approval pending from finance department",
-  "Payment processing delay due to documentation issues",
-  "Fund allocation delayed - awaiting authorization",
-  "Invoice approval pending from accounts",
-  "Budget reallocation required - awaiting approval",
-  "Financial clearance delayed - compliance review",
-  "Payment terms renegotiation in progress",
-  "Cost overrun - additional budget approval needed",
-  "Vendor payment delayed - invoice verification",
-  "Budget constraint - awaiting additional funds",
-  "Financial audit delay - documentation pending",
-  "Expense approval pending from management",
-];
-
-// Generate hardcoded delay logs for delayed sub-projects
-function generateHardcodedDelayLogs(
-  subProjects: SubProject[],
-  months: string[],
-  ganttTasks: GanttTask[],
-  isFinancial: boolean = false
-): DelayLog[] {
-  const delayLogs: DelayLog[] = [];
-
-  // Detect if we're in financial mode by checking sub-project names
-  const hasFinancialIndicators = subProjects.some(sp => 
-    sp.name.toLowerCase().includes('budget') || 
-    sp.name.toLowerCase().includes('financial')
-  );
-  const useFinancialReasons = isFinancial || hasFinancialIndicators;
-  const delayReasons = useFinancialReasons ? FINANCIAL_DELAY_REASONS : DELAY_REASONS;
-
-  // Find delayed sub-projects (where plannedProgress > actualProgress)
-  const delayedSubProjects = subProjects.filter(
-    sp => sp.plannedProgress > sp.actualProgress
-  );
-
-  // Generate 2-4 delay logs per delayed sub-project
-  delayedSubProjects.forEach((subProject) => {
-    const task = ganttTasks.find(t => t.id === subProject.id);
-    if (!task) return;
-
-    // Determine how many delay logs to create (2-4 based on delay severity)
-    const variance = subProject.plannedProgress - subProject.actualProgress;
-    const numLogs = variance > 15 ? 4 : variance > 8 ? 3 : 2;
-
-    // Generate delay logs spread across the task duration
-    for (let i = 0; i < numLogs; i++) {
-      // Distribute delays across the task timeline
-      const progress = (i + 1) / (numLogs + 1);
-      const monthIndex = Math.floor(
-        task.startIdx + (task.endIdx - task.startIdx) * progress
-      );
-      const clampedMonthIndex = Math.max(0, Math.min(monthIndex, months.length - 1));
-
-      // Generate delay date within the month
-      const monthName = months[clampedMonthIndex] || "Jan";
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const monthNum = monthNames.indexOf(monthName) >= 0
-        ? monthNames.indexOf(monthName)
-        : clampedMonthIndex % 12;
-      const currentYear = new Date().getFullYear();
-      const dayInMonth = Math.floor(5 + hash01(subProject.id + `|delay|${i}`) * 20); // Day 5-25
-      const delayDate = new Date(currentYear, monthNum, dayInMonth);
-
-      // Select reason based on sub-project name and mode
-      const reasonSeed = hash01(subProject.id + `|reason|${i}`);
-      const reason = delayReasons[Math.floor(reasonSeed * delayReasons.length)];
-
-      // Generate delay duration (3-15 days for physical, 5-20 days for financial)
-      const baseDuration = useFinancialReasons ? 5 : 3;
-      const maxDuration = useFinancialReasons ? 20 : 15;
-      const delayDuration = Math.floor(baseDuration + hash01(subProject.id + `|duration|${i}`) * (maxDuration - baseDuration));
-
-      // Generate logged by person (financial uses different roles)
-      const loggedBySeed = hash01(subProject.id + `|loggedBy|${i}`);
-      const loggedByOptions = useFinancialReasons
-        ? ["Finance Manager", "Accounts Officer", "Budget Controller", "Financial Analyst", "CFO"]
-        : ["Project Manager", "Site Supervisor", "QC Engineer", "Team Lead", "Site Engineer"];
-      const loggedBy = loggedByOptions[Math.floor(loggedBySeed * loggedByOptions.length)];
-
-      // Generate logged at date (1-5 days after delay date)
-      const loggedAt = new Date(delayDate);
-      loggedAt.setDate(loggedAt.getDate() + Math.floor(1 + hash01(subProject.id + `|loggedAt|${i}`) * 4));
-
-      delayLogs.push({
-        id: `hardcoded-${subProject.id}-${i}-${delayDate.getTime()}`,
-        taskId: subProject.id,
-        loggedBy,
-        reason,
-        delayDuration,
-        loggedAt: loggedAt.toISOString(),
-        delayDate: delayDate.toISOString(),
-        monthIndex: clampedMonthIndex,
-      });
-    }
-  });
-
-  return delayLogs;
+function generateHardcodedDelayLogs(): DelayLog[] {
+  return [];
 }
 
 const CHILD_NAME_TEMPLATES: Record<string, string[]> = {
@@ -309,16 +198,91 @@ function buildGanttTasks(subProjects: SubProject[], months: string[]): GanttTask
   const n = months.length;
   if (n === 0) return [];
 
+  const monthIndexFromDate = (value: string | null | undefined): number | null => {
+    if (!value) return null;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    // months[] entries are short month names ("Jan", "Feb", ...). Match by month number.
+    const monthShort = MONTH_NAMES[d.getMonth()];
+    const idx = months.findIndex((m) => m.startsWith(monthShort));
+    return idx >= 0 ? idx : null;
+  };
+
   return subProjects.map((s) => {
-    const r1 = hash01(s.id + "|s");
-    const r2 = hash01(s.id + "|d");
-    const duration = clamp(Math.round(2 + r2 * 3), 1, Math.max(1, n)); // 2..5 (clamped)
-    const startIdx = clamp(Math.round(r1 * Math.max(0, n - duration)), 0, Math.max(0, n - 1));
-    const endIdx = clamp(startIdx + duration - 1, startIdx, Math.max(0, n - 1));
+    const childMilestones = s.milestones ?? [];
+
+    // Parent timeline: prefer real date range from milestones if present.
+    let startIdx: number;
+    let endIdx: number;
+    if (childMilestones.length > 0) {
+      const idxs = childMilestones
+        .flatMap((m) => [monthIndexFromDate(m.startDate), monthIndexFromDate(m.finishDate)])
+        .filter((v): v is number => typeof v === "number");
+      if (idxs.length > 0) {
+        startIdx = clamp(Math.min(...idxs), 0, Math.max(0, n - 1));
+        endIdx = clamp(Math.max(...idxs), startIdx, Math.max(0, n - 1));
+      } else {
+        // fallback deterministic
+        const r1 = hash01(s.id + "|s");
+        const r2 = hash01(s.id + "|d");
+        const duration = clamp(Math.round(2 + r2 * 3), 1, Math.max(1, n)); // 2..5 (clamped)
+        startIdx = clamp(Math.round(r1 * Math.max(0, n - duration)), 0, Math.max(0, n - 1));
+        endIdx = clamp(startIdx + duration - 1, startIdx, Math.max(0, n - 1));
+      }
+    } else {
+      const r1 = hash01(s.id + "|s");
+      const r2 = hash01(s.id + "|d");
+      const duration = clamp(Math.round(2 + r2 * 3), 1, Math.max(1, n)); // 2..5 (clamped)
+      startIdx = clamp(Math.round(r1 * Math.max(0, n - duration)), 0, Math.max(0, n - 1));
+      endIdx = clamp(startIdx + duration - 1, startIdx, Math.max(0, n - 1));
+    }
 
     const variance = s.actualProgress - s.plannedProgress;
     const status: GanttTask["status"] =
       Math.abs(variance) < 1 ? "ontrack" : variance >= 0 ? "ahead" : "behind";
+
+    const children: GanttTask[] | undefined =
+      childMilestones.length > 0
+        ? childMilestones.map((m, i) => {
+            const cStart = monthIndexFromDate(m.startDate) ?? startIdx;
+            const cEnd = monthIndexFromDate(m.finishDate) ?? cStart;
+            const cs = clamp(cStart, 0, Math.max(0, n - 1));
+            const ce = clamp(cEnd, cs, Math.max(0, n - 1));
+            const rawProgress = (m as any).progress;
+            const rawPlanned = (m as any).plannedProgress;
+            const progressOverride =
+              typeof rawProgress === "number" && Number.isFinite(rawProgress) ? clamp(rawProgress, 0, 100) : undefined;
+            const plannedOverride =
+              typeof rawPlanned === "number" && Number.isFinite(rawPlanned) ? clamp(rawPlanned, 0, 100) : undefined;
+
+            // Weight evenly among children by default.
+            const w = childMilestones.length > 0 ? s.weight / childMilestones.length : s.weight;
+            const childVariance = (progressOverride ?? 0) - (plannedOverride ?? 100);
+            const childStatus: GanttTask["status"] =
+              Math.abs(childVariance) < 1 ? "ontrack" : childVariance >= 0 ? "ahead" : "behind";
+
+            return {
+              id: m.id || `${s.id}-m-${i}`,
+              name: m.name,
+              startIdx: cs,
+              endIdx: ce,
+              weight: w,
+              status: childStatus,
+              progressOverride,
+              plannedOverride,
+            };
+          })
+        : buildChildTasks(
+            {
+              id: s.id,
+              name: s.name,
+              startIdx,
+              endIdx,
+              weight: s.weight,
+              status,
+            },
+            s.id,
+          );
 
     return {
       id: s.id,
@@ -327,17 +291,7 @@ function buildGanttTasks(subProjects: SubProject[], months: string[]): GanttTask
       endIdx,
       weight: s.weight,
       status,
-      children: buildChildTasks(
-        {
-          id: s.id,
-          name: s.name,
-          startIdx,
-          endIdx,
-          weight: s.weight,
-          status,
-        },
-        s.id
-      ),
+      children,
     };
   });
 }
@@ -393,6 +347,9 @@ function getResponsiblePerson(taskId: string, taskName: string): string {
 // Calculate progress percentage for display (actual)
 // Note: subProject should already have adjusted progress from adjustedSubProjects
 function getProgressPercentage(task: GanttTask, subProject?: SubProject): number {
+  if (typeof task.progressOverride === "number") {
+    return Math.round(task.progressOverride);
+  }
   // If we have sub-project data, use actual progress (already adjusted for delays)
   if (subProject) {
     return Math.round(subProject.actualProgress);
@@ -407,6 +364,9 @@ function getProgressPercentage(task: GanttTask, subProject?: SubProject): number
 
 // Planned progress for display (where we should be)
 function getPlannedPercentage(task: GanttTask, subProject?: SubProject): number {
+  if (typeof task.plannedOverride === "number") {
+    return Math.round(Math.min(100, Math.max(0, task.plannedOverride)));
+  }
   if (subProject) {
     return Math.round(Math.min(100, Math.max(0, subProject.plannedProgress)));
   }
@@ -1270,9 +1230,11 @@ function GanttMini({
   const { width } = useWindowSize();
   const isMobile = width < 640;
   const isTablet = width >= 640 && width < 1024;
+  const delayLogsDisabled = true;
 
   // Get delay logs for a specific task and month
   const getDelayLogsForTask = (taskId: string, monthIndex: number): DelayLog[] => {
+    if (delayLogsDisabled) return [];
     if (!delayLogs) return [];
     return delayLogs.filter(log => log.taskId === taskId && log.monthIndex === monthIndex);
   };
@@ -1291,6 +1253,7 @@ function GanttMini({
 
   // Handle click on Gantt bar to add delay log
   const handleBarClick = (e: React.MouseEvent, taskId: string, taskName: string, monthIndex: number) => {
+    if (delayLogsDisabled) return;
     e.stopPropagation();
     // Calculate approximate date from click position within the month cell
     const rect = e.currentTarget.getBoundingClientRect();
@@ -1756,20 +1719,12 @@ function GanttMini({
                       <div className={`${isMobile ? 'text-[8px]' : 'text-[9px]'} font-semibold text-white truncate flex-1 pointer-events-none relative z-20 px-2 flex items-center h-full`}>
                         <div className="flex-1 min-w-0">
                           <div className="truncate flex items-center gap-1">
-                            {subProject && (subProject as any).delayImpact > 0 && (
-                              <AlertTriangle className="h-2.5 w-2.5 text-orange-300 flex-shrink-0" title={`${((subProject as any).delayImpact).toFixed(1)}% impact from delays`} />
-                            )}
                             <span className="truncate">{responsible}</span>
                           </div>
                           <div className={`${isMobile ? 'text-[7px]' : 'text-[8px]'} opacity-95 flex items-center gap-1.5 flex-wrap`}>
                             <span title="Top strip = Planned"><span className="opacity-80">P:</span>{plannedPct}%</span>
                             <span className="opacity-60">|</span>
                             <span title="Bottom strip = Actual"><span className="opacity-80">A:</span>{progress}%</span>
-                            {subProject && (subProject as any).delayImpact > 0 && (
-                              <span className="text-orange-200" title={`Delay impact: ${((subProject as any).delayImpact).toFixed(0)}%`}>
-                                (-{((subProject as any).delayImpact).toFixed(0)}%)
-                              </span>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -1778,35 +1733,7 @@ function GanttMini({
                   </div>
                   {/* Actions column: options menu (Add delay log / Delete delay log(s)) */}
                   <div className="flex items-center justify-center border-border bg-muted/10 p-1">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={(e) => e.stopPropagation()}
-                          className="h-8 w-8 rounded-md border border-border/60 bg-background hover:bg-muted/60 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-                          title="Options"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuItem
-                          onSelect={(e) => {
-                            e.preventDefault();
-                            setSelectedRowForDelayLog({
-                              taskId: t.id,
-                              taskName: t.name,
-                              startIdx: t.startIdx,
-                              endIdx: t.endIdx,
-                            });
-                            setRowAddLogOpen(true);
-                          }}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add delay log
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {/* Delay log options removed */}
                   </div>
                 </div>
 
@@ -2114,67 +2041,9 @@ export function MilestoneDetailsPanel({
   const timeline = phase.timeline ?? [];
   const months = useMemo(() => timeline.map((t) => t.month), [timeline]);
 
-  // Detect if we're in financial mode based on milestone title or sub-project names
-  const isFinancialMode = useMemo(() => {
-    return milestoneTitle.toLowerCase().includes('financial') || 
-           subProjects.some(sp => sp.name.toLowerCase().includes('budget'));
-  }, [milestoneTitle, subProjects]);
-
-  // Build Gantt tasks first (needed for delay log generation)
-  const ganttTasksForDelayLogs = useMemo(() => {
-    if (subProjects.length === 0 || months.length === 0) return [];
-    return buildGanttTasks(subProjects, months);
-  }, [subProjects, months]);
-
-  // Initialize delay logs with hardcoded data for delayed sub-projects
-  const initialDelayLogs = useMemo(() => {
-    if (subProjects.length === 0 || months.length === 0) return [];
-    return generateHardcodedDelayLogs(subProjects, months, ganttTasksForDelayLogs, isFinancialMode);
-  }, [subProjects, months, ganttTasksForDelayLogs, isFinancialMode]);
-
-  // Delay logs state - stored per milestone, initialized with hardcoded delays
-  const [delayLogs, setDelayLogs] = useState<DelayLog[]>(initialDelayLogs);
-
-  // Update delay logs when sub-projects, months, or financial mode changes
-  useEffect(() => {
-    if (subProjects.length > 0 && months.length > 0) {
-      const newDelayLogs = generateHardcodedDelayLogs(subProjects, months, ganttTasksForDelayLogs, isFinancialMode);
-      setDelayLogs(newDelayLogs);
-    }
-  }, [subProjects, months, ganttTasksForDelayLogs, isFinancialMode]);
-
-  // Create adjusted sub-projects based on delay logs with impact tracking
-  const adjustedSubProjects = useMemo(() => {
-    return subProjects.map(subProject => {
-      // Find all delay logs for this sub-project
-      const subProjectDelayLogs = delayLogs.filter(log => log.taskId === subProject.id);
-
-      if (subProjectDelayLogs.length === 0) {
-        return {
-          ...subProject,
-          delayImpact: 0,
-          originalProgress: subProject.actualProgress,
-        };
-      }
-
-      // Calculate total delay impact (each delay reduces actual progress)
-      const totalDelayImpact = subProjectDelayLogs.reduce((sum, log) => {
-        // Impact: delayDuration days / 30 days * 5% reduction per month of delay
-        // This makes delays more noticeable in the progress bar
-        return sum + (log.delayDuration / 30) * 5;
-      }, 0);
-
-      // Adjust actual progress downward based on delays
-      const adjustedActualProgress = Math.max(0, subProject.actualProgress - totalDelayImpact);
-
-      return {
-        ...subProject,
-        actualProgress: adjustedActualProgress,
-        delayImpact: totalDelayImpact,
-        originalProgress: subProject.actualProgress,
-      };
-    });
-  }, [subProjects, delayLogs]);
+  // Delay Logs feature removed (was hardcoded); do not adjust progress.
+  const delayLogs: DelayLog[] = [];
+  const adjustedSubProjects = subProjects;
 
   // Calculate overall project progress considering delays
   const overallProgress = useMemo(() => {
@@ -2188,34 +2057,17 @@ export function MilestoneDetailsPanel({
       sum + (sp.actualProgress * sp.weight), 0) / totalWeight;
     const weightedPlanned = adjustedSubProjects.reduce((sum, sp) =>
       sum + (sp.plannedProgress * sp.weight), 0) / totalWeight;
-    const totalImpact = adjustedSubProjects.reduce((sum, sp) =>
-      sum + ((sp as any).delayImpact || 0) * sp.weight, 0) / totalWeight;
-
     return {
       actual: Math.round(weightedActual),
       planned: Math.round(weightedPlanned),
-      impact: Math.round(totalImpact),
+      impact: 0,
     };
   }, [adjustedSubProjects]);
 
   const ganttTasks = useMemo(() => buildGanttTasks(adjustedSubProjects, months), [adjustedSubProjects, months]);
 
-  const handleAddDelayLog = (log: DelayLog) => {
-    setDelayLogs((prev) => {
-      // If log has existing ID, update it; otherwise add new
-      const existingIndex = prev.findIndex(l => l.id === log.id);
-      if (existingIndex >= 0) {
-        const updated = [...prev];
-        updated[existingIndex] = log;
-        return updated;
-      }
-      return [...prev, log];
-    });
-  };
-
-  const handleDeleteDelayLog = (logId: string) => {
-    setDelayLogs((prev) => prev.filter(log => log.id !== logId));
-  };
+  const handleAddDelayLog = (_log: DelayLog) => {};
+  const handleDeleteDelayLog = (_logId: string) => {};
 
   const wbsPieData = useMemo(
     () =>
@@ -2273,40 +2125,7 @@ export function MilestoneDetailsPanel({
                   onDeleteDelayLog={handleDeleteDelayLog}
                 />
                 {/* Overall Progress Summary with Delay Impact - beneath Gantt chart */}
-                {delayLogs.length > 0 && (
-                  <div className="bg-amber-50/80 dark:bg-orange-950/30 border border-amber-200 dark:border-orange-800 rounded-xl p-4 mt-4 shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-bold text-amber-900 dark:text-orange-100 mb-2">
-                          Delay Impact on Overall Progress
-                        </div>
-                        <div className="text-xs text-amber-800 dark:text-orange-200 space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span>Current Progress: <strong>{overallProgress.actual}%</strong></span>
-                            <span className="text-amber-700 dark:text-orange-400 font-medium">
-                              (Impact: {overallProgress.impact > 0 ? `-${overallProgress.impact}%` : '0%'})
-                            </span>
-                          </div>
-                          <div>Planned Progress: <strong>{overallProgress.planned}%</strong></div>
-                          <div className="text-[11px] opacity-90 mt-1.5">
-                            {delayLogs.length} delay log{delayLogs.length !== 1 ? 's' : ''} recorded affecting {adjustedSubProjects.filter(sp => (sp as any).delayImpact > 0).length} sub-project{adjustedSubProjects.filter(sp => (sp as any).delayImpact > 0).length !== 1 ? 's' : ''}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {/* Delay Log Cards - beneath Gantt chart */}
-                <DelayLogCards
-                  delayLogs={delayLogs}
-                  ganttTasks={ganttTasks}
-                  subProjects={subProjects}
-                  months={months}
-                  onDelete={onDeleteDelayLog}
-                  isMobile={isMobile}
-                  isTablet={isTablet}
-                />
+                {/* Delay Logs removed (were hardcoded) */}
               </div>
 
               {/* WBS Breakdown */}
@@ -2432,11 +2251,10 @@ export function MilestoneDetailsPanel({
           </>
         ) : (
           <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
-            <TabsList className={`w-full ${isMobile ? 'grid grid-cols-4' : 'justify-start'}`}>
+            <TabsList className={`w-full ${isMobile ? 'grid grid-cols-3' : 'justify-start'}`}>
               <TabsTrigger value="gantt" className={isMobile ? 'text-xs' : ''}>Gantt</TabsTrigger>
               <TabsTrigger value="wbs" className={isMobile ? 'text-xs' : ''}>WBS Breakdown</TabsTrigger>
               <TabsTrigger value="scurves" className={isMobile ? 'text-xs' : ''}>S-Curves</TabsTrigger>
-              <TabsTrigger value="logs" className={isMobile ? 'text-xs' : ''}>Delay Logs</TabsTrigger>
             </TabsList>
 
             <TabsContent value="gantt" className="mt-4">
@@ -2449,41 +2267,7 @@ export function MilestoneDetailsPanel({
                 onAddDelayLog={handleAddDelayLog}
                 onDeleteDelayLog={handleDeleteDelayLog}
               />
-              {/* Overall Progress Summary with Delay Impact - beneath Gantt chart */}
-              {delayLogs.length > 0 && (
-                <div className="bg-amber-50/80 dark:bg-orange-950/30 border border-amber-200 dark:border-orange-800 rounded-xl p-4 mt-4 shadow-sm">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-amber-900 dark:text-orange-100 mb-2">
-                        Delay Impact on Overall Progress
-                      </div>
-                      <div className="text-xs text-amber-800 dark:text-orange-200 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span>Current Progress: <strong>{overallProgress.actual}%</strong></span>
-                          <span className="text-amber-700 dark:text-orange-400 font-medium">
-                            (Impact: {overallProgress.impact > 0 ? `-${overallProgress.impact}%` : '0%'})
-                          </span>
-                        </div>
-                        <div>Planned Progress: <strong>{overallProgress.planned}%</strong></div>
-                        <div className="text-[11px] opacity-90 mt-1.5">
-                          {delayLogs.length} delay log{delayLogs.length !== 1 ? 's' : ''} recorded affecting {adjustedSubProjects.filter(sp => (sp as any).delayImpact > 0).length} sub-project{adjustedSubProjects.filter(sp => (sp as any).delayImpact > 0).length !== 1 ? 's' : ''}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {/* Delay Log Cards - beneath Gantt chart */}
-              <DelayLogCards
-                delayLogs={delayLogs}
-                ganttTasks={ganttTasks}
-                subProjects={subProjects}
-                months={months}
-                onDelete={handleDeleteDelayLog}
-                isMobile={isMobile}
-                isTablet={isTablet}
-              />
+              {/* Delay Logs removed (were hardcoded) */}
             </TabsContent>
 
             <TabsContent value="wbs" className="mt-4">
@@ -2602,79 +2386,7 @@ export function MilestoneDetailsPanel({
               </div>
             </TabsContent>
 
-            <TabsContent value="logs" className="mt-4 space-y-6">
-              {/* Delay Impact on Overall Progress - shown in Delay Log section */}
-              {delayLogs.length > 0 && (
-                <div className="bg-amber-50/80 dark:bg-orange-950/30 border border-amber-200 dark:border-orange-800 rounded-xl p-4 shadow-sm">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-amber-900 dark:text-orange-100 mb-2">
-                        Delay Impact on Overall Progress
-                      </div>
-                      <div className="text-xs text-amber-800 dark:text-orange-200 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span>Current Progress: <strong>{overallProgress.actual}%</strong></span>
-                          <span className="text-amber-700 dark:text-orange-400 font-medium">
-                            (Impact: {overallProgress.impact > 0 ? `-${overallProgress.impact}%` : '0%'})
-                          </span>
-                        </div>
-                        <div>Planned Progress: <strong>{overallProgress.planned}%</strong></div>
-                        <div className="text-[11px] opacity-90 mt-1.5">
-                          {delayLogs.length} delay log{delayLogs.length !== 1 ? 's' : ''} recorded affecting {adjustedSubProjects.filter(sp => (sp as any).delayImpact > 0).length} sub-project{adjustedSubProjects.filter(sp => (sp as any).delayImpact > 0).length !== 1 ? 's' : ''}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {/* Delay Log cards - same layout as under Gantt */}
-              <DelayLogCards
-                delayLogs={delayLogs}
-                ganttTasks={ganttTasks}
-                subProjects={subProjects}
-                months={months}
-                onDelete={handleDeleteDelayLog}
-                isMobile={isMobile}
-                isTablet={isTablet}
-              />
-              <DelayLogsTable
-                delayLogs={delayLogs}
-                ganttTasks={ganttTasks}
-                subProjects={subProjects}
-                months={months}
-                onEdit={(log) => {
-                  setEditingLogFromTable(log);
-                  setShowEditForm(true);
-                }}
-                onDelete={handleDeleteDelayLog}
-                isMobile={isMobile}
-                isTablet={isTablet}
-              />
-              {/* Edit form dialog */}
-              {editingLogFromTable && (
-                <DelayLogFormDialog
-                  open={showEditForm}
-                  onOpenChange={(open) => {
-                    if (!open) {
-                      setShowEditForm(false);
-                      setEditingLogFromTable(undefined);
-                    }
-                  }}
-                  taskName={editingLogFromTable.taskId}
-                  taskId={editingLogFromTable.taskId}
-                  monthIndex={editingLogFromTable.monthIndex}
-                  monthName={months[editingLogFromTable.monthIndex] || `Month ${editingLogFromTable.monthIndex + 1}`}
-                  months={months}
-                  onSave={(log) => {
-                    handleAddDelayLog(log);
-                    setShowEditForm(false);
-                    setEditingLogFromTable(undefined);
-                  }}
-                  existingLog={editingLogFromTable}
-                />
-              )}
-            </TabsContent>
+            {/* Delay Logs tab removed (was hardcoded) */}
           </Tabs>
         )}
       </CardContent>

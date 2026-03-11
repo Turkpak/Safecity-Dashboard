@@ -19,7 +19,7 @@ import {
 import { useWindowSize } from "@/hooks/use-window-size";
 import { CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
-import { listDivisions, listDistricts, listTehsils } from "@/api";
+import { getProjectGanttData, listDivisions, listDistricts, listTehsils } from "@/api";
 import type { Division, District, Tehsil, Project } from "@/api/types";
 import {
   ClipboardCheck,
@@ -99,6 +99,201 @@ type PhaseKey =
   | "cable"
   | "controlRoom"
   | "ppic3";
+
+type ProjectGanttTask = Awaited<ReturnType<typeof getProjectGanttData>>[number];
+
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+
+function safeParseDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function buildMonthLabelsBetween(minDate: Date, maxDate: Date): string[] {
+  const start = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+  const end = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+  const labels: string[] = [];
+
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    labels.push(MONTH_LABELS[cursor.getMonth()] ?? "Jan");
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return labels;
+}
+
+function clamp01(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, n));
+}
+
+function diffDaysInclusive(start: string | null | undefined, end: string | null | undefined): number {
+  const s = safeParseDate(start ?? null);
+  const e = safeParseDate(end ?? null);
+  if (!s || !e) return 1;
+  const ms = e.getTime() - s.getTime();
+  const days = Math.floor(ms / (1000 * 60 * 60 * 24)) + 1;
+  return Math.max(1, days);
+}
+
+function buildPhaseFromProjectGantt(tasks: ProjectGanttTask[]): { actual: number; planned: number; subProjects: SubProject[]; timeline: { month: string; actual: number; planned: number }[] } {
+  const planned = 100;
+  if (!tasks || tasks.length === 0) {
+    return { actual: 0, planned, subProjects: [], timeline: [] };
+  }
+
+  type Row = {
+    id: string;
+    name: string;
+    progress: number;
+    plannedProgress: number;
+    start: string;
+    end: string;
+    parentId: string;
+  };
+
+  // 1) Filter out null-date rows (exclude from chart entirely)
+  const datedRows: Row[] = [];
+  for (let i = 0; i < tasks.length; i++) {
+    const t = tasks[i];
+    if (!t) continue;
+    if (!t.start || !t.end) continue;
+    if (!t.parent) continue; // must have a parent_id to group; no-parent rows aren't shown in chart
+    datedRows.push({
+      id: String(t.id),
+      name: t.label,
+      progress: clamp01(Number(t.progress ?? 0)),
+      plannedProgress: planned,
+      start: t.start,
+      end: t.end,
+      parentId: String(t.parent),
+    });
+  }
+
+  if (datedRows.length === 0) {
+    return { actual: 0, planned, subProjects: [], timeline: [] };
+  }
+
+  // Lookup by id (uses API order preference naturally because we traverse `tasks`).
+  const datedById = new Map<string, Row>();
+  for (let i = 0; i < datedRows.length; i++) {
+    datedById.set(datedRows[i].id, datedRows[i]);
+  }
+
+  // 2) Group by parent_id
+  const groupMap = new Map<string, Row[]>();
+  for (let i = 0; i < datedRows.length; i++) {
+    const r = datedRows[i];
+    const list = groupMap.get(r.parentId);
+    if (list) list.push(r);
+    else groupMap.set(r.parentId, [r]);
+  }
+
+  type Group = { header: Row; children: Row[] };
+  const groups: Group[] = [];
+
+  for (const [parentId, rows] of Array.from(groupMap.entries())) {
+    // Prefer using the “real parent” row when it exists as a dated activity with id=parentId.
+    const realParent = datedById.get(parentId);
+    if (realParent) {
+      const children = rows.filter((r) => r.id !== realParent.id);
+      groups.push({ header: realParent, children });
+      continue;
+    }
+
+    // Otherwise: pick first dated row in API order as header; remaining are children.
+    const header = rows[0];
+    const children = rows.slice(1);
+    groups.push({ header, children });
+  }
+
+  // Stable order: by first appearance of header id in API order.
+  const apiIndex = new Map<string, number>();
+  for (let i = 0; i < tasks.length; i++) {
+    const id = String(tasks[i]?.id ?? "");
+    if (!id) continue;
+    if (!apiIndex.has(id)) apiIndex.set(id, i);
+  }
+  groups.sort((a, b) => (apiIndex.get(a.header.id) ?? 0) - (apiIndex.get(b.header.id) ?? 0));
+
+  const rootWeight = groups.length > 0 ? 1 / groups.length : 0;
+
+  const subProjects: SubProject[] = groups.map((g) => {
+    const milestones = g.children.map((c) => ({
+      id: c.id,
+      name: c.name,
+      duration: diffDaysInclusive(c.start, c.end),
+      startDate: c.start,
+      finishDate: c.end,
+      progress: c.progress,
+      plannedProgress: c.plannedProgress,
+    }));
+
+    const parentProgress =
+      milestones.length > 0
+        ? clamp01(milestones.reduce((sum, m: any) => sum + (Number(m.progress) || 0), 0) / milestones.length)
+        : g.header.progress;
+
+    const dates: Date[] = [];
+    const hs = safeParseDate(g.header.start);
+    const he = safeParseDate(g.header.end);
+    if (hs) dates.push(hs);
+    if (he) dates.push(he);
+    for (let i = 0; i < g.children.length; i++) {
+      const cs = safeParseDate(g.children[i].start);
+      const ce = safeParseDate(g.children[i].end);
+      if (cs) dates.push(cs);
+      if (ce) dates.push(ce);
+    }
+    const startDate = dates.length > 0 ? new Date(Math.min(...dates.map((d) => d.getTime()))).toISOString() : g.header.start;
+    const finishDate = dates.length > 0 ? new Date(Math.max(...dates.map((d) => d.getTime()))).toISOString() : g.header.end;
+
+    return {
+      id: g.header.id,
+      name: g.header.name,
+      actualProgress: parentProgress,
+      plannedProgress: planned,
+      weight: rootWeight,
+      startDate,
+      finishDate,
+      milestones: milestones as any,
+    };
+  });
+
+  const overallActual = clamp01(
+    subProjects.reduce((sum, sp) => sum + sp.actualProgress * sp.weight, 0) /
+      Math.max(1e-9, subProjects.reduce((sum, sp) => sum + sp.weight, 0)),
+  );
+
+  const dates: Date[] = [];
+  for (const sp of subProjects) {
+    const s = safeParseDate(sp.startDate ?? null);
+    const e = safeParseDate(sp.finishDate ?? null);
+    if (s) dates.push(s);
+    if (e) dates.push(e);
+  }
+  if (dates.length === 0) {
+    return { actual: overallActual, planned, subProjects, timeline: [] };
+  }
+  const minDate = new Date(Math.min(...dates.map((d) => d.getTime())));
+  const maxDate = new Date(Math.max(...dates.map((d) => d.getTime())));
+  const months = buildMonthLabelsBetween(minDate, maxDate);
+  if (months.length === 0) {
+    return { actual: overallActual, planned, subProjects, timeline: [] };
+  }
+
+  const timeline = months.map((m, idx) => {
+    const t = months.length === 1 ? 1 : idx / (months.length - 1);
+    return {
+      month: m,
+      planned: Math.round(t * planned),
+      actual: Math.round(t * overallActual),
+    };
+  });
+
+  return { actual: overallActual, planned, subProjects, timeline };
+}
 
 // Helper function to get progress value (backward compatible)
 const getProgressValue = (progress: number | PhaseProgress): number => {
@@ -456,6 +651,11 @@ export default function Dashboard() {
   );
   // track project selection within tehsil view for KPI/Gantt
   const [selectedProjectForDetails, setSelectedProjectForDetails] = useState<Project | null>(null);
+  const [selectedProjectGanttTasks, setSelectedProjectGanttTasks] = useState<ProjectGanttTask[]>([]);
+  const selectedProjectPhase = useMemo(
+    () => buildPhaseFromProjectGantt(selectedProjectGanttTasks),
+    [selectedProjectGanttTasks],
+  );
 
   const { theme, toggleTheme } = useTheme();
   const { width } = useWindowSize();
@@ -529,6 +729,31 @@ export default function Dashboard() {
       setSelectedProjectForDetails(null);
     }
   }, [selectedItemType, viewType]);
+
+  // Fetch project-gantt data whenever selected project changes (card or dropdown).
+  useEffect(() => {
+    let ignore = false;
+
+    const run = async () => {
+      if (!selectedProjectForDetails?.id) {
+        setSelectedProjectGanttTasks([]);
+        return;
+      }
+      try {
+        const data = await getProjectGanttData(selectedProjectForDetails.id);
+        if (ignore) return;
+        setSelectedProjectGanttTasks(Array.isArray(data) ? data : []);
+      } catch {
+        if (ignore) return;
+        setSelectedProjectGanttTasks([]);
+      }
+    };
+
+    run();
+    return () => {
+      ignore = true;
+    };
+  }, [selectedProjectForDetails?.id]);
 
   // Filter options from API data
   const divisions = useMemo(
@@ -940,7 +1165,7 @@ export default function Dashboard() {
                   title={phase.title}
                   percentage={progressValue}
                   icon={phase.icon}
-                  color={phase.color}
+                  color={phase.color as unknown as "green"}
                   actualProgress={hasDetails ? progress.actual : undefined}
                   plannedProgress={hasDetails ? progress.planned : undefined}
                   selected={selectedMilestoneKey === phase.key}
@@ -2188,20 +2413,7 @@ export default function Dashboard() {
                     {selectedProjectForDetails && (
                       <MilestoneDetailsPanel
                         milestoneTitle={`${selectedProjectForDetails.project_name} - Project Gantt`}
-                        phase={{
-                          actual: selectedProjectForDetails.activities?.reduce((sum, act) => sum + act.percent_complete, 0) / (selectedProjectForDetails.activities?.length || 1) || 0,
-                          planned: 100,
-                          subProjects: selectedProjectForDetails.activities?.map(activity => ({
-                            id: activity.id.toString(),
-                            name: activity.activity_name,
-                            actualProgress: activity.percent_complete,
-                            plannedProgress: 100,
-                            weight: 1 / (selectedProjectForDetails.activities?.length || 1),
-                            startDate: activity.start_date,
-                            finishDate: activity.finish_date,
-                            milestones: [],
-                          })) || [],
-                        }}
+                        phase={selectedProjectPhase}
                         phaseColor="#3b82f6"
                         onClear={() => setSelectedProjectForDetails(null)}
                       />
@@ -2689,20 +2901,7 @@ export default function Dashboard() {
               {selectedProjectForDetails && (
                 <MilestoneDetailsPanel
                   milestoneTitle={`${selectedProjectForDetails.project_name} - Project Gantt`}
-                  phase={{
-                    actual: selectedProjectForDetails.activities?.reduce((sum, act) => sum + act.percent_complete, 0) / (selectedProjectForDetails.activities?.length || 1) || 0,
-                    planned: 100,
-                    subProjects: selectedProjectForDetails.activities?.map(activity => ({
-                      id: activity.id.toString(),
-                      name: activity.activity_name,
-                      actualProgress: activity.percent_complete,
-                      plannedProgress: 100,
-                      weight: 1 / (selectedProjectForDetails.activities?.length || 1),
-                      startDate: activity.start_date,
-                      finishDate: activity.finish_date,
-                      milestones: [],
-                    })) || [],
-                  }}
+                  phase={selectedProjectPhase}
                   phaseColor="#3b82f6"
                   onClear={() => setSelectedProjectForDetails(null)}
                 />
