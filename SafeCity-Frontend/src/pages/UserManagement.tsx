@@ -21,12 +21,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { listStakeholders, createUser, listUsers, createUserPermission, getUsersWithPermissions, updateUserPermission } from "@/api";
-import { useState, useRef, useMemo } from "react";
-import { UserPlus, Users, ShieldAlert, ListChecks, UserCog } from "lucide-react";
+import { useState, useRef, useMemo, useEffect } from "react";
+import { UserPlus, Users, ShieldAlert, ListChecks, UserCog, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import type { UserCrudPermissions, UserWithPermissions, UserPermissionItem } from "@/api/types";
 
 /** Normalize role from login (backend may return super_admin or Super Admin) */
@@ -72,6 +85,9 @@ export default function UserManagement() {
   /** Selected user id for Page Permissions card; full user is derived from API data so refetch updates the table. */
   const [selectedUserIdForPermissions, setSelectedUserIdForPermissions] = useState<number | null>(null);
   const [isUpdatingPermission, setIsUpdatingPermission] = useState(false);
+  const [usersPage, setUsersPage] = useState(1);
+  const USERS_PER_PAGE = 6;
+  const [nameComboboxOpen, setNameComboboxOpen] = useState(false);
 
   const { data: stakeholders = [] } = useQuery({
     queryKey: ["stakeholders"],
@@ -95,6 +111,24 @@ export default function UserManagement() {
   });
 
   const pagePermissionsCardRef = useRef<HTMLDivElement>(null);
+
+  /** Users sorted by id ascending for consistent table order */
+  const sortedUsers = useMemo(
+    () => [...users].sort((a, b) => a.id - b.id),
+    [users]
+  );
+
+  const totalUsersPages = Math.max(1, Math.ceil(sortedUsers.length / USERS_PER_PAGE));
+  const paginatedUsers = useMemo(() => {
+    const start = (usersPage - 1) * USERS_PER_PAGE;
+    return sortedUsers.slice(start, start + USERS_PER_PAGE);
+  }, [sortedUsers, usersPage]);
+
+  useEffect(() => {
+    if (usersPage > totalUsersPages && totalUsersPages >= 1) {
+      setUsersPage(totalUsersPages);
+    }
+  }, [usersPage, totalUsersPages]);
 
   function permissionRowKey(sidebar_label: string, sub_label: string | null) {
     return `${sidebar_label}|${sub_label ?? ""}`;
@@ -516,7 +550,10 @@ export default function UserManagement() {
               Registered Users
             </CardTitle>
             <CardDescription>
-              Users added by Super Admin. Assign CRUD per page in the Page Permissions table below. Total: {users.length}
+              Users added by Super Admin,                                        Total: {users.length}
+              {users.length > USERS_PER_PAGE && (
+                <> · Page {usersPage} of {totalUsersPages}</>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -525,63 +562,95 @@ export default function UserManagement() {
             ) : users.length === 0 ? (
               <p className="text-muted-foreground py-8 text-center">No users yet. Click &quot;Add New User&quot; to create one.</p>
             ) : (
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[80px]">#</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Full name</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Stakeholder</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="w-[120px] text-right">Page permissions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((u) => {
-                      const isSuperAdminUser = (u.role ?? "").trim().toLowerCase() === "super_admin";
-                      return (
-                        <TableRow key={u.id}>
-                          <TableCell className="font-mono text-muted-foreground">{u.id}</TableCell>
-                          <TableCell>{u.email}</TableCell>
-                          <TableCell>{u.full_name}</TableCell>
-                          <TableCell className="capitalize">{formatRole(u.role)}</TableCell>
-                          <TableCell>{getStakeholderLabel(u.stakeholder)}</TableCell>
-                          <TableCell>
-                            <span
-                              className={
-                                u.is_active
-                                  ? "text-green-600 dark:text-green-400 font-medium"
-                                  : "text-muted-foreground"
-                              }
-                            >
-                              {u.is_active ? "Active" : "Inactive"}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {!isSuperAdminUser && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 gap-1 text-xs"
-                                onClick={() => {
-                                  setSelectedUserIdForPermissions(u.id);
-                                  pagePermissionsCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                                }}
+              <>
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[80px]">#</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Full name</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Stakeholder</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="w-[120px] text-right">Page permissions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedUsers.map((u, index) => {
+                        const rowNumber = (usersPage - 1) * USERS_PER_PAGE + index + 1;
+                        const isSuperAdminUser = (u.role ?? "").trim().toLowerCase() === "super_admin";
+                        return (
+                          <TableRow key={u.id}>
+                            <TableCell className="font-mono text-muted-foreground">{rowNumber}</TableCell>
+                            <TableCell>{u.email}</TableCell>
+                            <TableCell>{u.full_name}</TableCell>
+                            <TableCell className="capitalize">{formatRole(u.role)}</TableCell>
+                            <TableCell>{getStakeholderLabel(u.stakeholder)}</TableCell>
+                            <TableCell>
+                              <span
+                                className={
+                                  u.is_active
+                                    ? "text-green-600 dark:text-green-400 font-medium"
+                                    : "text-muted-foreground"
+                                }
                               >
-                                <UserCog className="h-3.5 w-3.5" />
-                                View permissions
-                              </Button>
-                            )}
-                            {isSuperAdminUser && <span className="text-muted-foreground text-xs">—</span>}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+                                {u.is_active ? "Active" : "Inactive"}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {!isSuperAdminUser && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 gap-1 text-xs"
+                                  onClick={() => {
+                                    setSelectedUserIdForPermissions(u.id);
+                                    pagePermissionsCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                  }}
+                                >
+                                  <UserCog className="h-3.5 w-3.5" />
+                                  View permissions
+                                </Button>
+                              )}
+                              {isSuperAdminUser && <span className="text-muted-foreground text-xs">—</span>}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+                {totalUsersPages > 1 && (
+                  <div className="flex items-center justify-between gap-4 mt-4">
+                    <p className="text-sm text-muted-foreground">
+                      Showing {((usersPage - 1) * USERS_PER_PAGE) + 1}–{Math.min(usersPage * USERS_PER_PAGE, sortedUsers.length)} of {sortedUsers.length}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setUsersPage((p) => Math.max(1, p - 1))}
+                        disabled={usersPage <= 1}
+                        className="gap-1"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setUsersPage((p) => Math.min(totalUsersPages, p + 1))}
+                        disabled={usersPage >= totalUsersPages}
+                        className="gap-1"
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
@@ -602,25 +671,57 @@ export default function UserManagement() {
               ) : (
                 <div className="flex flex-wrap items-end gap-4">
                   <div className="space-y-2 min-w-[200px]">
-                    <Label htmlFor="permissions-name-select">Name</Label>
-                    <Select
-                      value={selectedUserIdForPermissions != null ? String(selectedUserIdForPermissions) : "__none__"}
-                      onValueChange={(v) => {
-                        setSelectedUserIdForPermissions(v === "__none__" ? null : Number(v));
-                      }}
-                    >
-                      <SelectTrigger id="permissions-name-select" className="w-[280px] max-w-full">
-                        <SelectValue placeholder="Select user by name…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Select user…</SelectItem>
-                        {usersForPermissionView.map((u) => (
-                          <SelectItem key={u.user_id} value={String(u.user_id)}>
-                            {u.full_name || u.email}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="permissions-name-combobox">Name</Label>
+                    <Popover open={nameComboboxOpen} onOpenChange={setNameComboboxOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          id="permissions-name-combobox"
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={nameComboboxOpen}
+                          className="w-[280px] max-w-full justify-between font-normal h-9 px-3 text-sm"
+                        >
+                          <span className="truncate">
+                            {selectedUserWithPermissions
+                              ? selectedUserWithPermissions.full_name || selectedUserWithPermissions.email || `User ${selectedUserWithPermissions.user_id}`
+                              : "Select user by name…"}
+                          </span>
+                          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[280px] p-0" align="start">
+                        <Command
+                          filter={(value, search) => {
+                            const label = (value || "").toLowerCase();
+                            const q = (search || "").toLowerCase();
+                            if (!q) return 1;
+                            return label.includes(q) ? 1 : 0;
+                          }}
+                        >
+                          <CommandInput placeholder="Type to search name or email…" />
+                          <CommandList>
+                            <CommandEmpty>No user found.</CommandEmpty>
+                            <CommandGroup>
+                              {usersForPermissionView.map((u) => {
+                                const label = u.full_name || u.email || `User ${u.user_id}`;
+                                return (
+                                  <CommandItem
+                                    key={u.user_id}
+                                    value={`${label} ${u.email}`}
+                                    onSelect={() => {
+                                      setSelectedUserIdForPermissions(u.user_id);
+                                      setNameComboboxOpen(false);
+                                    }}
+                                  >
+                                    {label}
+                                  </CommandItem>
+                                );
+                              })}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div className="space-y-2 min-w-[140px]">
                     <Label htmlFor="permissions-role-display">Role</Label>

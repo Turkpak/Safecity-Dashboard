@@ -8,9 +8,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -26,6 +34,27 @@ import {
 } from "@/api";
 import type { Project as ApiProject } from "@/api/types";
 import { MapContainer, TileLayer, GeoJSON, useMap } from "react-leaflet";
+
+/** Format stakeholder for display using API stakeholder_details (names) instead of IDs */
+function formatProjectStakeholder(project: ApiProject): string {
+  const details = project.stakeholder_details;
+  if (details && details.length > 0) {
+    return details
+      .map((d) =>
+        d.stakeholder_title && d.stakeholder_type
+          ? `${d.stakeholder_title} (${d.stakeholder_type})`
+          : d.stakeholder_title || d.stakeholder_type || ""
+      )
+      .filter(Boolean)
+      .join(", ") || fallbackStakeholderLabel(project);
+  }
+  return fallbackStakeholderLabel(project);
+}
+function fallbackStakeholderLabel(project: ApiProject): string {
+  const ids = Array.isArray(project.stakeholder) ? project.stakeholder : [project.stakeholder];
+  if (ids.length > 0) return `Stakeholder #${ids.join(", #")}`;
+  return "—";
+}
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import icon from "leaflet/dist/images/marker-icon.png";
@@ -192,23 +221,32 @@ export default function ProjectManagement() {
   const [referenceNumber, setReferenceNumber] = useState("");
   const [stakeholderIds, setStakeholderIds] = useState<string[]>([]);
   const [selectedTehsilId, setSelectedTehsilId] = useState<string>("");
+  const [provinceComboboxOpen, setProvinceComboboxOpen] = useState(false);
+  const [divisionComboboxOpen, setDivisionComboboxOpen] = useState(false);
+  const [districtComboboxOpen, setDistrictComboboxOpen] = useState(false);
+  const [tehsilComboboxOpen, setTehsilComboboxOpen] = useState(false);
   const [totalBudgetAllocated, setTotalBudgetAllocated] = useState<string>("");
   const [budgetUtilized, setBudgetUtilized] = useState<string>("");
   const [xerFile, setXerFile] = useState<File | null>(null);
   const [areaFile, setAreaFile] = useState<File | null>(null);
   const [geoData, setGeoData] = useState<any>(null);
   const [isLoadingGeoData, setIsLoadingGeoData] = useState(false);
+  /** When true, geography useEffects should not clear children (we're loading from project) */
+  const skipGeographyClearRef = useRef(false);
 
   useEffect(() => {
+    if (skipGeographyClearRef.current) return;
     setSelectedDivisionId("");
     setSelectedDistrictId("");
     setSelectedTehsilId("");
   }, [selectedProvinceId]);
   useEffect(() => {
+    if (skipGeographyClearRef.current) return;
     setSelectedDistrictId("");
     setSelectedTehsilId("");
   }, [selectedDivisionId]);
   useEffect(() => {
+    if (skipGeographyClearRef.current) return;
     setSelectedTehsilId("");
   }, [selectedDistrictId]);
 
@@ -316,6 +354,7 @@ export default function ProjectManagement() {
 
   // Open dialog for editing a project — prefetch division/district/tehsil so dropdowns show selected values
   const openEditDialog = async (project: ApiProject) => {
+    skipGeographyClearRef.current = true;
     await Promise.all([
       queryClient.prefetchQuery({ queryKey: ["divisions", project.province], queryFn: () => listDivisions(project.province) }),
       queryClient.prefetchQuery({ queryKey: ["districts", project.division], queryFn: () => listDistricts(project.division) }),
@@ -326,7 +365,13 @@ export default function ProjectManagement() {
     setProjectDescription(project.project_description ?? "");
     setStartingDate(project.project_starting_date ? project.project_starting_date.slice(0, 10) : "");
     setReferenceNumber(project.project_reference_no ?? "");
-    setStakeholderIds(project.stakeholder?.map(String) || []);
+    setStakeholderIds(
+      Array.isArray(project.stakeholder)
+        ? project.stakeholder.map(String)
+        : project.stakeholder != null
+          ? [String(project.stakeholder)]
+          : []
+    );
     setSelectedProvinceId(String(project.province));
     setSelectedDivisionId(String(project.division));
     setSelectedDistrictId(String(project.district));
@@ -338,6 +383,9 @@ export default function ProjectManagement() {
     setGeoData(project.geom && typeof project.geom === "object" ? (project.geom as object) : null);
     setCurrentStep(1);
     setShowAddProjectDialog(true);
+    setTimeout(() => {
+      skipGeographyClearRef.current = false;
+    }, 0);
   };
 
   // Validate step 1
@@ -541,13 +589,7 @@ export default function ProjectManagement() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Building2 className="h-4 w-4 shrink-0" />
-                        <span>
-                          {project.stakeholder_title != null && project.stakeholder_title !== ""
-                            ? project.stakeholder_type != null && project.stakeholder_type !== ""
-                              ? `${project.stakeholder_title} (${project.stakeholder_type})`
-                              : project.stakeholder_title
-                            : `Stakeholder #${project.stakeholder}`}
-                        </span>
+                        <span>{formatProjectStakeholder(project)}</span>
                       </div>
                       <div className="flex items-start gap-2">
                         <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
@@ -646,11 +688,7 @@ export default function ProjectManagement() {
                   <div>
                     <p className="text-xs text-muted-foreground">Stakeholder</p>
                     <p className="text-sm font-medium">
-                      {selectedProjectForView.stakeholder_title != null && selectedProjectForView.stakeholder_title !== ""
-                        ? selectedProjectForView.stakeholder_type != null && selectedProjectForView.stakeholder_type !== ""
-                          ? `${selectedProjectForView.stakeholder_title} (${selectedProjectForView.stakeholder_type})`
-                          : selectedProjectForView.stakeholder_title
-                        : `Stakeholder #${selectedProjectForView.stakeholder}`}
+                      {formatProjectStakeholder(selectedProjectForView)}
                     </p>
                   </div>
                 </div>
@@ -955,64 +993,217 @@ export default function ProjectManagement() {
                   </Popover>
                 </div>
 
-                {/* Province */}
+                {/* Province — searchable */}
                 <div className="space-y-2">
                   <Label htmlFor="province">Province *</Label>
-                  <Select value={selectedProvinceId} onValueChange={setSelectedProvinceId} required>
-                    <SelectTrigger id="province">
-                      <SelectValue placeholder="Select province" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {provincesList.map((p) => (
-                        <SelectItem key={p.id} value={String(p.id)}>{p.province_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={provinceComboboxOpen} onOpenChange={setProvinceComboboxOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="province"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={provinceComboboxOpen}
+                        className="w-full justify-between font-normal h-9 px-3 text-sm"
+                      >
+                        <span className="truncate">
+                          {selectedProvinceId
+                            ? (provincesList.find((p) => String(p.id) === selectedProvinceId)?.province_name ?? "Select province")
+                            : "Select province"}
+                        </span>
+                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                      <Command
+                        filter={(value, search) => {
+                          const q = (search || "").toLowerCase();
+                          if (!q) return 1;
+                          return (value || "").toLowerCase().includes(q) ? 1 : 0;
+                        }}
+                      >
+                        <CommandInput placeholder="Type to search province…" />
+                        <CommandList>
+                          <CommandEmpty>No province found.</CommandEmpty>
+                          <CommandGroup>
+                            {provincesList.map((p) => (
+                              <CommandItem
+                                key={p.id}
+                                value={p.province_name}
+                                onSelect={() => {
+                                  setSelectedProvinceId(String(p.id));
+                                  setProvinceComboboxOpen(false);
+                                }}
+                              >
+                                {p.province_name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
-                {/* Division */}
+                {/* Division — searchable; show current name from list or editingProject */}
                 <div className="space-y-2">
                   <Label htmlFor="division">Division *</Label>
-                  <Select value={selectedDivisionId} onValueChange={setSelectedDivisionId} disabled={!selectedProvinceId} required>
-                    <SelectTrigger id="division">
-                      <SelectValue placeholder={selectedProvinceId ? "Select division" : "Select province first"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {divisionsList.map((d) => (
-                        <SelectItem key={d.id} value={String(d.id)}>{d.division_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={divisionComboboxOpen} onOpenChange={setDivisionComboboxOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="division"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={divisionComboboxOpen}
+                        disabled={!selectedProvinceId}
+                        className="w-full justify-between font-normal h-9 px-3 text-sm"
+                      >
+                        <span className="truncate">
+                          {selectedDivisionId
+                            ? (divisionsList.find((d) => String(d.id) === selectedDivisionId)?.division_name ??
+                              (editingProject && Number(selectedDivisionId) === editingProject.division ? editingProject.division_name : null) ??
+                              "Select division")
+                            : selectedProvinceId ? "Select division" : "Select province first"}
+                        </span>
+                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                      <Command
+                        filter={(value, search) => {
+                          const q = (search || "").toLowerCase();
+                          if (!q) return 1;
+                          return (value || "").toLowerCase().includes(q) ? 1 : 0;
+                        }}
+                      >
+                        <CommandInput placeholder="Type to search division…" />
+                        <CommandList>
+                          <CommandEmpty>No division found.</CommandEmpty>
+                          <CommandGroup>
+                            {divisionsList.map((d) => (
+                              <CommandItem
+                                key={d.id}
+                                value={d.division_name}
+                                onSelect={() => {
+                                  setSelectedDivisionId(String(d.id));
+                                  setDivisionComboboxOpen(false);
+                                }}
+                              >
+                                {d.division_name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
-                {/* District */}
+                {/* District — searchable */}
                 <div className="space-y-2">
                   <Label htmlFor="district">District *</Label>
-                  <Select value={selectedDistrictId} onValueChange={setSelectedDistrictId} disabled={!selectedDivisionId} required>
-                    <SelectTrigger id="district">
-                      <SelectValue placeholder={selectedDivisionId ? "Select district" : "Select division first"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {districtsList.map((d) => (
-                        <SelectItem key={d.id} value={String(d.id)}>{d.district_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={districtComboboxOpen} onOpenChange={setDistrictComboboxOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="district"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={districtComboboxOpen}
+                        disabled={!selectedDivisionId}
+                        className="w-full justify-between font-normal h-9 px-3 text-sm"
+                      >
+                        <span className="truncate">
+                          {selectedDistrictId
+                            ? (districtsList.find((d) => String(d.id) === selectedDistrictId)?.district_name ??
+                              (editingProject && Number(selectedDistrictId) === editingProject.district ? editingProject.district_name : null) ??
+                              "Select district")
+                            : selectedDivisionId ? "Select district" : "Select division first"}
+                        </span>
+                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                      <Command
+                        filter={(value, search) => {
+                          const q = (search || "").toLowerCase();
+                          if (!q) return 1;
+                          return (value || "").toLowerCase().includes(q) ? 1 : 0;
+                        }}
+                      >
+                        <CommandInput placeholder="Type to search district…" />
+                        <CommandList>
+                          <CommandEmpty>No district found.</CommandEmpty>
+                          <CommandGroup>
+                            {districtsList.map((d) => (
+                              <CommandItem
+                                key={d.id}
+                                value={d.district_name}
+                                onSelect={() => {
+                                  setSelectedDistrictId(String(d.id));
+                                  setDistrictComboboxOpen(false);
+                                }}
+                              >
+                                {d.district_name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
-                {/* Tehsil */}
+                {/* Tehsil — searchable */}
                 <div className="space-y-2">
                   <Label htmlFor="tehsil">Tehsil *</Label>
-                  <Select value={selectedTehsilId} onValueChange={setSelectedTehsilId} disabled={!selectedDistrictId} required>
-                    <SelectTrigger id="tehsil">
-                      <SelectValue placeholder={selectedDistrictId ? "Select tehsil" : "Select district first"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tehsilsList.map((t) => (
-                        <SelectItem key={t.id} value={String(t.id)}>{t.tehsil_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={tehsilComboboxOpen} onOpenChange={setTehsilComboboxOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="tehsil"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={tehsilComboboxOpen}
+                        disabled={!selectedDistrictId}
+                        className="w-full justify-between font-normal h-9 px-3 text-sm"
+                      >
+                        <span className="truncate">
+                          {selectedTehsilId
+                            ? (tehsilsList.find((t) => String(t.id) === selectedTehsilId)?.tehsil_name ??
+                              (editingProject && Number(selectedTehsilId) === editingProject.tehsil ? editingProject.tehsil_name : null) ??
+                              "Select tehsil")
+                            : selectedDistrictId ? "Select tehsil" : "Select district first"}
+                        </span>
+                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                      <Command
+                        filter={(value, search) => {
+                          const q = (search || "").toLowerCase();
+                          if (!q) return 1;
+                          return (value || "").toLowerCase().includes(q) ? 1 : 0;
+                        }}
+                      >
+                        <CommandInput placeholder="Type to search tehsil…" />
+                        <CommandList>
+                          <CommandEmpty>No tehsil found.</CommandEmpty>
+                          <CommandGroup>
+                            {tehsilsList.map((t) => (
+                              <CommandItem
+                                key={t.id}
+                                value={t.tehsil_name}
+                                onSelect={() => {
+                                  setSelectedTehsilId(String(t.id));
+                                  setTehsilComboboxOpen(false);
+                                }}
+                              >
+                                {t.tehsil_name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
                 {/* XER File Upload */}

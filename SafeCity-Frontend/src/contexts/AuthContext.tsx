@@ -12,6 +12,14 @@ import type { LoginResponse } from "@/api/types";
 
 const USER_STORAGE_KEY = "safecity_user";
 
+/** All localStorage keys used for auth/session — clear every one on logout */
+const AUTH_STORAGE_KEYS = [
+  "safecity_user",
+  "safecity_access_token",
+  "safecity_refresh_token",
+  "userRole",
+] as const;
+
 function getStoredUser(): LoginResponse | null {
   try {
     const raw = localStorage.getItem(USER_STORAGE_KEY);
@@ -49,9 +57,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    clearTokens();
     setUser(null);
-    localStorage.removeItem("userRole");
+    clearTokens();
+    AUTH_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
   }, [setUser]);
 
   useEffect(() => {

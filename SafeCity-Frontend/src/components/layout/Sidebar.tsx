@@ -82,8 +82,8 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export function Sidebar() {
-  const [location] = useLocation();
-  const { user } = useAuth();
+  const [location, setLocation] = useLocation();
+  const { user, logout } = useAuth();
   const userRole =
     (user?.role ?? localStorage.getItem("userRole"))?.trim().toLowerCase() ??
     null;
@@ -331,7 +331,11 @@ export function Sidebar() {
               <div>
                 <Link
                   href="/auth"
-                  onClick={() => localStorage.removeItem("userRole")}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    logout();
+                    setLocation("/auth");
+                  }}
                   className={cn(
                     "flex items-center rounded-lg bg-white/5 p-3 hover:bg-white/10 transition-all group pointer-events-auto",
                     isCollapsed ? "justify-center" : "justify-between gap-3",

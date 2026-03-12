@@ -275,9 +275,18 @@ export interface ProjectActivityUpdateInput {
   percent_complete?: number;
 }
 
+/** One entry from ProjectSerializer.get_stakeholder_details (backend) */
+export interface ProjectStakeholderDetail {
+  stakeholder_type: string;
+  stakeholder_title: string;
+}
+
 export interface Project {
   id: number;
-  stakeholder: number;
+  /** Backend returns array of stakeholder IDs (ManyToMany); legacy may be single number */
+  stakeholder: number | number[];
+  /** Readable names from API stakeholder_details; use this for display instead of IDs */
+  stakeholder_details?: ProjectStakeholderDetail[] | null;
   stakeholder_type?: string | null;
   stakeholder_title?: string | null;
   project_name: string | null;
