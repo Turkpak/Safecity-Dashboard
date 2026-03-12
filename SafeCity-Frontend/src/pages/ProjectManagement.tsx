@@ -250,6 +250,24 @@ export default function ProjectManagement() {
     setSelectedTehsilId("");
   }, [selectedDistrictId]);
 
+  // When editing a project, keep cascading clear disabled until all prefilled IDs are applied.
+  useEffect(() => {
+    if (!skipGeographyClearRef.current) return;
+    if (!editingProject) return;
+    const allSet =
+      selectedProvinceId === String(editingProject.province) &&
+      selectedDivisionId === String(editingProject.division) &&
+      selectedDistrictId === String(editingProject.district) &&
+      selectedTehsilId === String(editingProject.tehsil);
+    if (allSet) skipGeographyClearRef.current = false;
+  }, [
+    editingProject,
+    selectedProvinceId,
+    selectedDivisionId,
+    selectedDistrictId,
+    selectedTehsilId,
+  ]);
+
   // Handle XER file upload
   const handleXERFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -383,9 +401,6 @@ export default function ProjectManagement() {
     setGeoData(project.geom && typeof project.geom === "object" ? (project.geom as object) : null);
     setCurrentStep(1);
     setShowAddProjectDialog(true);
-    setTimeout(() => {
-      skipGeographyClearRef.current = false;
-    }, 0);
   };
 
   // Validate step 1
@@ -1030,6 +1045,7 @@ export default function ProjectManagement() {
                                 key={p.id}
                                 value={p.province_name}
                                 onSelect={() => {
+                                  skipGeographyClearRef.current = false;
                                   setSelectedProvinceId(String(p.id));
                                   setProvinceComboboxOpen(false);
                                 }}
@@ -1084,6 +1100,7 @@ export default function ProjectManagement() {
                                 key={d.id}
                                 value={d.division_name}
                                 onSelect={() => {
+                                  skipGeographyClearRef.current = false;
                                   setSelectedDivisionId(String(d.id));
                                   setDivisionComboboxOpen(false);
                                 }}
@@ -1138,6 +1155,7 @@ export default function ProjectManagement() {
                                 key={d.id}
                                 value={d.district_name}
                                 onSelect={() => {
+                                  skipGeographyClearRef.current = false;
                                   setSelectedDistrictId(String(d.id));
                                   setDistrictComboboxOpen(false);
                                 }}
@@ -1192,6 +1210,7 @@ export default function ProjectManagement() {
                                 key={t.id}
                                 value={t.tehsil_name}
                                 onSelect={() => {
+                                  skipGeographyClearRef.current = false;
                                   setSelectedTehsilId(String(t.id));
                                   setTehsilComboboxOpen(false);
                                 }}

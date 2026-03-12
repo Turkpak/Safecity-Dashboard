@@ -1409,38 +1409,7 @@ function GanttMini({
         );
       })()}
 
-      {/* Legend for delay logs and progress */}
-      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground bg-muted/30 p-2 rounded-lg border border-border/50">
-                        <div className="flex items-center gap-2">
-          <div className="flex flex-col gap-0.5 h-5 w-6 rounded-sm overflow-hidden border border-border">
-            <div className="flex-1 bg-emerald-600 min-h-[2px]" title="Planned (top)" />
-            <div className="flex-1 bg-emerald-600 min-h-[2px]" title="Actual (bottom)" />
-          </div>
-          <span>Bar: top = Planned, bottom = Actual (same color)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <MoreVertical className="h-4 w-4 text-muted-foreground" />
-          <span>Options (⋯) per row: Add delay log (within planned timeline). Delete via button beneath each delay log card.</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-blue-500" />
-          <span>Click on Gantt bars to add delay log</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="h-1.5 w-4 bg-orange-500 rounded" />
-          <span>Delay log marker (positioned by date)</span>
-        </div>
-        {delayLogs && delayLogs.length > 0 && (
-          <div className="flex items-center gap-2 text-xs">
-            <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              <span className="font-medium">
-                {delayLogs.length} delay log{delayLogs.length !== 1 ? 's' : ''} recorded
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Legend removed (delay logs feature removed) */}
 
       {/* Gantt Chart Container with full border */}
       <div className="border-2 border-border rounded-lg overflow-hidden bg-background">
@@ -2086,18 +2055,8 @@ export function MilestoneDetailsPanel({
     }));
   }, [adjustedSubProjects, timeline]);
 
-  if (subProjects.length === 0 || timeline.length === 0) {
-    return (
-      <Card className="border-border/50">
-        <CardHeader>
-          <CardTitle>{milestoneTitle} — Details</CardTitle>
-          <CardDescription>
-            No WBS/timeline data found for this milestone yet. Add `subProjects` and `timeline` for the phase to enable Gantt, WBS breakdown and S-curves.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
+  // If there is no WBS/timeline, render nothing (avoid showing an empty banner on pages).
+  if (subProjects.length === 0 || timeline.length === 0) return null;
 
   return (
     <Card className="border-2 border-primary/10">
