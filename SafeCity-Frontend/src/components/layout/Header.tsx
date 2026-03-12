@@ -1,6 +1,5 @@
-import { Bell, Search, Sun, Moon } from "lucide-react";
+import { Bell, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useTheme } from "@/hooks/use-theme.ts";
 
 export function Header({ title }: { title: string }) {
@@ -16,15 +15,6 @@ export function Header({ title }: { title: string }) {
       </div>
 
       <div className="ml-auto flex items-center gap-4">
-        <div className="relative hidden sm:block w-[180px] md:w-64 lg:w-80">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search cameras, incidents..."
-            className="w-full bg-background pl-8 shadow-none"
-          />
-        </div>
-
         <Button 
           variant="ghost" 
           size="icon" 
