@@ -366,7 +366,7 @@ export default function Finance() {
           </div>
           {(selectedDivision !== "all" || selectedDistrict !== "all" || selectedTehsil !== "all" || selectedProjectId !== "all") && (
             <Button
-              variant="ghost"
+              variant="destructive"
               size="sm"
               onClick={() => {
                 setSelectedDivision("all");
@@ -374,7 +374,7 @@ export default function Finance() {
                 setSelectedTehsil("all");
                 setSelectedProjectId("all");
               }}
-              className="h-9 px-3 text-xs font-medium shrink-0"
+              className="h-8 px-3 text-xs font-medium text-white bg-red-600 hover:bg-red-700 border-0 shrink-0"
             >
               Clear
             </Button>

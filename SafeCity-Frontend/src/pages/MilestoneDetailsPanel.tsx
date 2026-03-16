@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, X, Plus, Trash2, Edit2, Calendar, AlertTriangle, Clock, Image as ImageIcon, XCircle, MoreVertical } from "lucide-react";
+import { AlertCircle, X, Plus, Trash2, Edit2, Calendar, AlertTriangle, Clock, Image as ImageIcon, XCircle, MoreVertical, FileText, Upload, Download, ExternalLink } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +20,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type PhaseTimelinePoint = {
   month: string;
@@ -1960,7 +1961,15 @@ export function MilestoneDetailsPanel({
   onClear?: () => void;
   showAllTabs?: boolean;
 }) {
-  const [tab, setTab] = useState<"gantt" | "wbs" | "scurves" | "logs">("gantt");
+  const [tab, setTab] = useState<"gantt" | "wbs" | "scurves" | "logs" | "documents">("gantt");
+
+  // Progress documents & pictures (frontend-only state; no backend)
+  type ProgressPicture = { id: string; objectUrl: string; timelineMonth: string; caption: string; fileName: string };
+  type ProgressDocument = { id: string; objectUrl: string; fileName: string };
+  const [progressPictures, setProgressPictures] = useState<ProgressPicture[]>([]);
+  const [progressDocuments, setProgressDocuments] = useState<ProgressDocument[]>([]);
+  const [pictureTimelineMonth, setPictureTimelineMonth] = useState<string>("");
+  const [pictureCaption, setPictureCaption] = useState("");
 
   // State for editing delay log from table
   const [editingLogFromTable, setEditingLogFromTable] = useState<DelayLog | undefined>(undefined);
@@ -2058,6 +2067,51 @@ export function MilestoneDetailsPanel({
   }, [adjustedSubProjects]);
 
   const ganttTasks = useMemo(() => buildGanttTasks(adjustedSubProjects, months), [adjustedSubProjects, months]);
+
+  // Default timeline month for new pictures when months load
+  useEffect(() => {
+    if (months.length > 0 && !pictureTimelineMonth) setPictureTimelineMonth(months[0]);
+  }, [months, pictureTimelineMonth]);
+
+  const handleAddProgressPicture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    const month = pictureTimelineMonth || months[0] || "";
+    const objectUrl = URL.createObjectURL(file);
+    setProgressPictures((prev) => [
+      ...prev,
+      { id: `pic-${Date.now()}`, objectUrl, timelineMonth: month, caption: pictureCaption, fileName: file.name },
+    ]);
+    setPictureCaption("");
+    e.target.value = "";
+  };
+
+  const handleRemoveProgressPicture = (id: string) => {
+    setProgressPictures((prev) => {
+      const item = prev.find((p) => p.id === id);
+      if (item) URL.revokeObjectURL(item.objectUrl);
+      return prev.filter((p) => p.id !== id);
+    });
+  };
+
+  const handleAddProgressDocument = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const objectUrl = URL.createObjectURL(file);
+    setProgressDocuments((prev) => [
+      ...prev,
+      { id: `doc-${Date.now()}`, objectUrl, fileName: file.name },
+    ]);
+    e.target.value = "";
+  };
+
+  const handleRemoveProgressDocument = (id: string) => {
+    setProgressDocuments((prev) => {
+      const item = prev.find((d) => d.id === id);
+      if (item) URL.revokeObjectURL(item.objectUrl);
+      return prev.filter((d) => d.id !== id);
+    });
+  };
 
   const handleAddDelayLog = (log: DelayLog) => {
     setDelayLogs((prev) => {
@@ -2291,11 +2345,12 @@ export function MilestoneDetailsPanel({
           </>
         ) : (
           <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
-            <TabsList className={`w-full ${isMobile ? 'grid grid-cols-4' : 'justify-start'}`}>
+            <TabsList className={`w-full ${isMobile ? 'grid grid-cols-5' : 'justify-start flex-wrap'}`}>
               <TabsTrigger value="gantt" className={isMobile ? 'text-xs' : ''}>Gantt</TabsTrigger>
               <TabsTrigger value="wbs" className={isMobile ? 'text-xs' : ''}>WBS Breakdown</TabsTrigger>
               <TabsTrigger value="scurves" className={isMobile ? 'text-xs' : ''}>S-Curves</TabsTrigger>
               <TabsTrigger value="logs" className={isMobile ? 'text-xs' : ''}>Delay Logs</TabsTrigger>
+              <TabsTrigger value="documents" className={isMobile ? 'text-xs' : ''}>Progress Docs</TabsTrigger>
             </TabsList>
 
             <TabsContent value="gantt" className="mt-4">
@@ -2533,6 +2588,112 @@ export function MilestoneDetailsPanel({
                   existingLog={editingLogFromTable}
                 />
               )}
+            </TabsContent>
+
+            <TabsContent value="documents" className="mt-4 space-y-6">
+              <div className="space-y-4">
+                <h3 className={`${isMobile ? 'text-sm' : 'text-base'} font-bold`}>Progress Pictures</h3>
+                <p className="text-sm text-muted-foreground">
+                  Add photos with a timeline (month) so progress can be tracked over time. Each picture is linked to a period in the project timeline.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+                  <Select value={pictureTimelineMonth || months[0]} onValueChange={setPictureTimelineMonth}>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                      <SelectValue placeholder="Timeline (month)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {months.map((m) => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder="Caption (optional)"
+                    value={pictureCaption}
+                    onChange={(e) => setPictureCaption(e.target.value)}
+                    className="flex-1 min-w-[140px]"
+                  />
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAddProgressPicture}
+                    />
+                    <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
+                      <span><Upload className="h-4 w-4 mr-2 inline" /> Add Picture</span>
+                    </Button>
+                  </label>
+                </div>
+                {progressPictures.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border/60 bg-muted/30 p-8 text-center text-sm text-muted-foreground">
+                    No progress pictures yet. Select a timeline month and add a picture above.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {progressPictures.map((pic) => (
+                      <div key={pic.id} className="rounded-lg border border-border/60 bg-card overflow-hidden group relative">
+                        <div className="aspect-square relative bg-muted">
+                          <img src={pic.objectUrl} alt={pic.caption || pic.fileName} className="w-full h-full object-cover" />
+                          <Badge className="absolute top-2 left-2 text-xs bg-primary/90">{pic.timelineMonth}</Badge>
+                          <Button
+                            size="icon"
+                            variant="destructive"
+                            className="absolute top-2 right-2 h-7 w-7 opacity-90"
+                            onClick={() => handleRemoveProgressPicture(pic.id)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                        <div className="p-2">
+                          <p className="text-xs font-medium truncate" title={pic.caption || pic.fileName}>{pic.caption || pic.fileName}</p>
+                          <a href={pic.objectUrl} download={pic.fileName} className="inline-flex items-center gap-1 text-xs text-primary mt-1">
+                            <Download className="h-3 w-3" /> Download
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-4 pt-4 border-t">
+                <h3 className={`${isMobile ? 'text-sm' : 'text-base'} font-bold`}>Progress Documents</h3>
+                <p className="text-sm text-muted-foreground">
+                  Upload reports, certificates, or other documents. You can view and download them here.
+                </p>
+                <label className="cursor-pointer inline-block">
+                  <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" className="hidden" onChange={handleAddProgressDocument} />
+                  <Button type="button" variant="outline" asChild><span><Upload className="h-4 w-4 mr-2 inline" /> Add Document</span></Button>
+                </label>
+                {progressDocuments.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border/60 bg-muted/30 p-6 text-center text-sm text-muted-foreground">
+                    No documents yet. Add a document above.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {progressDocuments.map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between rounded-lg border border-border/60 bg-card p-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <FileText className="h-8 w-8 text-muted-foreground flex-shrink-0" />
+                          <span className="text-sm font-medium truncate">{doc.fileName}</span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <a href={doc.objectUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary">
+                            <ExternalLink className="h-3.5 w-3.5" /> View
+                          </a>
+                          <a href={doc.objectUrl} download={doc.fileName} className="inline-flex items-center gap-1 text-xs text-primary">
+                            <Download className="h-3.5 w-3.5" /> Download
+                          </a>
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleRemoveProgressDocument(doc.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </TabsContent>
           </Tabs>
         )}

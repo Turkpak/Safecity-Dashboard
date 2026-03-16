@@ -513,7 +513,7 @@ export default function ProjectDetail() {
                 <button
                   type="button"
                   onClick={() => setSelectedMilestoneKey(null)}
-                  className="h-9 px-4 rounded-xl border border-border/60 bg-background hover:bg-muted/40 text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0"
+                  className="h-8 px-3 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700 border-0 transition-colors whitespace-nowrap flex-shrink-0"
                 >
                   Clear
                 </button>

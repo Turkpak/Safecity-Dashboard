@@ -157,7 +157,7 @@ export default function ProvinceManagement() {
                     </>
                   )}
                   {editingId === null && canCreate && (
-                    <Button variant="outline" onClick={() => setProvinceName("")} className="w-full h-10">
+                    <Button variant="destructive" size="sm" onClick={() => setProvinceName("")} className="w-full h-8 text-white bg-red-600 hover:bg-red-700 border-0 text-xs font-medium">
                       Clear
                     </Button>
                   )}

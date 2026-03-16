@@ -663,9 +663,7 @@ export default function UserManagement() {
                 <ListChecks className="h-5 w-5" />
                 Page permissions
               </CardTitle>
-              <CardDescription>
-                Select a user by name and role to view and edit their page-level permissions (checkboxes).
-              </CardDescription>
+              
               {usersWithPermissionsLoading ? (
                 <p className="text-muted-foreground text-sm">Loading users and permissions…</p>
               ) : (
@@ -734,10 +732,10 @@ export default function UserManagement() {
                   </div>
                   {selectedUserIdForPermissions != null && (
                     <Button
-                      variant="ghost"
+                      variant="destructive"
                       size="sm"
                       onClick={() => setSelectedUserIdForPermissions(null)}
-                      className="text-muted-foreground shrink-0 h-9"
+                      className="shrink-0 h-8 text-white bg-red-600 hover:bg-red-700 border-0"
                     >
                       Clear selection
                     </Button>

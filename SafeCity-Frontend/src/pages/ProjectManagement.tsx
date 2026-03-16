@@ -781,18 +781,6 @@ export default function ProjectManagement() {
                   </div>
                 </div>
               )}
-              <div className="flex flex-wrap gap-2 pt-2">
-                <Button variant="outline" size="sm" onClick={() => openEditDialog(selectedProjectForView)} className="gap-1.5">
-                  <Pencil className="h-3.5 w-3.5" />
-                  Update this project
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <a href={`/project/${selectedProjectForView.tehsil}/${selectedProjectForView.id}`} className="gap-1.5">
-                    <Eye className="h-3.5 w-3.5" />
-                    Open full project page
-                  </a>
-                </Button>
-              </div>
             </CardContent>
           </Card>
         )}

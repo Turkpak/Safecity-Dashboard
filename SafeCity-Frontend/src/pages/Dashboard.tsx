@@ -1067,7 +1067,7 @@ export default function Dashboard() {
                   setSelectedMilestoneKey(null);
                   if (useProjectCards) setSelectedProjectForDetails(null);
                 }}
-                className="h-9 px-4 rounded-xl border border-border/60 bg-background hover:bg-muted/40 text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0"
+                className="h-8 px-3 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700 border-0 transition-colors whitespace-nowrap flex-shrink-0"
               >
                 Clear
               </button>
@@ -1142,8 +1142,8 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Financial Progress Pie Charts (hide when a milestone KPI is selected) */}
-        {!selectedMilestoneKey && (
+        {/* Financial Progress Pie Charts (hide when a milestone KPI or a single project is selected) */}
+        {!selectedMilestoneKey && !isSelectedProjectInThisScope && (
           <div className="grid gap-6 md:grid-cols-2">
             {/* Financial Progress Donut Chart */}
             <Card className="overflow-hidden border border-border/80 bg-card shadow-lg shadow-primary/5 transition-shadow hover:shadow-xl hover:shadow-primary/10">
@@ -1567,8 +1567,8 @@ export default function Dashboard() {
             </div>
           )}
 
-        {/* Charts Grid (drilldown only; hide in All Divisions/Districts/Tehsils views) */}
-        {!selectedMilestoneKey && !isAggregatedView && (
+        {/* Charts Grid (drilldown only; hide in All Divisions/Districts/Tehsils views and when a single project is selected) */}
+        {!selectedMilestoneKey && !isAggregatedView && !isSelectedProjectInThisScope && (
           <div className="space-y-4">
             <div>
               <h2 className="text-xl font-bold font-heading mb-1">

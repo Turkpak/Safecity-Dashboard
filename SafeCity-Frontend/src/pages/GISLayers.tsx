@@ -239,7 +239,7 @@ export default function GISLayers() {
                 </div>
                 {(selectedDivision !== "all" || selectedDistrict !== "all" || selectedTehsil !== "all" || selectedProjectId !== "all") && (
                   <Button
-                    variant="outline"
+                    variant="destructive"
                     size="sm"
                     onClick={() => {
                       setSelectedDivision("all");
@@ -247,7 +247,7 @@ export default function GISLayers() {
                       setSelectedTehsil("all");
                       setSelectedProjectId("all");
                     }}
-                    className="h-9 px-4 rounded-lg font-medium shrink-0 self-end"
+                    className="h-8 px-3 text-white bg-red-600 hover:bg-red-700 border-0 rounded-lg font-medium shrink-0 self-end text-xs"
                   >
                     Clear filters
                   </Button>

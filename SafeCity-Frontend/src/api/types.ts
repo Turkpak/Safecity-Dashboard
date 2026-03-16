@@ -374,3 +374,26 @@ export interface PictorialArchiveUpdateInput {
   image_date?: string;
   description?: string;
 }
+
+// --------------------------------------------------------
+// Project Progress Document (timeline-linked documents)
+// --------------------------------------------------------
+export interface ProjectProgressDocument {
+  id: number;
+  project: number;
+  project_name?: string;
+  file: string;
+  title: string;
+  document_date: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectProgressDocumentCreateInput {
+  project: number;
+  file: File;
+  title?: string;
+  document_date: string;
+  description?: string;
+}

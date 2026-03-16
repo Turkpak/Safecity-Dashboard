@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, X, Plus, Trash2, Edit2, Calendar, AlertTriangle, Clock, Image as ImageIcon, XCircle, MoreVertical } from "lucide-react";
+import { AlertCircle, X, Plus, Trash2, Edit2, Calendar, AlertTriangle, Clock, Image as ImageIcon, XCircle, MoreVertical, Upload, FileText, Download } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -93,6 +93,21 @@ type GanttTask = {
   // Optional overrides used when we generate tasks from API-driven milestones
   progressOverride?: number; // 0..100
   plannedOverride?: number; // 0..100
+};
+
+// Frontend-only: progress photos and documents (in-memory, no backend)
+type ProgressPhotoItem = {
+  id: string;
+  file: File;
+  objectUrl: string;
+  date: string; // YYYY-MM-DD
+  caption?: string;
+};
+type ProgressDocItem = {
+  id: string;
+  file: File;
+  name: string;
+  uploadedAt?: string; // ISO string for sort order
 };
 
 // Delay logs were previously hardcoded in the UI. We keep the types as no-op
@@ -1177,6 +1192,8 @@ function GanttMini({
   delayLogs,
   onAddDelayLog,
   onDeleteDelayLog,
+  onOpenAddPhoto,
+  onOpenAddDocument,
 }: {
   tasks: GanttTask[];
   months: string[];
@@ -1185,6 +1202,8 @@ function GanttMini({
   delayLogs?: DelayLog[];
   onAddDelayLog?: (log: DelayLog) => void;
   onDeleteDelayLog?: (logId: string) => void;
+  onOpenAddPhoto?: (taskId: string, taskName: string) => void;
+  onOpenAddDocument?: (taskId: string, taskName: string) => void;
 }) {
   const n = months.length || 1;
   // Initialize all tasks as expanded by default
@@ -1968,6 +1987,28 @@ function GanttMini({
                                   <Plus className="h-4 w-4 mr-2" />
                                   Add delay log
                                 </DropdownMenuItem>
+                                {onOpenAddPhoto && (
+                                  <DropdownMenuItem
+                                    onSelect={(e) => {
+                                      e.preventDefault();
+                                      onOpenAddPhoto(c.id, c.name);
+                                    }}
+                                  >
+                                    <ImageIcon className="h-4 w-4 mr-2" />
+                                    Add Photo
+                                  </DropdownMenuItem>
+                                )}
+                                {onOpenAddDocument && (
+                                  <DropdownMenuItem
+                                    onSelect={(e) => {
+                                      e.preventDefault();
+                                      onOpenAddDocument(c.id, c.name);
+                                    }}
+                                  >
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    Add Documents
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
@@ -1998,7 +2039,54 @@ export function MilestoneDetailsPanel({
   onClear?: () => void;
   showAllTabs?: boolean;
 }) {
-  const [tab, setTab] = useState<"gantt" | "wbs" | "scurves" | "logs">("gantt");
+  const [tab, setTab] = useState<"gantt" | "wbs" | "scurves" | "photos" | "logs">("gantt");
+
+  // Frontend-only: progress photos (with timeline date) and documents
+  const [progressPhotos, setProgressPhotos] = useState<ProgressPhotoItem[]>([]);
+  const [progressDocs, setProgressDocs] = useState<ProgressDocItem[]>([]);
+
+  // Dialogs opened from Gantt activity options (three dots)
+  const [addPhotoDialogOpen, setAddPhotoDialogOpen] = useState(false);
+  const [addDocumentDialogOpen, setAddDocumentDialogOpen] = useState(false);
+  const [selectedTaskForMedia, setSelectedTaskForMedia] = useState<{ taskId: string; taskName: string } | null>(null);
+  const [photoDialogForm, setPhotoDialogForm] = useState<{ file: File; objectUrl: string; date: string; caption: string } | null>(null);
+  const photoDialogInputRef = React.useRef<HTMLInputElement>(null);
+  const docDialogInputRef = React.useRef<HTMLInputElement>(null);
+
+  const progressPhotosRef = React.useRef(progressPhotos);
+  progressPhotosRef.current = progressPhotos;
+  useEffect(() => {
+    return () => {
+      progressPhotosRef.current.forEach((p) => URL.revokeObjectURL(p.objectUrl));
+    };
+  }, []);
+
+  const removePhoto = (id: string) => {
+    setProgressPhotos((prev) => {
+      const item = prev.find((p) => p.id === id);
+      if (item) URL.revokeObjectURL(item.objectUrl);
+      return prev.filter((p) => p.id !== id);
+    });
+  };
+  const downloadPhoto = (item: ProgressPhotoItem) => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(item.file);
+    a.download = item.file.name || `progress-${item.date}.jpg`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  const addDocument = (file: File) => {
+    const id = `doc-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setProgressDocs((prev) => [...prev, { id, file, name: file.name, uploadedAt: new Date().toISOString() }]);
+  };
+  const removeDoc = (id: string) => setProgressDocs((prev) => prev.filter((d) => d.id !== id));
+  const downloadDoc = (item: ProgressDocItem) => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(item.file);
+    a.download = item.name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
 
   // State for editing delay log from table
   const [editingLogFromTable, setEditingLogFromTable] = useState<DelayLog | undefined>(undefined);
@@ -2038,6 +2126,34 @@ export function MilestoneDetailsPanel({
 
   const handleAddDelayLog = (_log: DelayLog) => {};
   const handleDeleteDelayLog = (_logId: string) => {};
+
+  const openAddPhotoFromGantt = (taskId: string, taskName: string) => {
+    setSelectedTaskForMedia({ taskId, taskName });
+    setPhotoDialogForm(null);
+    setAddPhotoDialogOpen(true);
+  };
+  const openAddDocumentFromGantt = (taskId: string, taskName: string) => {
+    setSelectedTaskForMedia({ taskId, taskName });
+    setAddDocumentDialogOpen(true);
+  };
+  const savePhotoFromDialog = () => {
+    if (!photoDialogForm) return;
+    const id = `photo-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setProgressPhotos((prev) => [...prev, { id, file: photoDialogForm.file, objectUrl: photoDialogForm.objectUrl, date: photoDialogForm.date, caption: photoDialogForm.caption || undefined }]);
+    setPhotoDialogForm(null);
+    setAddPhotoDialogOpen(false);
+    setSelectedTaskForMedia(null);
+  };
+  const closePhotoDialog = () => {
+    if (photoDialogForm) URL.revokeObjectURL(photoDialogForm.objectUrl);
+    setPhotoDialogForm(null);
+    setAddPhotoDialogOpen(false);
+    setSelectedTaskForMedia(null);
+  };
+  const closeDocumentDialog = () => {
+    setAddDocumentDialogOpen(false);
+    setSelectedTaskForMedia(null);
+  };
 
   const wbsPieData = useMemo(
     () =>
@@ -2083,6 +2199,8 @@ export function MilestoneDetailsPanel({
                   delayLogs={delayLogs}
                   onAddDelayLog={handleAddDelayLog}
                   onDeleteDelayLog={handleDeleteDelayLog}
+                  onOpenAddPhoto={openAddPhotoFromGantt}
+                  onOpenAddDocument={openAddDocumentFromGantt}
                 />
                 {/* Overall Progress Summary with Delay Impact - beneath Gantt chart */}
                 {/* Delay Logs removed (were hardcoded) */}
@@ -2211,10 +2329,11 @@ export function MilestoneDetailsPanel({
           </>
         ) : (
           <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
-            <TabsList className={`w-full ${isMobile ? 'grid grid-cols-3' : 'justify-start'}`}>
+            <TabsList className={`w-full ${isMobile ? 'grid grid-cols-2 sm:grid-cols-4' : 'flex flex-wrap justify-start gap-1'}`}>
               <TabsTrigger value="gantt" className={isMobile ? 'text-xs' : ''}>Gantt</TabsTrigger>
               <TabsTrigger value="wbs" className={isMobile ? 'text-xs' : ''}>WBS Breakdown</TabsTrigger>
               <TabsTrigger value="scurves" className={isMobile ? 'text-xs' : ''}>S-Curves</TabsTrigger>
+              <TabsTrigger value="photos" className={isMobile ? 'text-xs' : ''}>Photos & Docs</TabsTrigger>
             </TabsList>
 
             <TabsContent value="gantt" className="mt-4">
@@ -2226,6 +2345,8 @@ export function MilestoneDetailsPanel({
                 delayLogs={delayLogs}
                 onAddDelayLog={handleAddDelayLog}
                 onDeleteDelayLog={handleDeleteDelayLog}
+                onOpenAddPhoto={openAddPhotoFromGantt}
+                onOpenAddDocument={openAddDocumentFromGantt}
               />
               {/* Delay Logs removed (were hardcoded) */}
             </TabsContent>
@@ -2346,10 +2467,164 @@ export function MilestoneDetailsPanel({
               </div>
             </TabsContent>
 
+            <TabsContent value="photos" className="mt-4 space-y-6">
+              {/* Progress Photos — display only; upload via Gantt activity options (⋮) */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold">Progress Photos</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  {progressPhotos.length === 0 ? (
+                    <p className="col-span-full text-sm text-muted-foreground">No photos yet. Use the options menu (⋮) on an activity in the Gantt chart to add a photo.</p>
+                  ) : null}
+                  {[...progressPhotos].sort((a, b) => b.date.localeCompare(a.date)).map((item) => (
+                    <Card key={item.id} className="overflow-hidden border border-border/60">
+                      <div className="aspect-square relative bg-muted">
+                        <img src={item.objectUrl} alt={item.caption || item.date} className="w-full h-full object-cover" />
+                        <Badge className="absolute bottom-1 left-1 text-[10px] bg-black/70">{item.date}</Badge>
+                        <div className="absolute top-1 right-1 flex gap-1">
+                          <Button type="button" size="icon" variant="secondary" className="h-7 w-7" onClick={() => downloadPhoto(item)} title="Download">
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button type="button" size="icon" variant="destructive" className="h-7 w-7" onClick={() => removePhoto(item.id)} title="Remove">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                      <CardContent className="p-2">
+                        <p className="text-xs text-muted-foreground truncate" title={item.caption}>{item.caption || "—"}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              {/* Documents — display only; upload via Gantt activity options (⋮) */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold">Documents</h3>
+                {progressDocs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No documents yet. Use the options menu (⋮) on an activity in the Gantt chart to add a document.</p>
+                ) : (
+                  <div className="rounded-lg border border-border/60 divide-y divide-border/60">
+                    {[...progressDocs]
+                      .sort((a, b) => (b.uploadedAt || b.id).localeCompare(a.uploadedAt || a.id))
+                      .map((item) => (
+                      <div key={item.id} className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/30">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="text-sm font-medium truncate">{item.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button type="button" size="sm" variant="ghost" className="h-8 gap-1" onClick={() => downloadDoc(item)}>
+                            <Download className="h-3.5 w-3.5" /> Download
+                          </Button>
+                          <Button type="button" size="sm" variant="ghost" className="h-8 text-destructive hover:text-destructive" onClick={() => removeDoc(item.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
             {/* Delay Logs tab removed (was hardcoded) */}
           </Tabs>
         )}
       </CardContent>
+
+      {/* Add Photo dialog (opened from Gantt activity options) */}
+      <Dialog open={addPhotoDialogOpen} onOpenChange={(open) => { if (!open) closePhotoDialog(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Photo</DialogTitle>
+            <DialogDescription>
+              {selectedTaskForMedia ? `Add a progress photo for: ${selectedTaskForMedia.taskName}` : "Add a progress photo. Set the progress date for the timeline."}
+            </DialogDescription>
+          </DialogHeader>
+          <input
+            ref={photoDialogInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) setPhotoDialogForm({ file, objectUrl: URL.createObjectURL(file), date: new Date().toISOString().slice(0, 10), caption: "" });
+              e.target.value = "";
+            }}
+          />
+          {photoDialogForm ? (
+            <div className="space-y-4">
+              <div className="flex gap-4">
+                <div className="shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-muted border">
+                  <img src={photoDialogForm.objectUrl} alt="Preview" className="w-full h-full object-cover" />
+                </div>
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <Label className="text-xs">Progress date (timeline)</Label>
+                    <Input
+                      type="date"
+                      value={photoDialogForm.date}
+                      onChange={(e) => setPhotoDialogForm((p) => (p ? { ...p, date: e.target.value } : null))}
+                      className="mt-1 h-9"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Caption (optional)</Label>
+                    <Input
+                      placeholder="e.g. Site visit"
+                      value={photoDialogForm.caption}
+                      onChange={(e) => setPhotoDialogForm((p) => (p ? { ...p, caption: e.target.value } : null))}
+                      className="mt-1 h-9"
+                    />
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={closePhotoDialog}>Cancel</Button>
+                <Button type="button" onClick={savePhotoFromDialog}>Save photo</Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="py-4">
+              <Button type="button" variant="outline" className="w-full gap-2" onClick={() => photoDialogInputRef.current?.click()}>
+                <Upload className="h-4 w-4" /> Choose image
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Documents dialog (opened from Gantt activity options) */}
+      <Dialog open={addDocumentDialogOpen} onOpenChange={(open) => { if (!open) closeDocumentDialog(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Documents</DialogTitle>
+            <DialogDescription>
+              {selectedTaskForMedia ? `Upload a document for: ${selectedTaskForMedia.taskName}` : "Upload PDF, Word, Excel or text files."}
+            </DialogDescription>
+          </DialogHeader>
+          <input
+            ref={docDialogInputRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                addDocument(file);
+                closeDocumentDialog();
+              }
+              e.target.value = "";
+            }}
+          />
+          <div className="py-4">
+            <Button type="button" variant="outline" className="w-full gap-2" onClick={() => docDialogInputRef.current?.click()}>
+              <Upload className="h-4 w-4" /> Choose file
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2">PDF, Word, Excel or text files. Document will appear in the Photos & Docs tab.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
