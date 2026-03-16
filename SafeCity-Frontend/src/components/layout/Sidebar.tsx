@@ -27,9 +27,11 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
+import { getPermissionForPath } from "@/utils/permissionPaths";
 import {
   Tooltip,
   TooltipContent,
@@ -84,6 +86,7 @@ const NAV_ITEMS: NavItem[] = [
 export function Sidebar() {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
+  const { canView, isSuperAdmin } = usePermissions();
   const userRole =
     (user?.role ?? localStorage.getItem("userRole"))?.trim().toLowerCase() ??
     null;
@@ -113,9 +116,45 @@ export function Sidebar() {
     }
   }, [location]);
 
-  const visibleNavItems = NAV_ITEMS.filter(
-    (item) => !item.roles || (userRole && item.roles.includes(userRole)),
-  );
+  // Filter nav items: by role (e.g. super_admin for User Management) and by page can_view permission.
+  // Users must not see sidebar links to pages they are not allowed to view.
+  const visibleNavItems = useMemo(() => {
+    return NAV_ITEMS.filter((item) => {
+      // Role-based: e.g. User Management only for super_admin
+      if (item.roles && (!userRole || !item.roles.includes(userRole)))
+        return false;
+      // Single link (no subItems)
+      if (item.href) {
+        const perm = getPermissionForPath(item.href);
+        if (!perm) return true; // no permission mapping = show (e.g. unknown path)
+        if (isSuperAdmin) return true;
+        return canView(perm.sidebar_label, perm.sub_label);
+      }
+      // Accordion with subItems (e.g. Area Management)
+      if (item.subItems && item.subItems.length > 0) {
+        const visibleSubs = item.subItems.filter((sub) => {
+          const perm = getPermissionForPath(sub.href);
+          if (!perm) return true;
+          if (isSuperAdmin) return true;
+          return canView(perm.sidebar_label, perm.sub_label);
+        });
+        return visibleSubs.length > 0; // show parent only if at least one sub is visible
+      }
+      return true;
+    }).map((item) => {
+      // For items with subItems, only include the subItems the user can view
+      if (item.subItems && item.subItems.length > 0) {
+        const visibleSubs = item.subItems.filter((sub) => {
+          const perm = getPermissionForPath(sub.href);
+          if (!perm) return true;
+          if (isSuperAdmin) return true;
+          return canView(perm.sidebar_label, perm.sub_label);
+        });
+        return { ...item, subItems: visibleSubs };
+      }
+      return item;
+    });
+  }, [userRole, canView, isSuperAdmin]);
 
   const NavContent = () => (
     <div className="flex h-full flex-col gap-4">

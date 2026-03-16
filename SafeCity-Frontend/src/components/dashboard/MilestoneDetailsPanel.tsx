@@ -1570,10 +1570,11 @@ function GanttMini({
                       })}
                     </div>
 
-                    {/* Task bar spanning across cells - clickable to add delay logs */}
+                    {/* Task bar spanning across cells - clickable to add delay logs. Planned = blue, Actual = green, Delay = red. */}
                     {(() => {
-                      const fillColor = statusColor(t.status, baseColor);
-                      const barBgColor = hexToRgba(fillColor, 0.4);
+                      const plannedColor = "#3b82f6"; // blue
+                      const actualColor = "#10b981"; // green
+                      const barBgColor = "rgba(59, 130, 246, 0.2)";
                       return (
                     <div
                       className="absolute top-1 bottom-1 rounded shadow-sm z-10 overflow-hidden"
@@ -1595,24 +1596,24 @@ function GanttMini({
                       }}
                       title="Click on the bar to add a delay log at this position"
                     >
-                      {/* Horizontal split: top = Planned, bottom = Actual (same dark color, no white tone) */}
+                      {/* Top = Planned (blue), Bottom = Actual (green), Delay stripe = red */}
                       <div className="absolute inset-0 flex flex-col z-8">
-                        {/* Top half: Planned progress */}
+                        {/* Top half: Planned progress - blue */}
                         <div className="flex-1 min-h-0 flex items-stretch border-b border-black/20">
                           <div
                             className="h-full transition-all duration-300"
-                            style={{ width: `${Math.min(100, Math.max(0, plannedPct))}%`, backgroundColor: fillColor }}
+                            style={{ width: `${Math.min(100, Math.max(0, plannedPct))}%`, backgroundColor: plannedColor }}
                             title={`Planned: ${plannedPct}%`}
                           />
                         </div>
-                        {/* Bottom half: Actual progress */}
+                        {/* Bottom half: Actual progress - green */}
                         <div className="flex-1 min-h-0 flex items-stretch relative">
                           <div
                             className="h-full transition-all duration-300"
-                            style={{ width: `${Math.min(100, Math.max(0, progress))}%`, backgroundColor: fillColor }}
+                            style={{ width: `${Math.min(100, Math.max(0, progress))}%`, backgroundColor: actualColor }}
                             title={`Actual: ${progress}%`}
                           />
-                          {/* Delay impact stripe within actual row (starts after actual %) */}
+                          {/* Delay impact stripe - red */}
                           {subProject && (subProject as any).delayImpact > 0 && (subProject as any).originalProgress > progress && (
                             <div
                               className="absolute top-0 bottom-0 bg-red-500/50 border-r-2 border-red-600/60 transition-all duration-300"
@@ -1815,10 +1816,11 @@ function GanttMini({
                               })}
                             </div>
 
-                            {/* Child task bar - same dark color for both strips */}
+                            {/* Child task bar: Planned = blue, Actual = green, Delay = red */}
                             {(() => {
-                              const childFillColor = statusColor(c.status, baseColor);
-                              const childBarBgColor = hexToRgba(childFillColor, 0.4);
+                              const plannedColor = "#3b82f6";
+                              const actualColor = "#10b981";
+                              const childBarBgColor = "rgba(59, 130, 246, 0.2)";
                               return (
                             <div
                               className="absolute top-0.5 bottom-0.5 rounded z-20 overflow-hidden"
@@ -1840,19 +1842,18 @@ function GanttMini({
                               }}
                               title="Click on the bar to add a delay log at this position"
                             >
-                              {/* Horizontal split: top = Planned, bottom = Actual */}
                               <div className="absolute inset-0 flex flex-col z-8">
                                 <div className="flex-1 min-h-0 flex items-stretch border-b border-black/20">
                                   <div
                                     className="h-full transition-all duration-300"
-                                    style={{ width: `${Math.min(100, Math.max(0, childPlannedPct))}%`, backgroundColor: childFillColor }}
+                                    style={{ width: `${Math.min(100, Math.max(0, childPlannedPct))}%`, backgroundColor: plannedColor }}
                                     title={`Planned: ${childPlannedPct}%`}
                                   />
                                 </div>
                                 <div className="flex-1 min-h-0 flex items-stretch relative">
                                   <div
                                     className="h-full transition-all duration-300"
-                                    style={{ width: `${Math.min(100, Math.max(0, childProgress))}%`, backgroundColor: childFillColor }}
+                                    style={{ width: `${Math.min(100, Math.max(0, childProgress))}%`, backgroundColor: actualColor }}
                                     title={`Actual: ${childProgress}%`}
                                   />
                                   {childSubProject && (childSubProject as any).delayImpact > 0 && (childSubProject as any).originalProgress > childProgress && (

@@ -457,132 +457,23 @@ const calcOverallProgress = (projects: Project[]): number => {
   return Math.round((totalUtilized / totalBudget) * 100);
 };
 
-/** Build CityInstallationData from an overall financial progress number */
+/** Build CityInstallationData from an overall financial progress number (API-only; no synthetic phase or timeline data). */
 const generateCityDataFromOverall = (
   overall: number,
-  division?: string,
-  district?: string,
-  tehsil?: string,
+  _division?: string,
+  _district?: string,
+  _tehsil?: string,
 ): CityInstallationData => {
-  const surveys = Math.min(100, Math.round(overall * 1.25));
-  const foundations = Math.min(100, Math.round(overall * 1.15));
-  const cabinet = Math.min(100, Math.round(overall * 1.05));
-  const cable = Math.min(100, Math.round(overall * 0.95));
-  const controlRoom = Math.min(100, Math.round(overall * 0.8));
-  const ppic3 = Math.min(100, Math.round(overall * 0.65));
-  const timeline = [
-    {
-      month: "Jan",
-      surveys: Math.max(0, surveys - 50),
-      foundations: Math.max(0, foundations - 75),
-      cabinet: Math.max(0, cabinet - 73),
-      cable: Math.max(0, cable - 70),
-      controlRoom: Math.max(0, controlRoom - 60),
-      ppic3: Math.max(0, ppic3 - 55),
-      overall: Math.max(0, overall - 60),
-    },
-    {
-      month: "Feb",
-      surveys: Math.max(0, surveys - 30),
-      foundations: Math.max(0, foundations - 50),
-      cabinet: Math.max(0, cabinet - 55),
-      cable: Math.max(0, cable - 50),
-      controlRoom: Math.max(0, controlRoom - 45),
-      ppic3: Math.max(0, ppic3 - 40),
-      overall: Math.max(0, overall - 40),
-    },
-    {
-      month: "Mar",
-      surveys: Math.max(0, surveys - 15),
-      foundations: Math.max(0, foundations - 30),
-      cabinet: Math.max(0, cabinet - 35),
-      cable: Math.max(0, cable - 30),
-      controlRoom: Math.max(0, controlRoom - 25),
-      ppic3: Math.max(0, ppic3 - 20),
-      overall: Math.max(0, overall - 20),
-    },
-    {
-      month: "Apr",
-      surveys: Math.max(0, surveys - 8),
-      foundations: Math.max(0, foundations - 15),
-      cabinet: Math.max(0, cabinet - 20),
-      cable: Math.max(0, cable - 15),
-      controlRoom: Math.max(0, controlRoom - 12),
-      ppic3: Math.max(0, ppic3 - 10),
-      overall: Math.max(0, overall - 10),
-    },
-    {
-      month: "May",
-      surveys: Math.max(0, surveys - 3),
-      foundations: Math.max(0, foundations - 8),
-      cabinet: Math.max(0, cabinet - 10),
-      cable: Math.max(0, cable - 8),
-      controlRoom: Math.max(0, controlRoom - 5),
-      ppic3: Math.max(0, ppic3 - 3),
-      overall: Math.max(0, overall - 3),
-    },
-    {
-      month: "Jun",
-      surveys,
-      foundations,
-      cabinet,
-      cable,
-      controlRoom,
-      ppic3,
-      overall,
-    },
-  ];
+  const value = Math.min(100, Math.max(0, overall));
   return {
-    surveys: convertToPhaseProgress(
-      surveys,
-      "surveys",
-      timeline,
-      division,
-      district,
-      tehsil,
-    ),
-    foundations: convertToPhaseProgress(
-      foundations,
-      "foundations",
-      timeline,
-      division,
-      district,
-      tehsil,
-    ),
-    cabinet: convertToPhaseProgress(
-      cabinet,
-      "cabinet",
-      timeline,
-      division,
-      district,
-      tehsil,
-    ),
-    cable: convertToPhaseProgress(
-      cable,
-      "cable",
-      timeline,
-      division,
-      district,
-      tehsil,
-    ),
-    controlRoom: convertToPhaseProgress(
-      controlRoom,
-      "controlRoom",
-      timeline,
-      division,
-      district,
-      tehsil,
-    ),
-    ppic3: convertToPhaseProgress(
-      ppic3,
-      "ppic3",
-      timeline,
-      division,
-      district,
-      tehsil,
-    ),
-    overall,
-    timeline,
+    surveys: value,
+    foundations: value,
+    cabinet: value,
+    cable: value,
+    controlRoom: value,
+    ppic3: value,
+    overall: value,
+    timeline: undefined,
   };
 };
 

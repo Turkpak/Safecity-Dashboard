@@ -151,114 +151,131 @@ export default function GISLayers() {
   return (
     <Layout title="Advanced GIS Intelligence">
       <div className="flex flex-col gap-6">
-        {/* Filters — single row; Filter icon only (no text); short Project text */}
-        <div className="flex flex-nowrap items-center gap-3">
-          <Filter className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
-          <div className="flex items-center gap-2 shrink-0">
-            <label className="text-sm font-medium text-muted-foreground shrink-0">Division</label>
-            <Select value={selectedDivision} onValueChange={handleDivisionChange}>
-              <SelectTrigger className="h-9 w-[140px] border-border/50 bg-background rounded-md">
-                <SelectValue placeholder="All" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                {getAllDivisions().map((div) => (
-                  <SelectItem key={div} value={div}>{div}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <label className="text-sm font-medium text-muted-foreground shrink-0">District</label>
-            <Select
-              value={selectedDistrict}
-              onValueChange={handleDistrictChange}
-              disabled={selectedDivision === "all"}
-            >
-              <SelectTrigger
-                className={`h-9 w-[140px] border-border/50 bg-background rounded-md ${selectedDivision === "all" ? "opacity-50 cursor-not-allowed" : ""}`}
-                disabled={selectedDivision === "all"}
-              >
-                <SelectValue placeholder="All" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                {selectedDivision !== "all" &&
-                  getDistrictsByDivision(selectedDivision).map((dist) => (
-                    <SelectItem key={dist} value={dist}>{dist}</SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <label className="text-sm font-medium text-muted-foreground shrink-0">Tehsil</label>
-            <Select
-              value={selectedTehsil}
-              onValueChange={handleTehsilChange}
-              disabled={selectedDivision === "all" || selectedDistrict === "all"}
-            >
-              <SelectTrigger
-                className={`h-9 w-[140px] border-border/50 bg-background rounded-md ${selectedDivision === "all" || selectedDistrict === "all" ? "opacity-50 cursor-not-allowed" : ""}`}
-                disabled={selectedDivision === "all" || selectedDistrict === "all"}
-              >
-                <SelectValue placeholder="All" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                {selectedDivision !== "all" &&
-                  selectedDistrict !== "all" &&
-                  getTehsilsByDivisionAndDistrict(selectedDivision, selectedDistrict).map((teh) => (
-                    <SelectItem key={teh} value={teh}>{teh}</SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <label className="text-sm font-medium text-muted-foreground shrink-0">Project</label>
-            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-              <SelectTrigger className="h-9 w-[160px] border-border/50 bg-background rounded-md">
-                <SelectValue placeholder="All" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All ({filteredProjects.length})</SelectItem>
-                {filteredProjects.map((p) => (
-                  <SelectItem key={p.id} value={String(p.id)}>
-                    {p.project_name || `#${p.id}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {(selectedDivision !== "all" || selectedDistrict !== "all" || selectedTehsil !== "all" || selectedProjectId !== "all") && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSelectedDivision("all");
-                setSelectedDistrict("all");
-                setSelectedTehsil("all");
-                setSelectedProjectId("all");
-              }}
-              className="h-9 px-3 text-xs font-medium shrink-0"
-            >
-              Clear
-            </Button>
-          )}
-        </div>
+        {/* Filters — card panel with clear hierarchy */}
+        <Card className="border border-border/60 bg-card shadow-sm overflow-hidden">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Filter className="h-4 w-4" aria-hidden />
+                </div>
+                <span className="text-sm font-semibold text-foreground">Filters</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-4 flex-1 min-w-0">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Division</label>
+                  <Select value={selectedDivision} onValueChange={handleDivisionChange}>
+                    <SelectTrigger className="h-9 w-[140px] sm:w-[160px] border-border/60 bg-background rounded-lg shadow-sm">
+                      <SelectValue placeholder="All" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      {getAllDivisions().map((div) => (
+                        <SelectItem key={div} value={div}>{div}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">District</label>
+                  <Select
+                    value={selectedDistrict}
+                    onValueChange={handleDistrictChange}
+                    disabled={selectedDivision === "all"}
+                  >
+                    <SelectTrigger
+                      className={`h-9 w-[140px] sm:w-[160px] border-border/60 bg-background rounded-lg shadow-sm ${selectedDivision === "all" ? "opacity-60" : ""}`}
+                      disabled={selectedDivision === "all"}
+                    >
+                      <SelectValue placeholder="All" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      {selectedDivision !== "all" &&
+                        getDistrictsByDivision(selectedDivision).map((dist) => (
+                          <SelectItem key={dist} value={dist}>{dist}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Tehsil</label>
+                  <Select
+                    value={selectedTehsil}
+                    onValueChange={handleTehsilChange}
+                    disabled={selectedDivision === "all" || selectedDistrict === "all"}
+                  >
+                    <SelectTrigger
+                      className={`h-9 w-[140px] sm:w-[160px] border-border/60 bg-background rounded-lg shadow-sm ${selectedDivision === "all" || selectedDistrict === "all" ? "opacity-60" : ""}`}
+                      disabled={selectedDivision === "all" || selectedDistrict === "all"}
+                    >
+                      <SelectValue placeholder="All" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      {selectedDivision !== "all" &&
+                        selectedDistrict !== "all" &&
+                        getTehsilsByDivisionAndDistrict(selectedDivision, selectedDistrict).map((teh) => (
+                          <SelectItem key={teh} value={teh}>{teh}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Project</label>
+                  <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                    <SelectTrigger className="h-9 w-[160px] sm:w-[180px] border-border/60 bg-background rounded-lg shadow-sm">
+                      <SelectValue placeholder="All" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All ({filteredProjects.length})</SelectItem>
+                      {filteredProjects.map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.project_name || `#${p.id}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {(selectedDivision !== "all" || selectedDistrict !== "all" || selectedTehsil !== "all" || selectedProjectId !== "all") && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedDivision("all");
+                      setSelectedDistrict("all");
+                      setSelectedTehsil("all");
+                      setSelectedProjectId("all");
+                    }}
+                    className="h-9 px-4 rounded-lg font-medium shrink-0 self-end"
+                  >
+                    Clear filters
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Project stats cards — situation-based colors */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Project stats cards — refined layout, accent bar, icon badge */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {PROJECT_STAT_CARDS.map((stat) => (
             <Card
               key={stat.id}
-              className={`border-none shadow-md text-white overflow-hidden relative group border-l-4 ${stat.bgClass} ${stat.borderClass}`}
+              className={`overflow-hidden border-0 shadow-lg hover:shadow-xl transition-shadow duration-200 rounded-xl border-l-4 ${stat.bgClass} ${stat.borderClass}`}
             >
-              <div className={`absolute right-[-10px] top-[-10px] ${stat.iconOpacity} group-hover:scale-110 transition-transform`}>
-                <stat.icon className="h-20 w-20" />
-              </div>
-              <CardContent className="p-4 flex flex-col gap-1 relative z-10">
-                <p className="text-[10px] uppercase font-bold tracking-widest opacity-90">{stat.label}</p>
-                <p className="text-2xl font-bold font-heading">{projectCounts[stat.id]}</p>
+              <CardContent className="p-5 flex flex-col gap-3 relative">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-white/90">
+                    {stat.label}
+                  </p>
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 ${stat.iconOpacity} backdrop-blur-sm`}>
+                    <stat.icon className="h-5 w-5 text-white" />
+                  </div>
+                </div>
+                <p className="text-3xl font-bold font-heading tabular-nums text-white drop-shadow-sm">
+                  {projectCounts[stat.id]}
+                </p>
               </CardContent>
             </Card>
           ))}
