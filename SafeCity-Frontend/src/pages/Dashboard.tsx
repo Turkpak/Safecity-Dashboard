@@ -1144,27 +1144,27 @@ export default function Dashboard() {
 
         {/* Financial Progress Pie Charts (hide when a milestone KPI or a single project is selected) */}
         {!selectedMilestoneKey && !isSelectedProjectInThisScope && (
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             {/* Financial Progress Donut Chart */}
             <Card className="overflow-hidden border border-border/80 bg-card shadow-lg shadow-primary/5 transition-shadow hover:shadow-xl hover:shadow-primary/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-heading">
+              <CardHeader className="py-3 px-4 pb-1">
+                <CardTitle className="text-base font-heading">
                   Financial Progress Overview
                 </CardTitle>
-                <CardDescription className="text-sm text-muted-foreground">
+                <CardDescription className="text-xs text-muted-foreground">
                   Planned vs actual and variance
                 </CardDescription>
               </CardHeader>
-              <CardContent className="pt-0">
+              <CardContent className="pt-0 px-4 pb-4">
                 <div
                   className="relative w-full"
                   style={{
-                    height: isMobile ? "260px" : isTablet ? "300px" : "360px",
+                    height: isMobile ? "200px" : isTablet ? "220px" : "260px",
                   }}
                 >
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart
-                      margin={{ top: 8, right: 8, bottom: 48, left: 8 }}
+                      margin={{ top: 2, right: 2, bottom: 32, left: 2 }}
                     >
                       <defs>
                         <linearGradient
@@ -1230,9 +1230,9 @@ export default function Dashboard() {
                           },
                         ]}
                         cx="50%"
-                        cy="45%"
-                        innerRadius={isMobile ? 52 : isTablet ? 64 : 80}
-                        outerRadius={isMobile ? 82 : isTablet ? 100 : 120}
+                        cy="48%"
+                        innerRadius={isMobile ? 38 : isTablet ? 44 : 54}
+                        outerRadius={isMobile ? 60 : isTablet ? 72 : 88}
                         paddingAngle={2}
                         dataKey="value"
                         stroke="rgba(255,255,255,0.9)"
@@ -1277,11 +1277,11 @@ export default function Dashboard() {
                         align="center"
                         layout="horizontal"
                         wrapperStyle={{
-                          paddingTop: 16,
-                          fontSize: isMobile ? "11px" : "12px",
+                          paddingTop: 6,
+                          fontSize: isMobile ? "10px" : "11px",
                         }}
                         iconType="circle"
-                        iconSize={10}
+                        iconSize={8}
                         formatter={(value) => {
                           let itemValue = 0;
                           if (value === "Planned") itemValue = financialPlanned;
@@ -1303,10 +1303,10 @@ export default function Dashboard() {
                   </ResponsiveContainer>
                   {/* Center label - centered in chart area */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-2xl sm:text-3xl font-bold font-heading tabular-nums text-foreground">
+                    <span className="text-xl sm:text-2xl font-bold font-heading tabular-nums text-foreground">
                       {financialActual.toFixed(1)}%
                     </span>
-                    <span className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <span className="text-[9px] sm:text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                       Actual
                     </span>
                   </div>
@@ -1316,24 +1316,24 @@ export default function Dashboard() {
 
             {/* Overall Progress Donut Chart */}
             <Card className="overflow-hidden border border-border/80 bg-card shadow-lg shadow-primary/5 transition-shadow hover:shadow-xl hover:shadow-primary/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-heading">
+              <CardHeader className="py-3 px-4 pb-1">
+                <CardTitle className="text-base font-heading">
                   Overall Progress
                 </CardTitle>
-                <CardDescription className="text-sm text-muted-foreground">
+                <CardDescription className="text-xs text-muted-foreground">
                   Planned vs actual and variance
                 </CardDescription>
               </CardHeader>
-              <CardContent className="pt-0">
+              <CardContent className="pt-0 px-4 pb-4">
                 <div
                   className="relative w-full"
                   style={{
-                    height: isMobile ? "260px" : isTablet ? "300px" : "360px",
+                    height: isMobile ? "200px" : isTablet ? "220px" : "260px",
                   }}
                 >
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart
-                      margin={{ top: 8, right: 8, bottom: 48, left: 8 }}
+                      margin={{ top: 2, right: 2, bottom: 32, left: 2 }}
                     >
                       <defs>
                         <linearGradient
@@ -1365,11 +1365,11 @@ export default function Dashboard() {
                         >
                           <stop
                             offset="0%"
-                            stopColor={variance < 0 ? "#d97706" : "#dc2626"}
+                            stopColor={variance <= 0 ? "#d97706" : "#dc2626"}
                           />
                           <stop
                             offset="100%"
-                            stopColor={variance < 0 ? "#f59e0b" : "#ef4444"}
+                            stopColor={variance <= 0 ? "#f59e0b" : "#ef4444"}
                           />
                         </linearGradient>
                       </defs>
@@ -1395,9 +1395,9 @@ export default function Dashboard() {
                           },
                         ]}
                         cx="50%"
-                        cy="45%"
-                        innerRadius={isMobile ? 52 : isTablet ? 64 : 80}
-                        outerRadius={isMobile ? 82 : isTablet ? 100 : 120}
+                        cy="48%"
+                        innerRadius={isMobile ? 38 : isTablet ? 44 : 54}
+                        outerRadius={isMobile ? 60 : isTablet ? 72 : 88}
                         paddingAngle={2}
                         dataKey="value"
                         stroke="rgba(255,255,255,0.9)"
@@ -1442,11 +1442,11 @@ export default function Dashboard() {
                         align="center"
                         layout="horizontal"
                         wrapperStyle={{
-                          paddingTop: 16,
-                          fontSize: isMobile ? "11px" : "12px",
+                          paddingTop: 6,
+                          fontSize: isMobile ? "10px" : "11px",
                         }}
                         iconType="circle"
-                        iconSize={10}
+                        iconSize={8}
                         formatter={(value) => {
                           let itemValue = 0;
                           if (value === "Planned") itemValue = avgPlanned;
@@ -1467,10 +1467,10 @@ export default function Dashboard() {
                   </ResponsiveContainer>
                   {/* Center label - centered in chart area */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-2xl sm:text-3xl font-bold font-heading tabular-nums text-foreground">
+                    <span className="text-xl sm:text-2xl font-bold font-heading tabular-nums text-foreground">
                       {avgActual.toFixed(1)}%
                     </span>
-                    <span className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <span className="text-[9px] sm:text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                       Actual
                     </span>
                   </div>
