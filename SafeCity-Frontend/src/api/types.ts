@@ -314,7 +314,8 @@ export interface Project {
 }
 
 export interface ProjectCreateInput {
-  stakeholder: number;
+  /** Backend expects ManyToMany IDs (array); legacy may accept single number */
+  stakeholder: number | number[];
   project_name?: string | null;
   project_description?: string | null;
   project_starting_date?: string | null;
@@ -332,7 +333,8 @@ export interface ProjectCreateInput {
 }
 
 export interface ProjectUpdateInput {
-  stakeholder?: number;
+  /** Backend expects ManyToMany IDs (array); legacy may accept single number */
+  stakeholder?: number | number[];
   project_name?: string | null;
   project_description?: string | null;
   project_starting_date?: string | null;

@@ -60,6 +60,42 @@ import L from "leaflet";
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
+type ProjectAccent = {
+  /** subtle left border accent */
+  borderClass: string;
+  /** light tinted background for icon container */
+  iconBgClass: string;
+  /** icon color */
+  iconClass: string;
+};
+
+function getProjectAccent(projectId: number): ProjectAccent {
+  const accents: ProjectAccent[] = [
+    {
+      borderClass: "border-l-sky-500",
+      iconBgClass: "bg-sky-50 dark:bg-sky-950/35",
+      iconClass: "text-sky-700 dark:text-sky-300",
+    },
+    {
+      borderClass: "border-l-emerald-500",
+      iconBgClass: "bg-emerald-50 dark:bg-emerald-950/35",
+      iconClass: "text-emerald-700 dark:text-emerald-300",
+    },
+    {
+      borderClass: "border-l-violet-500",
+      iconBgClass: "bg-violet-50 dark:bg-violet-950/35",
+      iconClass: "text-violet-700 dark:text-violet-300",
+    },
+    {
+      borderClass: "border-l-amber-500",
+      iconBgClass: "bg-amber-50 dark:bg-amber-950/35",
+      iconClass: "text-amber-800 dark:text-amber-300",
+    },
+  ];
+  const idx = Math.abs(projectId) % accents.length;
+  return accents[idx];
+}
+
 let DefaultIcon = L.icon({
   iconUrl: icon,
   shadowUrl: iconShadow,
@@ -565,55 +601,71 @@ export default function ProjectManagement() {
           <div className="grid gap-5 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
             {paginatedProjects.map((project: ApiProject) => {
               const isSelected = selectedProjectForView?.id === project.id;
+              const accent = getProjectAccent(project.id);
               return (
                 <Card
                   key={project.id}
-                  className={`rounded-xl border border-border/80 bg-card shadow-sm transition-all duration-200 hover:shadow-md overflow-hidden ${
+                  className={`rounded-xl border border-border/80 bg-gradient-to-b from-card to-muted/15 shadow-sm transition-all duration-200 hover:shadow-md overflow-hidden border-l-4 ${accent.borderClass} ${
                     isSelected
                       ? "ring-2 ring-primary shadow-md"
                       : "hover:border-primary/30"
                   }`}
                 >
-                  <CardHeader className="pb-2 pt-5 px-5">
+                  <CardHeader className="pb-3 pt-4 px-5">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base font-semibold leading-tight truncate" title={project.project_name || "Unnamed"}>
-                          {project.project_name || "Unnamed"}
-                        </CardTitle>
-                        <CardDescription className="text-xs mt-1.5 text-muted-foreground">
-                          Updated {project.updated_at ? new Date(project.updated_at).toLocaleDateString() : "—"}
-                        </CardDescription>
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className={`mt-0.5 h-9 w-9 rounded-lg flex items-center justify-center ${accent.iconBgClass}`}>
+                          <FolderKanban className={`h-5 w-5 ${accent.iconClass}`} />
+                        </div>
+                        <div className="min-w-0">
+                          <CardTitle className="text-base font-semibold leading-tight truncate" title={project.project_name || "Unnamed"}>
+                            {project.project_name || "Unnamed"}
+                          </CardTitle>
+                          <CardDescription className="text-xs mt-1 text-muted-foreground">
+                            Updated {project.updated_at ? new Date(project.updated_at).toLocaleDateString() : "—"}
+                          </CardDescription>
+                        </div>
                       </div>
-                      <Badge className="shrink-0 bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-0 text-[11px] font-medium px-2 py-0">
+                      <Badge className="shrink-0 text-[11px] font-medium px-2 py-0 bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200 border-0">
                         Active
                       </Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="px-5 pb-5 pt-0 space-y-4">
-                    {project.project_description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2 leading-snug">{project.project_description}</p>
-                    )}
-                    <div className="space-y-2 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2.5">
-                        <Calendar className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
-                        <span>Start: {project.project_starting_date ? new Date(project.project_starting_date).toLocaleDateString() : "N/A"}</span>
-                      </div>
-                      <div className="flex items-center gap-2.5">
-                        <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
-                        <span>Ref: {project.project_reference_no || "N/A"}</span>
-                      </div>
-                      <div className="flex items-center gap-2.5">
-                        <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
-                        <span className="truncate" title={formatProjectStakeholder(project)}>{formatProjectStakeholder(project)}</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 min-h-[1.25rem]">
-                        <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
-                        <span className="break-words line-clamp-2">
+                    {/* Compact summary: keep the cards clean; full details live in the View panel */}
+                    <div className="flex flex-wrap gap-2">
+                      {project.project_reference_no && (
+                        <Badge
+                          variant="outline"
+                          className="text-[11px] font-medium bg-background/60 border-border/70 text-foreground"
+                        >
+                          <FileText className="h-3 w-3 mr-1 text-muted-foreground" />
+                          <span className="truncate max-w-[160px]" title={project.project_reference_no}>
+                            {project.project_reference_no}
+                          </span>
+                        </Badge>
+                      )}
+                      <Badge
+                        variant="outline"
+                        className="text-[11px] font-medium bg-background/60 border-border/70 text-foreground"
+                      >
+                        <MapPin className="h-3 w-3 mr-1 text-muted-foreground" />
+                        <span className="max-w-[220px] truncate" title={project.tehsil_name ?? String(project.tehsil)}>
                           {project.tehsil_name ?? String(project.tehsil)}
                         </span>
-                      </div>
+                      </Badge>
+                      {project.project_starting_date && (
+                        <Badge
+                          variant="outline"
+                          className="text-[11px] font-medium bg-background/60 border-border/70 text-foreground"
+                        >
+                          <Calendar className="h-3 w-3 mr-1 text-muted-foreground" />
+                          {new Date(project.project_starting_date).toLocaleDateString()}
+                        </Badge>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2 pt-4 border-t border-border/60">
+
+                    <div className="flex items-center gap-2 pt-3 border-t border-border/60">
                       <Button
                         variant="default"
                         size="sm"

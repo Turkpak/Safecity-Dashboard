@@ -179,7 +179,7 @@ export default function DivisionManagement() {
                   </Button>
                 )}
                 {editingId === null && (
-                  <Button variant="destructive" size="sm" onClick={() => setFormData({ ...formData, division_name: "" })} className="w-full h-8 text-white bg-red-600 hover:bg-red-700 border-0 text-xs font-medium">
+                  <Button variant="outline" size="sm" onClick={() => setFormData({ ...formData, division_name: "" })} className="w-full h-7 text-red-600 bg-white hover:bg-red-50 border-red-200 hover:border-red-300 text-xs font-medium">
                     Clear
                   </Button>
                 )}
