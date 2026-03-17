@@ -7,7 +7,6 @@ import {
   LucideBanknote,
   LayoutDashboard,
   Map as MapIcon,
-  Settings,
   Menu,
   LogOut,
   MapPin,
@@ -80,7 +79,6 @@ const NAV_ITEMS: NavItem[] = [
     href: "/user-management",
     roles: ["super_admin"],
   },
-  { icon: Settings, label: "Settings", href: "/settings" },
 ];
 
 export function Sidebar() {
