@@ -638,11 +638,11 @@ export default function UserManagement() {
                         Previous
                       </Button>
                       <Button
-                        variant="outline"
+                        variant="default"
                         size="sm"
                         onClick={() => setUsersPage((p) => Math.min(totalUsersPages, p + 1))}
                         disabled={usersPage >= totalUsersPages}
-                        className="gap-1"
+                        className="gap-1 bg-primary text-primary-foreground"
                       >
                         Next
                         <ChevronRight className="h-4 w-4" />

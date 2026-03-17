@@ -161,10 +161,11 @@ export function ComparisonTable({ data }: ComparisonTableProps) {
               </Button>
             ))}
             <Button
-              variant="outline"
+              variant="default"
               size="sm"
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
+              className="bg-primary text-primary-foreground"
             >
               Next
               <ChevronRight className="h-4 w-4" />

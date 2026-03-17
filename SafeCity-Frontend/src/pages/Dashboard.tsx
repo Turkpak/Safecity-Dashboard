@@ -1166,71 +1166,29 @@ export default function Dashboard() {
                     <PieChart
                       margin={{ top: 2, right: 2, bottom: 32, left: 2 }}
                     >
-                      <defs>
-                        <linearGradient
-                          id="financial-planned"
-                          x1="0"
-                          y1="0"
-                          x2="1"
-                          y2="1"
-                        >
-                          <stop offset="0%" stopColor="#4f46e5" />
-                          <stop offset="100%" stopColor="#6366f1" />
-                        </linearGradient>
-                        <linearGradient
-                          id="financial-actual"
-                          x1="0"
-                          y1="0"
-                          x2="1"
-                          y2="0"
-                        >
-                          <stop offset="0%" stopColor="#0d9488" />
-                          <stop offset="100%" stopColor="#14b8a6" />
-                        </linearGradient>
-                        <linearGradient
-                          id="financial-variance"
-                          x1="0"
-                          y1="0"
-                          x2="1"
-                          y2="0"
-                        >
-                          <stop
-                            offset="0%"
-                            stopColor={
-                              financialVariance < 0 ? "#d97706" : "#dc2626"
-                            }
-                          />
-                          <stop
-                            offset="100%"
-                            stopColor={
-                              financialVariance < 0 ? "#f59e0b" : "#ef4444"
-                            }
-                          />
-                        </linearGradient>
-                      </defs>
                       <Pie
                         data={[
                           {
                             name: "Planned",
                             value: normalizedFinancialPlanned,
                             originalValue: financialPlanned,
-                            fill: "url(#financial-planned)",
+                            fill: "#60a5fa",
                           },
                           {
                             name: "Actual",
                             value: normalizedFinancialActual,
                             originalValue: financialActual,
-                            fill: "url(#financial-actual)",
+                            fill: "#22c55e",
                           },
                           {
                             name: "Variance",
                             value: normalizedFinancialVariance,
                             originalValue: absFinancialVariance,
-                            fill: "url(#financial-variance)",
+                            fill: "#ef4444",
                           },
                         ]}
                         cx="50%"
-                        cy="48%"
+                        cy="50%"
                         innerRadius={isMobile ? 38 : isTablet ? 44 : 54}
                         outerRadius={isMobile ? 60 : isTablet ? 72 : 88}
                         paddingAngle={2}
@@ -1241,14 +1199,10 @@ export default function Dashboard() {
                         animationDuration={800}
                         animationBegin={0}
                       >
-                        {[
-                          { fill: "url(#financial-planned)" },
-                          { fill: "url(#financial-actual)" },
-                          { fill: "url(#financial-variance)" },
-                        ].map((entry, index) => (
+                        {["#60a5fa", "#22c55e", "#ef4444"].map((fill, index) => (
                           <Cell
                             key={`cell-f-${index}`}
-                            fill={entry.fill}
+                            fill={fill}
                             stroke="rgba(255,255,255,0.9)"
                             strokeWidth={2}
                           />
@@ -1335,67 +1289,29 @@ export default function Dashboard() {
                     <PieChart
                       margin={{ top: 2, right: 2, bottom: 32, left: 2 }}
                     >
-                      <defs>
-                        <linearGradient
-                          id="overall-planned"
-                          x1="0"
-                          y1="0"
-                          x2="1"
-                          y2="1"
-                        >
-                          <stop offset="0%" stopColor="#4f46e5" />
-                          <stop offset="100%" stopColor="#6366f1" />
-                        </linearGradient>
-                        <linearGradient
-                          id="overall-actual"
-                          x1="0"
-                          y1="0"
-                          x2="1"
-                          y2="0"
-                        >
-                          <stop offset="0%" stopColor="#0d9488" />
-                          <stop offset="100%" stopColor="#14b8a6" />
-                        </linearGradient>
-                        <linearGradient
-                          id="overall-variance"
-                          x1="0"
-                          y1="0"
-                          x2="1"
-                          y2="0"
-                        >
-                          <stop
-                            offset="0%"
-                            stopColor={variance <= 0 ? "#d97706" : "#dc2626"}
-                          />
-                          <stop
-                            offset="100%"
-                            stopColor={variance <= 0 ? "#f59e0b" : "#ef4444"}
-                          />
-                        </linearGradient>
-                      </defs>
                       <Pie
                         data={[
                           {
                             name: "Planned",
                             value: normalizedPlanned,
                             originalValue: avgPlanned,
-                            fill: "url(#overall-planned)",
+                            fill: "#60a5fa",
                           },
                           {
                             name: "Actual",
                             value: normalizedActual,
                             originalValue: avgActual,
-                            fill: "url(#overall-actual)",
+                            fill: "#22c55e",
                           },
                           {
                             name: "Variance",
                             value: normalizedVariance,
                             originalValue: absVariance,
-                            fill: "url(#overall-variance)",
+                            fill: "#ef4444",
                           },
                         ]}
                         cx="50%"
-                        cy="48%"
+                        cy="50%"
                         innerRadius={isMobile ? 38 : isTablet ? 44 : 54}
                         outerRadius={isMobile ? 60 : isTablet ? 72 : 88}
                         paddingAngle={2}
@@ -1406,14 +1322,10 @@ export default function Dashboard() {
                         animationDuration={800}
                         animationBegin={0}
                       >
-                        {[
-                          { fill: "url(#overall-planned)" },
-                          { fill: "url(#overall-actual)" },
-                          { fill: "url(#overall-variance)" },
-                        ].map((entry, index) => (
+                        {["#60a5fa", "#22c55e", "#ef4444"].map((fill, index) => (
                           <Cell
                             key={`cell-o-${index}`}
-                            fill={entry.fill}
+                            fill={fill}
                             stroke="rgba(255,255,255,0.9)"
                             strokeWidth={2}
                           />

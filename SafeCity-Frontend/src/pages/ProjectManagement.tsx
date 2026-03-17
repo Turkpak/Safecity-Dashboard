@@ -562,64 +562,64 @@ export default function ProjectManagement() {
           </Card>
         ) : (
           <>
-          <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
             {paginatedProjects.map((project: ApiProject) => {
               const isSelected = selectedProjectForView?.id === project.id;
               return (
                 <Card
                   key={project.id}
-                  className={`transition-all duration-200 hover:shadow-md ${
+                  className={`rounded-xl border border-border/80 bg-card shadow-sm transition-all duration-200 hover:shadow-md overflow-hidden ${
                     isSelected
                       ? "ring-2 ring-primary shadow-md"
                       : "hover:border-primary/30"
                   }`}
                 >
-                  <CardHeader className="pb-3">
+                  <CardHeader className="pb-2 pt-5 px-5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <CardTitle className="text-lg leading-tight truncate" title={project.project_name || "Unnamed"}>
+                        <CardTitle className="text-base font-semibold leading-tight truncate" title={project.project_name || "Unnamed"}>
                           {project.project_name || "Unnamed"}
                         </CardTitle>
-                        <CardDescription className="text-xs mt-1">
+                        <CardDescription className="text-xs mt-1.5 text-muted-foreground">
                           Updated {project.updated_at ? new Date(project.updated_at).toLocaleDateString() : "—"}
                         </CardDescription>
                       </div>
-                      <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 shrink-0">
+                      <Badge className="shrink-0 bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-0 text-[11px] font-medium px-2 py-0">
                         Active
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="px-5 pb-5 pt-0 space-y-4">
                     {project.project_description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2">{project.project_description}</p>
+                      <p className="text-sm text-muted-foreground line-clamp-2 leading-snug">{project.project_description}</p>
                     )}
-                    <div className="space-y-2.5 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 shrink-0" />
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2.5">
+                        <Calendar className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
                         <span>Start: {project.project_starting_date ? new Date(project.project_starting_date).toLocaleDateString() : "N/A"}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 shrink-0" />
+                      <div className="flex items-center gap-2.5">
+                        <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
                         <span>Ref: {project.project_reference_no || "N/A"}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 shrink-0" />
-                        <span>{formatProjectStakeholder(project)}</span>
+                      <div className="flex items-center gap-2.5">
+                        <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
+                        <span className="truncate" title={formatProjectStakeholder(project)}>{formatProjectStakeholder(project)}</span>
                       </div>
-                      <div className="flex items-start gap-2">
-                        <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
-                        <span className="break-words">
+                      <div className="flex items-center gap-2.5 min-h-[1.25rem]">
+                        <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
+                        <span className="break-words line-clamp-2">
                           {project.tehsil_name ?? String(project.tehsil)}
                         </span>
                       </div>
                     </div>
-                    <div className="flex flex-row items-center gap-3 pt-4 mt-1 border-t">
+                    <div className="flex items-center gap-2 pt-4 border-t border-border/60">
                       <Button
                         variant="default"
                         size="sm"
                         onClick={() => openEditDialog(project)}
                         disabled={updateProjectMutation.isPending}
-                        className="gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground"
+                        className="flex-1 gap-1.5 h-8 bg-primary text-primary-foreground hover:bg-primary/90 border-0"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                         Update
@@ -628,7 +628,7 @@ export default function ProjectManagement() {
                         variant="outline"
                         size="sm"
                         onClick={() => setSelectedProjectForView(isSelected ? null : project)}
-                        className={`gap-1.5 border-emerald-500/70 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-500/50 dark:text-emerald-400 dark:hover:bg-emerald-950/30 ${isSelected ? "bg-emerald-50 dark:bg-emerald-950/20" : ""}`}
+                        className={`flex-1 gap-1.5 h-8 border-border bg-background hover:bg-muted/50 ${isSelected ? "ring-1 ring-primary/50 bg-muted/30" : ""}`}
                       >
                         <Eye className="h-3.5 w-3.5" />
                         View
@@ -655,11 +655,11 @@ export default function ProjectManagement() {
                 Page {projectsPage} of {totalProjectsPages}
               </span>
               <Button
-                variant="outline"
+                variant="default"
                 size="sm"
                 onClick={() => setProjectsPage((p) => Math.min(totalProjectsPages, p + 1))}
                 disabled={projectsPage >= totalProjectsPages}
-                className="gap-1.5"
+                className="gap-1.5 bg-primary text-primary-foreground"
               >
                 Next
                 <ChevronRight className="h-4 w-4" />

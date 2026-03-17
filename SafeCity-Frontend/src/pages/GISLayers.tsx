@@ -154,18 +154,18 @@ export default function GISLayers() {
         {/* Filters — card panel with clear hierarchy */}
         <Card className="border border-border/60 bg-card shadow-sm overflow-hidden">
           <CardContent className="p-4 sm:p-5">
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-              <div className="flex items-center gap-2 shrink-0">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Filter className="h-4 w-4" aria-hidden />
+            <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+              <div className="flex items-center gap-2 shrink-0 pb-0.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Filter className="h-3.5 w-3.5" aria-hidden />
                 </div>
                 <span className="text-sm font-semibold text-foreground">Filters</span>
               </div>
-              <div className="flex flex-wrap items-center gap-4 flex-1 min-w-0">
-                <div className="flex flex-col gap-1.5">
+              <div className="flex flex-wrap items-end gap-3 flex-1 min-w-0">
+                <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-muted-foreground">Division</label>
                   <Select value={selectedDivision} onValueChange={handleDivisionChange}>
-                    <SelectTrigger className="h-9 w-[140px] sm:w-[160px] border-border/60 bg-background rounded-lg shadow-sm">
+                    <SelectTrigger className="h-8 w-[120px] sm:w-[140px] border-border/60 bg-background rounded-lg shadow-sm">
                       <SelectValue placeholder="All" />
                     </SelectTrigger>
                     <SelectContent>
@@ -176,7 +176,7 @@ export default function GISLayers() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-muted-foreground">District</label>
                   <Select
                     value={selectedDistrict}
@@ -184,7 +184,7 @@ export default function GISLayers() {
                     disabled={selectedDivision === "all"}
                   >
                     <SelectTrigger
-                      className={`h-9 w-[140px] sm:w-[160px] border-border/60 bg-background rounded-lg shadow-sm ${selectedDivision === "all" ? "opacity-60" : ""}`}
+                      className={`h-8 w-[120px] sm:w-[140px] border-border/60 bg-background rounded-lg shadow-sm ${selectedDivision === "all" ? "opacity-60" : ""}`}
                       disabled={selectedDivision === "all"}
                     >
                       <SelectValue placeholder="All" />
@@ -198,7 +198,7 @@ export default function GISLayers() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-muted-foreground">Tehsil</label>
                   <Select
                     value={selectedTehsil}
@@ -206,7 +206,7 @@ export default function GISLayers() {
                     disabled={selectedDivision === "all" || selectedDistrict === "all"}
                   >
                     <SelectTrigger
-                      className={`h-9 w-[140px] sm:w-[160px] border-border/60 bg-background rounded-lg shadow-sm ${selectedDivision === "all" || selectedDistrict === "all" ? "opacity-60" : ""}`}
+                      className={`h-8 w-[120px] sm:w-[140px] border-border/60 bg-background rounded-lg shadow-sm ${selectedDivision === "all" || selectedDistrict === "all" ? "opacity-60" : ""}`}
                       disabled={selectedDivision === "all" || selectedDistrict === "all"}
                     >
                       <SelectValue placeholder="All" />
@@ -221,10 +221,10 @@ export default function GISLayers() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-muted-foreground">Project</label>
                   <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-                    <SelectTrigger className="h-9 w-[160px] sm:w-[180px] border-border/60 bg-background rounded-lg shadow-sm">
+                    <SelectTrigger className="h-8 w-[130px] sm:w-[150px] border-border/60 bg-background rounded-lg shadow-sm">
                       <SelectValue placeholder="All" />
                     </SelectTrigger>
                     <SelectContent>
@@ -247,7 +247,7 @@ export default function GISLayers() {
                       setSelectedTehsil("all");
                       setSelectedProjectId("all");
                     }}
-                    className="h-8 px-3 text-white bg-red-600 hover:bg-red-700 border-0 rounded-lg font-medium shrink-0 self-end text-xs"
+                    className="h-7 min-h-7 px-2.5 text-white bg-red-600 hover:bg-red-700 border-0 rounded-md font-medium shrink-0 text-[11px]"
                   >
                     Clear filters
                   </Button>

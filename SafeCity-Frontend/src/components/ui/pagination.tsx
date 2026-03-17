@@ -82,7 +82,7 @@ const PaginationNext = ({
   <PaginationLink
     aria-label="Go to next page"
     size="default"
-    className={cn("gap-1 pr-2.5", className)}
+    className={cn("gap-1 pr-2.5 bg-primary text-primary-foreground border-primary hover:bg-primary/90 hover:text-primary-foreground", className)}
     {...props}
   >
     <span>Next</span>
