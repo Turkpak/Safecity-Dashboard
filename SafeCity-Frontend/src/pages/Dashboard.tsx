@@ -31,7 +31,6 @@ import {
   TrendingUp,
   FileDown,
   Filter,
-  ArrowLeft,
   ChevronDown,
   ChevronUp,
   Search,
@@ -621,6 +620,13 @@ export default function Dashboard() {
       setSelectedProjectForDetails(null);
     }
   }, [selectedItemType, viewType]);
+
+  // When drilled into a specific geography, collapse filter choices into icon-only state.
+  useEffect(() => {
+    if (selectedItemType) {
+      setShowFilters(false);
+    }
+  }, [selectedItemType]);
 
   // Fetch project-gantt data whenever selected project changes (card or dropdown).
   useEffect(() => {
@@ -1745,7 +1751,7 @@ export default function Dashboard() {
                     className={`h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary transition-transform duration-300 ${showFilters ? "rotate-180" : ""}`}
                   />
                   <span className="text-xs sm:text-sm font-semibold text-foreground">
-                    View:
+                    {showFilters ? "View:" : navigationFlow.length > 1 ? "Path:" : "View:"}
                   </span>
                 </div>
 
@@ -1854,6 +1860,31 @@ export default function Dashboard() {
                     </motion.div>
                   )}
                 </AnimatePresence>
+
+                {/* Compact breadcrumb on same row when filters are collapsed */}
+                {!showFilters && navigationFlow.length > 1 && (
+                  <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm min-w-0">
+                    {navigationFlow.map((step, idx) => (
+                      <div key={`${step.key}-compact-${idx}`} className="flex items-center gap-2">
+                        {idx > 0 && (
+                          <span className="text-muted-foreground/70">{"->"}</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => step.clickable && handleNavigateToLevel(step.key)}
+                          disabled={!step.clickable}
+                          className={`rounded-md border px-2 py-1 transition-colors ${
+                            step.clickable
+                              ? "border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 cursor-pointer"
+                              : "border-border/60 bg-background/60 text-foreground cursor-default"
+                          }`}
+                        >
+                          {step.label}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Expand/Collapse Button */}
@@ -1873,7 +1904,7 @@ export default function Dashboard() {
             </div>
 
             {/* Drilldown navigation flow (shown in header bar) */}
-            {navigationFlow.length > 1 && (
+            {showFilters && navigationFlow.length > 1 && (
               <div className="mt-2 ml-1 sm:ml-2 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
                 <span className="font-medium text-muted-foreground">
                   Navigation:
@@ -2099,28 +2130,13 @@ export default function Dashboard() {
 
               return (
                 <div className="space-y-6">
-                  {/* Back Button */}
-                  <div className="flex items-center gap-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedItemName(null);
-                        setSelectedItemType(null);
-                        setSelectedItemId(null);
-                      }}
-                      className="rounded-xl cursor-pointer"
-                    >
-                      <ArrowLeft className="h-4 w-4 mr-2" />
-                      Back to All Divisions
-                    </Button>
-                    <div>
-                      <h2 className="text-lg sm:text-2xl font-bold font-heading">
-                        Districts in {selectedItemName} Division
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedItemName} Division
-                      </p>
-                    </div>
+                  <div>
+                    <h2 className="text-lg sm:text-2xl font-bold font-heading">
+                      Districts in {selectedItemName} Division
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedItemName} Division
+                    </p>
                   </div>
 
                   {/* District Cards */}
@@ -2209,30 +2225,14 @@ export default function Dashboard() {
 
               return (
                 <div className="space-y-6">
-                  {/* Back Button */}
-                  <div className="flex items-center gap-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        // Go back to parent division view
-                        setSelectedItemId(parentDivisionId);
-                        setSelectedItemName(parentDivisionName);
-                        setSelectedItemType("division");
-                      }}
-                      className="rounded-xl cursor-pointer"
-                    >
-                      <ArrowLeft className="h-4 w-4 mr-2" />
-                      Back to {parentDivisionName} Division
-                    </Button>
-                    <div>
-                      <h2 className="text-lg sm:text-2xl font-bold font-heading">
-                        Tehsils in {selectedItemName} District (
-                        {parentDivisionName} Division)
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedItemName} District
-                      </p>
-                    </div>
+                  <div>
+                    <h2 className="text-lg sm:text-2xl font-bold font-heading">
+                      Tehsils in {selectedItemName} District (
+                      {parentDivisionName} Division)
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedItemName} District
+                    </p>
                   </div>
 
                   {/* Tehsil Cards */}
@@ -2302,29 +2302,13 @@ export default function Dashboard() {
 
               return (
                 <div className="space-y-6">
-                  {/* Back Button */}
-                  <div className="flex items-center gap-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        // Go back to parent district view
-                        setSelectedItemId(parentDistrictId);
-                        setSelectedItemName(parentDistrictName);
-                        setSelectedItemType("district");
-                      }}
-                      className="rounded-xl cursor-pointer"
-                    >
-                      <ArrowLeft className="h-4 w-4 mr-2" />
-                      Back to {parentDistrictName} District
-                    </Button>
-                    <div>
-                      <h2 className="text-lg sm:text-2xl font-bold font-heading">
-                        Ongoing projects in {selectedItemName} Tehsil
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedItemName} Tehsil
-                      </p>
-                    </div>
+                  <div>
+                    <h2 className="text-lg sm:text-2xl font-bold font-heading">
+                      Ongoing projects in {selectedItemName} Tehsil
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedItemName} Tehsil
+                    </p>
                   </div>
 
                   {/* Project Cards from API */}
