@@ -175,7 +175,7 @@ export default function ProjectManagement() {
   const [selectedProjectForView, setSelectedProjectForView] = useState<ApiProject | null>(null);
   const [projectsPage, setProjectsPage] = useState(1);
 
-  const PROJECTS_PER_PAGE = 3;
+  const PROJECTS_PER_PAGE = 6;
   const { data: projectsData = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["projects"],
     queryFn: listProjects,
@@ -564,9 +564,9 @@ export default function ProjectManagement() {
 
   return (
     <Layout title="Project Management">
-      <div className="space-y-8">
+      <div className="flex flex-col min-h-[calc(100vh-8rem)]">
         {/* Header with Add Project Button */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center justify-between flex-wrap gap-4 shrink-0 mb-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Added Projects</h1>
             <p className="text-muted-foreground mt-1">
@@ -597,7 +597,7 @@ export default function ProjectManagement() {
             </CardContent>
           </Card>
         ) : (
-          <>
+          <div className="flex-1 flex flex-col min-h-0">
           <div className="grid gap-5 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
             {paginatedProjects.map((project: ApiProject) => {
               const isSelected = selectedProjectForView?.id === project.id;
@@ -691,34 +691,36 @@ export default function ProjectManagement() {
               );
             })}
           </div>
-          {totalProjectsPages > 1 && (
-            <div className="flex items-center justify-center gap-4 pt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setProjectsPage((p) => Math.max(1, p - 1))}
-                disabled={projectsPage <= 1}
-                className="gap-1.5"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Previous
-              </Button>
-              <span className="text-sm text-muted-foreground min-w-[100px] text-center">
-                Page {projectsPage} of {totalProjectsPages}
-              </span>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => setProjectsPage((p) => Math.min(totalProjectsPages, p + 1))}
-                disabled={projectsPage >= totalProjectsPages}
-                className="gap-1.5 bg-primary text-primary-foreground"
-              >
-                Next
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-          </>
+          </div>
+        )}
+
+        {/* Pagination at bottom of page */}
+        {!projectsLoading && projectsData.length > 0 && totalProjectsPages > 1 && (
+          <div className="flex items-center justify-center gap-4 py-6 mt-auto border-t border-border/80 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setProjectsPage((p) => Math.max(1, p - 1))}
+              disabled={projectsPage <= 1}
+              className="gap-1.5"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground min-w-[100px] text-center">
+              Page {projectsPage} of {totalProjectsPages}
+            </span>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setProjectsPage((p) => Math.min(totalProjectsPages, p + 1))}
+              disabled={projectsPage >= totalProjectsPages}
+              className="gap-1.5 bg-primary text-primary-foreground"
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         )}
 
         {/* Detail panel: selected project info in the space beneath the cards */}
