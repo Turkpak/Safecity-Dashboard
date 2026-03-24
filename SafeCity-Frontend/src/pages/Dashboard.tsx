@@ -661,6 +661,97 @@ export default function Dashboard() {
     [apiTehsils],
   );
 
+  type NavigationStep = {
+    key: "all" | "division" | "district" | "tehsil";
+    label: string;
+    clickable: boolean;
+  };
+
+  const navigationFlow = useMemo<NavigationStep[]>(() => {
+    const flow: NavigationStep[] = [
+      {
+        key: "all",
+        label: "All Divisions",
+        clickable: selectedItemType !== null,
+      },
+    ];
+
+    if (selectedItemType === "division" && selectedItemName) {
+      flow.push({
+        key: "division",
+        label: `${selectedItemName} Division`,
+        clickable: false,
+      });
+    } else if (selectedItemType === "district" && selectedItemName) {
+      if (parentDivisionName) {
+        flow.push({
+          key: "division",
+          label: `${parentDivisionName} Division`,
+          clickable: true,
+        });
+      }
+      flow.push({
+        key: "district",
+        label: `${selectedItemName} District`,
+        clickable: false,
+      });
+    } else if (selectedItemType === "tehsil" && selectedItemName) {
+      if (parentDivisionName) {
+        flow.push({
+          key: "division",
+          label: `${parentDivisionName} Division`,
+          clickable: true,
+        });
+      }
+      if (parentDistrictName) {
+        flow.push({
+          key: "district",
+          label: `${parentDistrictName} District`,
+          clickable: true,
+        });
+      }
+      flow.push({
+        key: "tehsil",
+        label: `${selectedItemName} Tehsil`,
+        clickable: false,
+      });
+    }
+    return flow;
+  }, [
+    selectedItemType,
+    selectedItemName,
+    parentDivisionId,
+    parentDivisionName,
+    parentDistrictId,
+    parentDistrictName,
+  ]);
+
+  const handleNavigateToLevel = (level: NavigationStep["key"]) => {
+    if (level === "all") {
+      setSelectedItemName(null);
+      setSelectedItemType(null);
+      setSelectedItemId(null);
+      setParentDivisionId(null);
+      setParentDivisionName(null);
+      setParentDistrictId(null);
+      setParentDistrictName(null);
+      return;
+    }
+
+    if (level === "division" && parentDivisionId && parentDivisionName) {
+      setSelectedItemId(parentDivisionId);
+      setSelectedItemName(parentDivisionName);
+      setSelectedItemType("division");
+      return;
+    }
+
+    if (level === "district" && parentDistrictId && parentDistrictName) {
+      setSelectedItemId(parentDistrictId);
+      setSelectedItemName(parentDistrictName);
+      setSelectedItemType("district");
+    }
+  };
+
   // Helper: calculate overall financial progress from a set of projects
   const calcProjectsOverall = (projects: Project[]): number => {
     const valid = projects.filter(
@@ -1780,6 +1871,34 @@ export default function Dashboard() {
                 )}
               </Button>
             </div>
+
+            {/* Drilldown navigation flow (shown in header bar) */}
+            {navigationFlow.length > 1 && (
+              <div className="mt-2 ml-1 sm:ml-2 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                <span className="font-medium text-muted-foreground">
+                  Navigation:
+                </span>
+                {navigationFlow.map((step, idx) => (
+                  <div key={`${step.key}-${idx}`} className="flex items-center gap-2">
+                    {idx > 0 && (
+                      <span className="text-muted-foreground/70">{"->"}</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => step.clickable && handleNavigateToLevel(step.key)}
+                      disabled={!step.clickable}
+                      className={`rounded-md border px-2 py-1 transition-colors ${
+                        step.clickable
+                          ? "border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 cursor-pointer"
+                          : "border-border/60 bg-background/60 text-foreground cursor-default"
+                      }`}
+                    >
+                      {step.label}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Header Content Section - Collapsible */}

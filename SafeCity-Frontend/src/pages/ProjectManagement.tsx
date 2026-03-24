@@ -174,6 +174,7 @@ export default function ProjectManagement() {
   const [editingProject, setEditingProject] = useState<ApiProject | null>(null);
   const [selectedProjectForView, setSelectedProjectForView] = useState<ApiProject | null>(null);
   const [projectsPage, setProjectsPage] = useState(1);
+  const [locationSearch, setLocationSearch] = useState("");
 
   const PROJECTS_PER_PAGE = 6;
   const { data: projectsData = [], isLoading: projectsLoading } = useQuery({
@@ -550,11 +551,28 @@ export default function ProjectManagement() {
     }
   };
 
-  const totalProjectsPages = Math.ceil(projectsData.length / PROJECTS_PER_PAGE) || 1;
+  const filteredProjects = useMemo(() => {
+    const query = locationSearch.trim().toLowerCase();
+
+    return projectsData.filter((project) => {
+      const divisionText = (project.division_name ?? String(project.division ?? "")).toLowerCase();
+      const districtText = (project.district_name ?? String(project.district ?? "")).toLowerCase();
+      const tehsilText = (project.tehsil_name ?? String(project.tehsil ?? "")).toLowerCase();
+
+      if (!query) return true;
+      return (
+        divisionText.includes(query) ||
+        districtText.includes(query) ||
+        tehsilText.includes(query)
+      );
+    });
+  }, [projectsData, locationSearch]);
+
+  const totalProjectsPages = Math.ceil(filteredProjects.length / PROJECTS_PER_PAGE) || 1;
   const paginatedProjects = useMemo(() => {
     const start = (projectsPage - 1) * PROJECTS_PER_PAGE;
-    return projectsData.slice(start, start + PROJECTS_PER_PAGE);
-  }, [projectsData, projectsPage, PROJECTS_PER_PAGE]);
+    return filteredProjects.slice(start, start + PROJECTS_PER_PAGE);
+  }, [filteredProjects, projectsPage, PROJECTS_PER_PAGE]);
 
   useEffect(() => {
     if (projectsPage > totalProjectsPages && totalProjectsPages > 0) {
@@ -562,23 +580,41 @@ export default function ProjectManagement() {
     }
   }, [projectsPage, totalProjectsPages]);
 
+  useEffect(() => {
+    setProjectsPage(1);
+  }, [locationSearch]);
+
   return (
     <Layout title="Project Management">
       <div className="flex flex-col min-h-[calc(100vh-8rem)]">
-        {/* Header with Add Project Button */}
-        <div className="flex items-center justify-between flex-wrap gap-4 shrink-0 mb-8">
+        {/* Header with search and Add Project button */}
+        <div className="flex items-center justify-between flex-wrap gap-2 shrink-0 mb-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Added Projects</h1>
             <p className="text-muted-foreground mt-1">
               {!projectsLoading && projectsData.length > 0
-                ? `${projectsData.length} project${projectsData.length !== 1 ? "s" : ""}`
+                ? filteredProjects.length !== projectsData.length
+                  ? `${filteredProjects.length} of ${projectsData.length} projects`
+                  : `${projectsData.length} project${projectsData.length !== 1 ? "s" : ""}`
                 : "Manage and view project details below"}
             </p>
           </div>
-          <Button onClick={() => setShowAddProjectDialog(true)} className="gap-2 shrink-0">
-            <Plus className="h-4 w-4" />
-            Add New Project
-          </Button>
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            {!projectsLoading && projectsData.length > 0 && (
+              <div className="w-full sm:w-[280px] md:w-[300px]">
+                <Input
+                  value={locationSearch}
+                  onChange={(e) => setLocationSearch(e.target.value)}
+                  placeholder="Search division, district, or tehsil"
+                  className="h-9"
+                />
+              </div>
+            )}
+            <Button onClick={() => setShowAddProjectDialog(true)} className="gap-2 shrink-0">
+              <Plus className="h-4 w-4" />
+              Add New Project
+            </Button>
+          </div>
         </div>
 
         {/* Projects Grid */}
@@ -588,12 +624,12 @@ export default function ProjectManagement() {
               <p className="text-muted-foreground">Loading projects…</p>
             </CardContent>
           </Card>
-        ) : projectsData.length === 0 ? (
+        ) : filteredProjects.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16">
               <FolderKanban className="h-16 w-16 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No projects yet</h3>
-              <p className="text-sm text-muted-foreground mb-4">Get started by creating a new project</p>
+              <h3 className="text-lg font-semibold mb-2">No matching projects</h3>
+              <p className="text-sm text-muted-foreground mb-4">Try changing division, district, or tehsil search text</p>
             </CardContent>
           </Card>
         ) : (
@@ -725,7 +761,7 @@ export default function ProjectManagement() {
 
         {/* Detail panel: selected project info in the space beneath the cards */}
         {selectedProjectForView && (
-          <Card className="border-primary/20 shadow-lg">
+          <Card className="mt-6 border-primary/20 shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <div>
                 <CardTitle className="text-xl flex items-center gap-2">
