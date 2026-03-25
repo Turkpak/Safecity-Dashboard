@@ -332,18 +332,29 @@ class ProjectSerializer(GeoFeatureModelSerializer):
 
         wbs_objects = {}
 
-        # Create WBS nodes
-        for wbs_id, w in wbs.items():
+        # Create WBS nodes.
+        # IMPORTANT: create parents before children (dict iteration order is not guaranteed
+        # to match hierarchy), otherwise parent links can be lost.
+        def wbs_depth(wbs_id, _seen=None):
+            if _seen is None:
+                _seen = set()
+            if wbs_id in _seen:
+                return 0
+            _seen.add(wbs_id)
+            parent_id = (wbs.get(wbs_id) or {}).get("parent")
+            if not parent_id:
+                return 0
+            return 1 + wbs_depth(parent_id, _seen=_seen)
 
-            parent = wbs_objects.get(w["parent"])
-
+        for wbs_id in sorted(wbs.keys(), key=wbs_depth):
+            w = wbs[wbs_id]
+            parent = wbs_objects.get(w.get("parent"))
             obj = ProjectActivity.objects.create(
                 project=project,
                 activity_id=wbs_id,
-                activity_name=w["name"],
-                parent=parent
+                activity_name=w.get("name"),
+                parent=parent,
             )
-
             wbs_objects[wbs_id] = obj
 
         # Create tasks
@@ -351,14 +362,18 @@ class ProjectSerializer(GeoFeatureModelSerializer):
 
             parent = wbs_objects.get(task["wbs_id"])
 
-            start = task["start_date"]
-            end = task["end_date"]
+            # Store as DateField (YYYY-MM-DD); strip time if present.
+            start = task.get("start_date")
+            end = task.get("end_date")
+            if isinstance(start, str):
+                start = start.split(" ")[0].split("T")[0]
+            if isinstance(end, str):
+                end = end.split(" ")[0].split("T")[0]
 
-            if start:
-                start = start.split(" ")[0]
+            # Frontend expects progress in percent 0..100.
+            from .utils import normalize_progress_to_percent, recompute_project_activity_rollups
 
-            if end:
-                end = end.split(" ")[0]
+            prog = normalize_progress_to_percent(task.get("progress"))
 
             ProjectActivity.objects.create(
                 project=project,
@@ -367,8 +382,11 @@ class ProjectSerializer(GeoFeatureModelSerializer):
                 parent=parent,
                 start_date=start,
                 end_date=end,
-                progress=task["progress"]
+                progress=prog
             )
+
+        # Roll up WBS/summary rows so Gantt/WBS can render correct header spans and progress.
+        recompute_project_activity_rollups(project)
 class SubActivitySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectActivity

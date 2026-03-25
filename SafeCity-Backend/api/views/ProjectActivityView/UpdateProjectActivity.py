@@ -1,4 +1,5 @@
 from ..common_imports import *
+from ...utils import recompute_activity_ancestors
 
 class ProjectActivityUpdateView(viewsets.ViewSet):
     queryset = ProjectActivity.objects.all()
@@ -22,7 +23,14 @@ class ProjectActivityUpdateView(viewsets.ViewSet):
         try:
             serializer = ProjectActivitySerializer(myprojectactivity, data=data, partial=True)  
             if serializer.is_valid():
-                serializer.save()
+                updated = serializer.save()
+                # Keep WBS/summary nodes consistent after any leaf updates
+                # (progress and/or dates).
+                try:
+                    recompute_activity_ancestors(updated)
+                except Exception:
+                    # Best-effort; do not block the update call.
+                    pass
                 return ApiResponse(
                     status=status.HTTP_200_OK,
                     message="Project Activity updated successfully.",

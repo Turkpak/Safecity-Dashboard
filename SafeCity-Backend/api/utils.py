@@ -17,7 +17,8 @@ from rest_framework.pagination import PageNumberPagination
 from collections import defaultdict
 from rest_framework.pagination import PageNumberPagination
 from django.utils.text import slugify
-from datetime import datetime
+from datetime import datetime, date
+from django.db.models import Avg, Max, Min
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -330,3 +331,173 @@ def get_xer_gantt_data(project_id):
     activities = parse_xer(xer_path)
 
     return activities
+
+
+def _parse_date_only(value):
+    """
+    Best-effort parse for date/datetime strings coming from XER exports.
+    Accepts 'YYYY-MM-DD', 'YYYY-MM-DD HH:mm', 'YYYY-MM-DD HH:mm:ss', etc.
+    Returns a Python date or None.
+    """
+    if not value:
+        return None
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    if not isinstance(value, str):
+        return None
+    s = value.strip()
+    if not s:
+        return None
+    s = s.split("T")[0].split(" ")[0]
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+
+def parse_xer_file(file_path: str):
+    """
+    Minimal XER parser used by tests (SafeCity-Backend/api/tests/test_xer_parsing.py).
+    Supports a simplified %T/%F/%R structure with a TASK table containing:
+    TASK_ID, TASK_NAME, START_DATE, FINISH_DATE, PERCENT_COMPLETE.
+
+    Returns a list of tasks:
+    [{ id, label, start, end, progress }] where progress is 0..1
+    """
+    current_table = None
+    fields = []
+    out = []
+
+    with open(file_path, "r", encoding="utf-8", errors="ignore") as file:
+        for raw in file:
+            line = raw.strip()
+            if not line:
+                continue
+            if line.startswith("%T"):
+                parts = line.split("\t")
+                current_table = parts[1] if len(parts) > 1 else None
+                continue
+            if line.startswith("%F"):
+                fields = line.split("\t")[1:]
+                continue
+            if line.startswith("%R"):
+                if current_table != "TASK":
+                    continue
+                values = line.split("\t")[1:]
+                row = dict(zip(fields, values))
+                task_id = row.get("TASK_ID") or row.get("task_id")
+                name = row.get("TASK_NAME") or row.get("task_name") or ""
+                start = row.get("START_DATE") or row.get("start_date")
+                end = row.get("FINISH_DATE") or row.get("finish_date") or row.get("END_DATE") or row.get("end_date")
+                pct = row.get("PERCENT_COMPLETE") or row.get("percent_complete") or "0"
+                try:
+                    pct_num = float(pct)
+                except Exception:
+                    pct_num = 0.0
+                out.append(
+                    {
+                        "id": str(task_id) if task_id is not None else "",
+                        "label": name,
+                        "start": (start.split(" ")[0] if isinstance(start, str) else start) or None,
+                        "end": (end.split(" ")[0] if isinstance(end, str) else end) or None,
+                        "progress": max(0.0, min(1.0, pct_num / 100.0)),
+                    }
+                )
+    return out
+
+
+def normalize_progress_to_percent(value):
+    """
+    Normalize progress into 0..100 (percent).
+    Accepts:
+    - 0..1 fractions
+    - 0..100 percents
+    """
+    if value is None:
+        return 0.0
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if 0.0 <= v <= 1.0:
+        v *= 100.0
+    return max(0.0, min(100.0, v))
+
+
+def recompute_project_activity_rollups(project):
+    """
+    Recompute derived fields for WBS/summary rows (ProjectActivity nodes with children):
+    - start_date = min(child.start_date)
+    - end_date = max(child.end_date)
+    - progress = avg(child.progress) [simple rollup]
+
+    Runs bottom-up so nested WBS nodes get correct values.
+    """
+    from .models import ProjectActivity
+
+    nodes = list(ProjectActivity.objects.filter(project=project).values("id", "parent_id"))
+    children_by_parent = {}
+    for n in nodes:
+        children_by_parent.setdefault(n["parent_id"], []).append(n["id"])
+
+    parent_by_id = {n["id"]: n["parent_id"] for n in nodes}
+    depth_cache = {}
+
+    def depth(node_id, _seen=None):
+        if node_id in depth_cache:
+            return depth_cache[node_id]
+        if _seen is None:
+            _seen = set()
+        if node_id in _seen:
+            depth_cache[node_id] = 0
+            return 0
+        _seen.add(node_id)
+        pid = parent_by_id.get(node_id)
+        if not pid:
+            depth_cache[node_id] = 0
+            return 0
+        d = 1 + depth(pid, _seen=_seen)
+        depth_cache[node_id] = d
+        return d
+
+    ids_desc = sorted(parent_by_id.keys(), key=lambda i: depth(i), reverse=True)
+
+    for node_id in ids_desc:
+        if not children_by_parent.get(node_id):
+            continue  # leaf
+
+        qs = ProjectActivity.objects.filter(project=project, parent_id=node_id)
+        dated = qs.filter(start_date__isnull=False, end_date__isnull=False)
+        agg_start = dated.aggregate(Min("start_date")).get("start_date__min")
+        agg_end = dated.aggregate(Max("end_date")).get("end_date__max")
+        agg_progress = qs.aggregate(Avg("progress")).get("progress__avg")
+
+        ProjectActivity.objects.filter(project=project, id=node_id).update(
+            start_date=agg_start,
+            end_date=agg_end,
+            progress=float(agg_progress) if agg_progress is not None else 0.0,
+        )
+
+
+def recompute_activity_ancestors(activity):
+    """
+    Recompute rollups for all ancestors of a given activity.
+    """
+    from .models import ProjectActivity
+
+    cur = activity.parent
+    while cur is not None:
+        qs = ProjectActivity.objects.filter(project=activity.project, parent=cur)
+        dated = qs.filter(start_date__isnull=False, end_date__isnull=False)
+        agg_start = dated.aggregate(Min("start_date")).get("start_date__min")
+        agg_end = dated.aggregate(Max("end_date")).get("end_date__max")
+        agg_progress = qs.aggregate(Avg("progress")).get("progress__avg")
+
+        cur.start_date = agg_start
+        cur.end_date = agg_end
+        cur.progress = float(agg_progress) if agg_progress is not None else 0.0
+        cur.save(update_fields=["start_date", "end_date", "progress"])
+
+        cur = cur.parent

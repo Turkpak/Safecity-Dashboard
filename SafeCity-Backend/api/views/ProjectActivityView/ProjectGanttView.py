@@ -37,6 +37,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from ..common_imports import *
 from api.models import Project, ProjectActivity
+from api.utils import recompute_project_activity_rollups
 
 
 class ProjectGanttView(APIView):
@@ -44,6 +45,15 @@ class ProjectGanttView(APIView):
     def get(self, request, project_id):
         try:
             project = Project.objects.get(id=project_id)
+
+            # Ensure WBS/summary rows have rolled-up start/end/progress.
+            # This makes the endpoint consistent even for projects imported before
+            # rollup logic existed (or if rollups were not triggered).
+            try:
+                recompute_project_activity_rollups(project)
+            except Exception:
+                # Best-effort; still return raw rows if rollup fails.
+                pass
 
             activities = ProjectActivity.objects.filter(project=project).values(
                 "id",

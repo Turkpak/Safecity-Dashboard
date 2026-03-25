@@ -271,7 +271,7 @@ export default function ProjectActivityManagement() {
                         const width = getTaskWidth(task.start, task.end);
                         const actualWidth = width;
                         const delayLog =
-                          task.end && task.progress < 1 && new Date(task.end) < new Date()
+                          task.end && (task.progress ?? 0) < 100 && new Date(task.end) < new Date()
                             ? [`Task delayed by ${Math.ceil((new Date().getTime() - new Date(task.end).getTime())/(1000*60*60*24))} days`]
                             : [];
 
