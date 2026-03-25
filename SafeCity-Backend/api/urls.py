@@ -75,6 +75,9 @@ urlpatterns = [
 
     # ✅ NEW: Update Actual Task Data
     path('update-task-actual/<int:task_id>/', UpdateTaskActualView.as_view(), name='update-task-actual'),
+
+    # urls.py
+    path('project-gantt-nested/<int:project_id>/', ProjectGanttNestedView.as_view(), name='project-gantt-nested'),
 ]
 
 if settings.DEBUG:
