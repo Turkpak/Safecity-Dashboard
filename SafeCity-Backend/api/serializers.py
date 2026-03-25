@@ -329,10 +329,14 @@ class ProjectSerializer(GeoFeatureModelSerializer):
 
         wbs = data["wbs"]
         tasks = data["tasks"]
+        dependencies = data["dependencies"]
 
         wbs_objects = {}
+        task_map = {}
 
-        # Create WBS nodes
+        # ----------------------------------------
+        # 1. CREATE WBS (Summary Tasks)
+        # ----------------------------------------
         for wbs_id, w in wbs.items():
 
             parent = wbs_objects.get(w["parent"])
@@ -341,12 +345,15 @@ class ProjectSerializer(GeoFeatureModelSerializer):
                 project=project,
                 activity_id=wbs_id,
                 activity_name=w["name"],
-                parent=parent
+                parent=parent,
+                task_type="wbs"   # optional but useful
             )
 
             wbs_objects[wbs_id] = obj
 
-        # Create tasks
+        # ----------------------------------------
+        # 2. CREATE TASKS
+        # ----------------------------------------
         for task in tasks:
 
             parent = wbs_objects.get(task["wbs_id"])
@@ -354,21 +361,79 @@ class ProjectSerializer(GeoFeatureModelSerializer):
             start = task["start_date"]
             end = task["end_date"]
 
+            # Clean datetime → date only
             if start:
                 start = start.split(" ")[0]
 
             if end:
                 end = end.split(" ")[0]
 
-            ProjectActivity.objects.create(
+            # Detect milestone
+            task_type = "task"
+            if start == end:
+                task_type = "milestone"
+
+            obj = ProjectActivity.objects.create(
                 project=project,
                 activity_id=task["activity_id"],
                 activity_name=task["activity_name"],
                 parent=parent,
                 start_date=start,
                 end_date=end,
-                progress=task["progress"]
+                progress=task["progress"],
+                duration=task["duration"],
+                task_type=task_type
             )
+
+            # 🔥 IMPORTANT: store mapping
+            task_map[task["activity_id"]] = obj
+
+        # ----------------------------------------
+        # 3. CREATE DEPENDENCIES (VERY IMPORTANT)
+        # ----------------------------------------
+        for dep in dependencies:
+
+            task_obj = task_map.get(dep["task_id"])
+            pred_obj = task_map.get(dep["pred_task_id"])
+
+            # skip if mapping not found
+            if not task_obj or not pred_obj:
+                continue
+
+            TaskDependency.objects.create(
+                project=project,
+                task=task_obj,
+                predecessor=pred_obj,
+                type=dep["type"]  # FS, SS, FF
+            )
+    
+class TaskSerializer(serializers.ModelSerializer):
+    parent_id = serializers.PrimaryKeyRelatedField(
+        source='parent',
+        read_only=True
+    )
+
+    class Meta:
+        model = ProjectActivity
+        fields = [
+            "id",
+            "activity_id",
+            "activity_name",
+            "parent_id",
+
+            # planned
+            "start_date",
+            "end_date",
+
+            # actual
+            "actual_start",
+            "actual_end",
+
+            "progress",
+            "duration",
+            "task_type"
+        ]
+            
 class SubActivitySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectActivity

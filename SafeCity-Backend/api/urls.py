@@ -69,7 +69,12 @@ urlpatterns = [
     path('api/', include(router.urls)),
 
     path('', include(router.urls)),
+
+    # ✅ Gantt API
     path('project-gantt/<int:project_id>/', ProjectGanttView.as_view(), name='project-gantt'),
+
+    # ✅ NEW: Update Actual Task Data
+    path('update-task-actual/<int:task_id>/', UpdateTaskActualView.as_view(), name='update-task-actual'),
 ]
 
 if settings.DEBUG:

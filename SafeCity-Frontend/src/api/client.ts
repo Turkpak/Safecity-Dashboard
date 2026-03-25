@@ -35,26 +35,30 @@ function getAuthHeaders(): Record<string, string> {
 
 async function parseResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
-  let json: ApiEnvelope<T>;
+  let json: any;
+
   try {
     json = text ? JSON.parse(text) : {};
   } catch {
     throw new Error(res.statusText || `Request failed: ${res.status}`);
   }
-  const status = json.status ?? res.status;
-  const message = json.message ?? res.statusText;
+
   if (res.status >= 400) {
-    const dataStr =
-      typeof json.data === "object" && json.data !== null
-        ? JSON.stringify(json.data)
-        : String(json.data);
-    throw new Error(dataStr || message || `Request failed: ${res.status}`);
+    throw new Error(json?.message || `Request failed: ${res.status}`);
   }
-  // Backend may return raw array (e.g. GET user-permissions list)
+
+  // ✅ handle raw array
   if (Array.isArray(json)) {
     return json as T;
   }
-  return json.data as T;
+
+  // ✅ handle normal API (with data)
+  if ("data" in json) {
+    return json.data as T;
+  }
+
+  // ✅ handle gantt API (tasks, links)
+  return json as T;
 }
 
 export interface RequestOptions {
