@@ -31,7 +31,6 @@ import {
   TrendingUp,
   FileDown,
   Filter,
-  ArrowLeft,
   ChevronDown,
   ChevronUp,
   Search,
@@ -53,7 +52,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useTheme } from "@/hooks/use-theme";
 import { CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -564,6 +563,7 @@ export default function Dashboard() {
   const [parentDistrictName, setParentDistrictName] = useState<string | null>(
     null,
   );
+  const skipNextUrlSyncRef = useRef(false);
 
   // API queries
   const { data: apiDivisions = [] } = useQuery({
@@ -583,17 +583,90 @@ export default function Dashboard() {
     queryFn: () => listProjects(),
   });
 
-  // Check for tehsil parameter in URL (from ProjectDetail back navigation)
+  const toSlug = (value: string) =>
+    value
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
+
+  // Hydrate dashboard hierarchy state from clean URL query params (slug-based, no IDs).
   useEffect(() => {
-    if (apiTehsils.length === 0) return;
+    if (apiDivisions.length === 0 || apiDistricts.length === 0 || apiTehsils.length === 0) return;
+
     const urlParams = new URLSearchParams(window.location.search);
+    const level = urlParams.get("level");
+    const viewParam = urlParams.get("view");
+    if (viewParam === "divisions" || viewParam === "districts" || viewParam === "tehsils" || viewParam === "projects") {
+      setViewType(viewParam);
+    }
+
+    const divisionSlug = urlParams.get("division");
+    const districtSlug = urlParams.get("district");
+    const tehsilSlug = urlParams.get("tehsil");
+
+    if (level === "tehsil" && tehsilSlug) {
+      const foundTehsil = apiTehsils.find((t) => {
+        if (toSlug(t.tehsil_name) !== tehsilSlug) return false;
+        if (districtSlug && toSlug(t.district_name) !== districtSlug) return false;
+        if (divisionSlug && toSlug(t.division_name) !== divisionSlug) return false;
+        return true;
+      });
+      if (foundTehsil) {
+        skipNextUrlSyncRef.current = true;
+        setSelectedItemType("tehsil");
+        setSelectedItemId(foundTehsil.id);
+        setSelectedItemName(foundTehsil.tehsil_name);
+        setParentDistrictId(foundTehsil.district);
+        setParentDistrictName(foundTehsil.district_name);
+        setParentDivisionId(foundTehsil.division);
+        setParentDivisionName(foundTehsil.division_name);
+      }
+      return;
+    }
+
+    if (level === "district" && districtSlug) {
+      const foundDistrict = apiDistricts.find((d) => {
+        if (toSlug(d.district_name) !== districtSlug) return false;
+        if (divisionSlug && toSlug(d.division_name) !== divisionSlug) return false;
+        return true;
+      });
+      if (foundDistrict) {
+        skipNextUrlSyncRef.current = true;
+        setSelectedItemType("district");
+        setSelectedItemId(foundDistrict.id);
+        setSelectedItemName(foundDistrict.district_name);
+        setParentDivisionId(foundDistrict.division);
+        setParentDivisionName(foundDistrict.division_name);
+        setParentDistrictId(null);
+        setParentDistrictName(null);
+      }
+      return;
+    }
+
+    if (level === "division" && divisionSlug) {
+      const foundDivision = apiDivisions.find((d) => toSlug(d.division_name) === divisionSlug);
+      if (foundDivision) {
+        skipNextUrlSyncRef.current = true;
+        setSelectedItemType("division");
+        setSelectedItemId(foundDivision.id);
+        setSelectedItemName(foundDivision.division_name);
+        setParentDivisionId(null);
+        setParentDivisionName(null);
+        setParentDistrictId(null);
+        setParentDistrictName(null);
+      }
+      return;
+    }
+
+    // Backward compatibility with old ?tehsil=<name> link format.
     const tehsilParam = urlParams.get("tehsil");
     if (tehsilParam) {
-      const tehsilName = decodeURIComponent(tehsilParam);
       const found = apiTehsils.find(
-        (t) => t.tehsil_name.toLowerCase() === tehsilName.toLowerCase(),
+        (t) => t.tehsil_name.toLowerCase() === decodeURIComponent(tehsilParam).toLowerCase(),
       );
       if (found) {
+        skipNextUrlSyncRef.current = true;
         setSelectedItemName(found.tehsil_name);
         setSelectedItemType("tehsil");
         setSelectedItemId(found.id);
@@ -601,10 +674,56 @@ export default function Dashboard() {
         setParentDistrictName(found.district_name);
         setParentDivisionId(found.division);
         setParentDivisionName(found.division_name);
-        window.history.replaceState({}, "", "/");
       }
     }
-  }, [apiTehsils]);
+  }, [location, apiDivisions, apiDistricts, apiTehsils]);
+
+  // Keep URL in sync with drilldown selection.
+  useEffect(() => {
+    if (skipNextUrlSyncRef.current) {
+      skipNextUrlSyncRef.current = false;
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (viewType) params.set("view", viewType);
+
+    if (selectedItemType === "division" && selectedItemId && selectedItemName) {
+      params.set("level", "division");
+      params.set("division", toSlug(selectedItemName));
+    } else if (selectedItemType === "district" && selectedItemId && selectedItemName) {
+      params.set("level", "district");
+      params.set("district", toSlug(selectedItemName));
+      if (parentDivisionId && parentDivisionName) {
+        params.set("division", toSlug(parentDivisionName));
+      }
+    } else if (selectedItemType === "tehsil" && selectedItemId && selectedItemName) {
+      params.set("level", "tehsil");
+      params.set("tehsil", toSlug(selectedItemName));
+      if (parentDistrictId && parentDistrictName) {
+        params.set("district", toSlug(parentDistrictName));
+      }
+      if (parentDivisionId && parentDivisionName) {
+        params.set("division", toSlug(parentDivisionName));
+      }
+    }
+
+    const nextUrl = params.toString() ? `/?${params.toString()}` : "/";
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+    if (currentUrl !== nextUrl) {
+      setLocation(nextUrl);
+    }
+  }, [
+    viewType,
+    selectedItemType,
+    selectedItemId,
+    selectedItemName,
+    parentDivisionId,
+    parentDivisionName,
+    parentDistrictId,
+    parentDistrictName,
+    setLocation,
+  ]);
 
   // Simulate loading on initial mount and when view type changes
   useEffect(() => {
@@ -621,6 +740,13 @@ export default function Dashboard() {
       setSelectedProjectForDetails(null);
     }
   }, [selectedItemType, viewType]);
+
+  // When drilled into a specific geography, collapse filter choices into icon-only state.
+  useEffect(() => {
+    if (selectedItemType) {
+      setShowFilters(false);
+    }
+  }, [selectedItemType]);
 
   // Fetch project-gantt data whenever selected project changes (card or dropdown).
   useEffect(() => {
@@ -660,6 +786,97 @@ export default function Dashboard() {
     () => ["all", ...apiTehsils.map((t) => t.tehsil_name)],
     [apiTehsils],
   );
+
+  type NavigationStep = {
+    key: "all" | "division" | "district" | "tehsil";
+    label: string;
+    clickable: boolean;
+  };
+
+  const navigationFlow = useMemo<NavigationStep[]>(() => {
+    const flow: NavigationStep[] = [
+      {
+        key: "all",
+        label: "All Divisions",
+        clickable: selectedItemType !== null,
+      },
+    ];
+
+    if (selectedItemType === "division" && selectedItemName) {
+      flow.push({
+        key: "division",
+        label: `${selectedItemName} Division`,
+        clickable: false,
+      });
+    } else if (selectedItemType === "district" && selectedItemName) {
+      if (parentDivisionName) {
+        flow.push({
+          key: "division",
+          label: `${parentDivisionName} Division`,
+          clickable: true,
+        });
+      }
+      flow.push({
+        key: "district",
+        label: `${selectedItemName} District`,
+        clickable: false,
+      });
+    } else if (selectedItemType === "tehsil" && selectedItemName) {
+      if (parentDivisionName) {
+        flow.push({
+          key: "division",
+          label: `${parentDivisionName} Division`,
+          clickable: true,
+        });
+      }
+      if (parentDistrictName) {
+        flow.push({
+          key: "district",
+          label: `${parentDistrictName} District`,
+          clickable: true,
+        });
+      }
+      flow.push({
+        key: "tehsil",
+        label: `${selectedItemName} Tehsil`,
+        clickable: false,
+      });
+    }
+    return flow;
+  }, [
+    selectedItemType,
+    selectedItemName,
+    parentDivisionId,
+    parentDivisionName,
+    parentDistrictId,
+    parentDistrictName,
+  ]);
+
+  const handleNavigateToLevel = (level: NavigationStep["key"]) => {
+    if (level === "all") {
+      setSelectedItemName(null);
+      setSelectedItemType(null);
+      setSelectedItemId(null);
+      setParentDivisionId(null);
+      setParentDivisionName(null);
+      setParentDistrictId(null);
+      setParentDistrictName(null);
+      return;
+    }
+
+    if (level === "division" && parentDivisionId && parentDivisionName) {
+      setSelectedItemId(parentDivisionId);
+      setSelectedItemName(parentDivisionName);
+      setSelectedItemType("division");
+      return;
+    }
+
+    if (level === "district" && parentDistrictId && parentDistrictName) {
+      setSelectedItemId(parentDistrictId);
+      setSelectedItemName(parentDistrictName);
+      setSelectedItemType("district");
+    }
+  };
 
   // Helper: calculate overall financial progress from a set of projects
   const calcProjectsOverall = (projects: Project[]): number => {
@@ -1654,7 +1871,7 @@ export default function Dashboard() {
                     className={`h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary transition-transform duration-300 ${showFilters ? "rotate-180" : ""}`}
                   />
                   <span className="text-xs sm:text-sm font-semibold text-foreground">
-                    View:
+                    {showFilters ? "View:" : navigationFlow.length > 1 ? "Path:" : "View:"}
                   </span>
                 </div>
 
@@ -1763,6 +1980,31 @@ export default function Dashboard() {
                     </motion.div>
                   )}
                 </AnimatePresence>
+
+                {/* Compact breadcrumb on same row when filters are collapsed */}
+                {!showFilters && navigationFlow.length > 1 && (
+                  <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm min-w-0">
+                    {navigationFlow.map((step, idx) => (
+                      <div key={`${step.key}-compact-${idx}`} className="flex items-center gap-2">
+                        {idx > 0 && (
+                          <span className="text-muted-foreground/70">{"->"}</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => step.clickable && handleNavigateToLevel(step.key)}
+                          disabled={!step.clickable}
+                          className={`rounded-md border px-2 py-1 transition-colors ${
+                            step.clickable
+                              ? "border-[#1e3a8a] bg-[#1e3a8a] text-white hover:bg-[#1d4ed8] cursor-pointer"
+                              : "border-[#b91c1c] bg-[#b91c1c] text-white cursor-default"
+                          }`}
+                        >
+                          {step.label}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Expand/Collapse Button */}
@@ -1780,17 +2022,45 @@ export default function Dashboard() {
                 )}
               </Button>
             </div>
+
+            {/* Drilldown navigation flow (shown in header bar) */}
+            {showFilters && navigationFlow.length > 1 && (
+              <div className="mt-2 ml-1 sm:ml-2 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                <span className="font-medium text-muted-foreground">
+                  Navigation:
+                </span>
+                {navigationFlow.map((step, idx) => (
+                  <div key={`${step.key}-${idx}`} className="flex items-center gap-2">
+                    {idx > 0 && (
+                      <span className="text-muted-foreground/70">{"->"}</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => step.clickable && handleNavigateToLevel(step.key)}
+                      disabled={!step.clickable}
+                      className={`rounded-md border px-2 py-1 transition-colors ${
+                        step.clickable
+                          ? "border-[#1e3a8a] bg-[#1e3a8a] text-white hover:bg-[#1d4ed8] cursor-pointer"
+                          : "border-[#b91c1c] bg-[#b91c1c] text-white cursor-default"
+                      }`}
+                    >
+                      {step.label}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Header Content Section - Collapsible */}
           <div
             className={`relative flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 ease-in-out overflow-hidden ${
               isFilterBarExpanded
-                ? "max-h-[500px] opacity-100 p-4 md:p-6"
+                ? "max-h-[500px] opacity-100 px-4 md:px-6 pt-2 pb-4 md:pb-5"
                 : "max-h-0 opacity-0 p-0"
             }`}
           >
-            <div className="space-y-3 flex-1">
+            <div className="space-y-2 flex-1">
               <div className="flex items-center gap-3 flex-wrap">
                 <div>
                   <h1 className="text-xl sm:text-3xl md:text-4xl font-bold font-heading bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
@@ -1980,28 +2250,13 @@ export default function Dashboard() {
 
               return (
                 <div className="space-y-6">
-                  {/* Back Button */}
-                  <div className="flex items-center gap-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedItemName(null);
-                        setSelectedItemType(null);
-                        setSelectedItemId(null);
-                      }}
-                      className="rounded-xl cursor-pointer"
-                    >
-                      <ArrowLeft className="h-4 w-4 mr-2" />
-                      Back to All Divisions
-                    </Button>
-                    <div>
-                      <h2 className="text-lg sm:text-2xl font-bold font-heading">
-                        Districts in {selectedItemName} Division
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedItemName} Division
-                      </p>
-                    </div>
+                  <div>
+                    <h2 className="text-lg sm:text-2xl font-bold font-heading">
+                      Districts in {selectedItemName} Division
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedItemName} Division
+                    </p>
                   </div>
 
                   {/* District Cards */}
@@ -2090,30 +2345,14 @@ export default function Dashboard() {
 
               return (
                 <div className="space-y-6">
-                  {/* Back Button */}
-                  <div className="flex items-center gap-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        // Go back to parent division view
-                        setSelectedItemId(parentDivisionId);
-                        setSelectedItemName(parentDivisionName);
-                        setSelectedItemType("division");
-                      }}
-                      className="rounded-xl cursor-pointer"
-                    >
-                      <ArrowLeft className="h-4 w-4 mr-2" />
-                      Back to {parentDivisionName} Division
-                    </Button>
-                    <div>
-                      <h2 className="text-lg sm:text-2xl font-bold font-heading">
-                        Tehsils in {selectedItemName} District (
-                        {parentDivisionName} Division)
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedItemName} District
-                      </p>
-                    </div>
+                  <div>
+                    <h2 className="text-lg sm:text-2xl font-bold font-heading">
+                      Tehsils in {selectedItemName} District (
+                      {parentDivisionName} Division)
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedItemName} District
+                    </p>
                   </div>
 
                   {/* Tehsil Cards */}
@@ -2183,40 +2422,19 @@ export default function Dashboard() {
 
               return (
                 <div className="space-y-6">
-                  {/* Back Button */}
-                  <div className="flex items-center gap-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        // Go back to parent district view
-                        setSelectedItemId(parentDistrictId);
-                        setSelectedItemName(parentDistrictName);
-                        setSelectedItemType("district");
-                      }}
-                      className="rounded-xl cursor-pointer"
-                    >
-                      <ArrowLeft className="h-4 w-4 mr-2" />
-                      Back to {parentDistrictName} District
-                    </Button>
-                    <div>
-                      <h2 className="text-lg sm:text-2xl font-bold font-heading">
-                        Ongoing projects in {selectedItemName} Tehsil
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedItemName} Tehsil
-                      </p>
-                    </div>
+                  <div>
+                    <h2 className="text-lg sm:text-2xl font-bold font-heading">
+                      Ongoing projects in {selectedItemName} Tehsil
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedItemName} Tehsil
+                    </p>
                   </div>
 
                   {/* Project Cards from API */}
                   <div className="w-full">
                     <div className="mb-4">
-                      <h3 className="text-xl font-bold font-heading mb-1">
-                        Projects
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        Select a project to view details
-                      </p>
+                      
                     </div>
 
                     {/* dropdown to pick project for KPI/Gantt */}
