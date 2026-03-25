@@ -7,13 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search } from "lucide-react";
-import { listProjects, getProjectGanttData, updateProjectActivity } from "@/api";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { listProjects, getProjectGanttData } from "@/api";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface GanttTask {
   id: string;
@@ -32,7 +27,6 @@ export default function ProjectActivityManagement() {
   const [loadingGantt, setLoadingGantt] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [updates, setUpdates] = useState<Record<string, { start: string | null; end: string | null }>>({});
-  const [editingTask, setEditingTask] = useState<{ id: string; start: string | null; end: string | null } | null>(null);
   const [selectedDelayLog, setSelectedDelayLog] = useState<string[] | null>(null);
 
   const parseDate = (d: string | null) => (d ? new Date(d) : null);
@@ -82,40 +76,17 @@ export default function ProjectActivityManagement() {
     return map;
   }, [filteredTasks]);
 
-  // --------------- NEW: propagate updates to parents ----------------
-  const updatedTaskIds = useMemo(() => {
-    const updatedSet = new Set(Object.keys(updates));
-
-    const parentMap: Record<string, string | undefined> = {};
-    ganttTasks.forEach(t => { if (t.parent) parentMap[t.id] = t.parent; });
-
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (const task of ganttTasks) {
-        if (task.parent && updatedSet.has(task.id) && !updatedSet.has(task.parent)) {
-          updatedSet.add(task.parent);
-          changed = true;
-        }
-      }
-    }
-
-    return updatedSet;
-  }, [updates, ganttTasks]);
-  // ------------------------------------------------------------------
-
   interface DisplayTask extends GanttTask {
     isUpdated?: boolean;
     indent?: number;
   }
 
   const displayTasks: DisplayTask[] = [];
-
   const addChildren = (parentId: string, indent: number) => {
     if (!childMap[parentId]) return;
     childMap[parentId].forEach((child) => {
       const upd = updates[child.id];
-      const isUpdated = updatedTaskIds.has(child.id);
+      const isUpdated = updates[child.id] !== undefined;
       const childToPush: DisplayTask = {
         ...child,
         start: upd?.start || child.start,
@@ -124,54 +95,48 @@ export default function ProjectActivityManagement() {
         indent,
       };
       displayTasks.push(childToPush);
-
       if (expandedTasks.has(child.id)) addChildren(child.id, indent + 1);
     });
   };
 
   filteredTasks.forEach((t) => {
     if (t.parent) return;
-
     const upd = updates[t.id];
-    const isUpdated = updatedTaskIds.has(t.id);
-
+    const isUpdated = updates[t.id] !== undefined;
     const taskToPush: DisplayTask = {
       ...t,
       start: upd?.start || t.start,
       end: upd?.end || t.end,
       isUpdated,
     };
-
     displayTasks.push(taskToPush);
-
     if (expandedTasks.has(t.id)) addChildren(t.id, 1);
   });
 
-  // ----------------- Gantt calculations -----------------
-  const dateRange = (() => {
-    if (!ganttTasks.length) return { start: new Date(), end: new Date() };
-    const dates = ganttTasks
-      .flatMap((t) => [t.start ? new Date(t.start) : null, t.end ? new Date(t.end) : null])
-      .filter((d): d is Date => d !== null);
-    return {
-      start: new Date(Math.min(...dates.map((d) => d.getTime()))),
-      end: new Date(Math.max(...dates.map((d) => d.getTime()))),
-    };
-  })();
+  // Gantt calculations
+  const allDates = ganttTasks
+    .flatMap((t) => [t.start ? new Date(t.start) : null, t.end ? new Date(t.end) : null])
+    .filter((d): d is Date => d !== null);
 
-  const totalDays = Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const projectStart = allDates.length ? new Date(Math.min(...allDates.map(d => d.getTime()))) : null;
+  const projectEnd = allDates.length ? new Date(Math.max(...allDates.map(d => d.getTime()))) : null;
+  const projectDuration = projectStart && projectEnd
+    ? Math.ceil((projectEnd.getTime() - projectStart.getTime()) / (1000*60*60*24)) + 1
+    : 0;
+
+  const dateRange = projectStart && projectEnd ? { start: projectStart, end: projectEnd } : { start: new Date(), end: new Date() };
+  const totalDays = Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / (1000*60*60*24)) + 1;
 
   const getTaskPosition = (start: string | null) => {
     const startDate = parseDate(start);
     if (!startDate) return 0;
-    return ((startDate.getTime() - dateRange.start.getTime()) / (1000 * 60 * 60 * 24) / totalDays) * 100;
+    return ((startDate.getTime() - dateRange.start.getTime()) / (1000*60*60*24) / totalDays) * 100;
   };
-
   const getTaskWidth = (start: string | null, end: string | null) => {
     const startDate = parseDate(start);
     const endDate = parseDate(end);
     if (!startDate || !endDate) return 2;
-    const days = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1;
+    const days = (endDate.getTime() - startDate.getTime()) / (1000*60*60*24) + 1;
     return (days / totalDays) * 100;
   };
 
@@ -186,10 +151,17 @@ export default function ProjectActivityManagement() {
     return months;
   }, [dateRange]);
 
-  // ----------------- Render -----------------
+  const calculateDuration = (start: string | null, end: string | null) => {
+    if (!start || !end) return 0;
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    return Math.ceil((endDate.getTime() - startDate.getTime()) / (1000*60*60*24)) + 1;
+  };
+
   return (
     <Layout title="Project Activities">
       <div className="flex flex-col gap-8 max-w-[1400px] mx-auto pb-20">
+
         {/* Project Selector */}
         <Card className="border-none shadow-sm overflow-hidden">
           <CardHeader className="pb-2">
@@ -239,109 +211,112 @@ export default function ProjectActivityManagement() {
             <CardHeader>
               <CardTitle>Project Timeline (Gantt Chart)</CardTitle>
             </CardHeader>
-            <CardContent>
-              {loadingGantt ? (
-                <div className="space-y-4">
-                  {[1, 2, 3].map((i) => <div key={i} className="h-12 bg-muted animate-pulse rounded" />)}
-                </div>
-              ) : filteredTasks.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">No schedule activities found for this project.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <div className="min-w-max">
-                    {/* Header */}
-                    <div className="mb-4 flex items-start">
-                      <div className="w-48 flex-shrink-0 flex items-center"><span className="text-xs font-semibold">Activity</span></div>
-                      <div className="w-20 flex-shrink-0 flex items-center justify-center"><span className="text-xs font-semibold">Action</span></div>
-                      <div className="flex-1 grid grid-flow-col auto-cols-[120px] text-xs text-center">
-                        {monthsArray.map((d, i) => (
-                          <div key={i} className="border-l py-1 font-medium">
-                            {d.toLocaleDateString("en-US", { month: "short" })}
-                            <div className="text-[10px] text-muted-foreground">{d.getFullYear()}</div>
-                          </div>
-                        ))}
+            <CardContent className="overflow-x-auto">
+              <div className="min-w-[1400px]">
+                {/* Header */}
+                <div className="flex border-b mb-4 text-xs font-semibold">
+                  <div className="w-48">Activity</div>
+                  <div className="w-20 text-center">Duration</div>
+                  <div className="w-32 text-center">Start Date</div>
+                  <div className="w-32 text-center">Finish Date</div>
+                  <div className="flex-1 grid grid-flow-col auto-cols-[120px] text-center">
+                    {monthsArray.map((d, i) => (
+                      <div key={i} className="border-l py-1 font-medium">
+                        {d.toLocaleDateString("en-US", { month: "short" })}
+                        <div className="text-[10px] text-muted-foreground">{d.getFullYear()}</div>
                       </div>
-                    </div>
-
-                    {/* Tasks */}
-                    <div className="space-y-4">
-                      {displayTasks.slice(0, 150).map((task, index) => {
-                        const isUpdated = !!task.isUpdated;
-                        const left = getTaskPosition(task.start);
-                        const width = getTaskWidth(task.start, task.end);
-                        const actualWidth = width;
-                        const delayLog =
-                          task.end && (task.progress ?? 0) < 100 && new Date(task.end) < new Date()
-                            ? [`Task delayed by ${Math.ceil((new Date().getTime() - new Date(task.end).getTime())/(1000*60*60*24))} days`]
-                            : [];
-
-                        return (
-                          <div key={`${task.id}-${index}-${isUpdated ? 'u' : 'p'}`} className="flex items-center gap-2">
-                            {/* Activity Name + Expand */}
-                            <div className="w-48 flex-shrink-0 flex items-center gap-1" style={{ paddingLeft: `${(task.indent || 0) * 16}px` }}>
-                              {!isUpdated && childMap[task.id] && childMap[task.id].length > 0 && (
-                                <button
-                                  onClick={() => {
-                                    const copy = new Set(expandedTasks);
-                                    copy.has(task.id) ? copy.delete(task.id) : copy.add(task.id);
-                                    setExpandedTasks(copy);
-                                  }}
-                                  className="text-xs"
-                                >
-                                  {expandedTasks.has(task.id) ? '▾' : '▸'}
-                                </button>
-                              )}
-                              <div className={`text-xs font-semibold truncate ${isUpdated ? 'italic text-muted-foreground' : ''}`}>
-                                {task.label}{task.activity_id ? ` (${task.activity_id})` : ''}
-                              </div>
-                            </div>
-
-                            {/* Action */}
-                            {!isUpdated && (
-                              <div className="w-20 flex-shrink-0">
-                                <button
-                                  className="text-xs underline text-primary"
-                                  onClick={() => setEditingTask({ id: task.id, start: task.start, end: task.end })}
-                                >
-                                  Action
-                                </button>
-                              </div>
-                            )}
-
-                            {/* Timeline */}
-                            <div className="flex-1 relative h-12 bg-muted/30 rounded-md border border-muted">
-                              <div className="absolute h-4 bg-red-400 rounded" style={{ top: "4px", left: `${left}%`, width: `${width}%` }}
-  />
-                              {isUpdated && (
-                                <div className="absolute h-4 bg-green-500 rounded" style={{ top: "10px", left: `${left}%`, width: `${width}%` }}    />
-                              )}
-                              {delayLog.length > 0 && (
-                                <div
-                                  className="absolute h-full bg-red-900 opacity-50 cursor-pointer z-10"
-                                  style={{ left: `${left + actualWidth}%`, width: `${width - actualWidth}%` }}
-                                  onClick={() => setSelectedDelayLog(delayLog)}
-                                />
-                              )}
-                            </div>
-
-                            {/* Dates */}
-                            <div className="w-32 flex-shrink-0 text-xs text-muted-foreground">
-                              <div>{task.start ? new Date(task.start).toLocaleDateString() : "—"}</div>
-                              <div>{task.end ? new Date(task.end).toLocaleDateString() : "—"}</div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Legend */}
-                    <div className="mt-6 flex flex-wrap gap-6 text-xs">
-                      <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-400" />Planned</div>
-                      <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-green-500" />Updated</div>
-                    </div>
+                    ))}
                   </div>
                 </div>
-              )}
+
+                {/* Main Project Row */}
+                <div className="flex items-center gap-2 font-semibold bg-gray-100 px-2 py-1 rounded">
+                  <div className="w-48 truncate">
+                    {projects.find(p => p.id === selectedProjectId)?.project_name} ({selectedProjectId})
+                  </div>
+                  <div className="w-20 text-center text-xs">{projectDuration}d</div>
+                  <div className="w-32 text-center text-xs">{projectStart ? projectStart.toLocaleDateString() : "—"}</div>
+                  <div className="w-32 text-center text-xs">{projectEnd ? projectEnd.toLocaleDateString() : "—"}</div>
+                  <div className="flex-1 relative h-8 rounded overflow-visible bg-transparent">
+                    {/* Plan Bar */}
+                    {projectStart && projectEnd && (
+                      <div
+                        className="absolute h-4 bg-blue-400 rounded top-1"
+                        style={{
+                          left: 0,
+                          width: "100%",
+                        }}
+                      />
+                    )}
+                    {/* Actual Bar */}
+                    <div
+                      className="absolute h-2 bg-blue-700 rounded top-4"
+                      style={{
+                        left: 0,
+                        width: `${totalDays}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Tasks */}
+                <div className="space-y-2 mt-2">
+                  {displayTasks.map((task) => {
+                    const left = getTaskPosition(task.start);
+                    const width = getTaskWidth(task.start, task.end);
+                    const actualWidth = width * task.progress;
+                    const duration = calculateDuration(task.start, task.end);
+                    const delayLog =
+                      task.end && task.progress < 1 && new Date(task.end) < new Date()
+                        ? [`Task delayed by ${Math.ceil((new Date().getTime() - new Date(task.end).getTime())/(1000*60*60*24))} days`]
+                        : [];
+
+                    return (
+                      <div key={task.id} className="flex items-center gap-2">
+                        {/* Activity Name + Expand */}
+                        <div className="w-48 truncate" style={{ paddingLeft: `${(task.indent || 0) * 16}px` }}>
+                          {childMap[task.id] && childMap[task.id].length > 0 && (
+                            <button
+                              onClick={() => {
+                                const copy = new Set(expandedTasks);
+                                copy.has(task.id) ? copy.delete(task.id) : copy.add(task.id);
+                                setExpandedTasks(copy);
+                              }}
+                              className="text-xs mr-1"
+                            >
+                              {expandedTasks.has(task.id) ? '▾' : '▸'}
+                            </button>
+                          )}
+                          {task.label}{task.activity_id ? ` (${task.activity_id})` : ''}
+                        </div>
+
+                        {/* Duration */}
+                        <div className="w-20 text-center text-xs">{duration}d</div>
+
+                        {/* Start Date */}
+                        <div className="w-32 text-center text-xs">{task.start ? new Date(task.start).toLocaleDateString() : "—"}</div>
+
+                        {/* Finish Date */}
+                        <div className="w-32 text-center text-xs">{task.end ? new Date(task.end).toLocaleDateString() : "—"}</div>
+
+                        {/* Timeline Bar */}
+                        <div className="flex-1 relative h-8 rounded overflow-visible bg-transparent">
+                          <div className="absolute h-4 bg-red-400 rounded top-1" style={{ left: `${left}%`, width: `${width}%` }} />
+                          <div className="absolute h-2 bg-red-700 rounded top-4" style={{ left: `${left}%`, width: `${actualWidth}%` }} />
+                          {delayLog.length > 0 && (
+                            <div
+                              className="absolute h-full bg-red-900 opacity-70 cursor-pointer"
+                              style={{ left: `${left + actualWidth}%`, width: `${width - actualWidth}%` }}
+                              onClick={() => setSelectedDelayLog(delayLog)}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+              </div>
             </CardContent>
           </Card>
         )}
@@ -360,66 +335,6 @@ export default function ProjectActivityManagement() {
           </Dialog>
         )}
 
-        {/* Edit Task Modal */}
-        {editingTask && (
-          <Dialog open={true} onOpenChange={() => setEditingTask(null)}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Update Activity Dates</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="flex flex-col">
-                  <Label htmlFor="edit-start">Start Date</Label>
-                  <Input
-                    id="edit-start"
-                    type="date"
-                    value={editingTask.start || ""}
-                    onChange={(e) =>
-                      setEditingTask((prev) => prev ? { ...prev, start: e.target.value || null } : prev)
-                    }
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <Label htmlFor="edit-end">End Date</Label>
-                  <Input
-                    id="edit-end"
-                    type="date"
-                    value={editingTask.end || ""}
-                    onChange={(e) =>
-                      setEditingTask((prev) => prev ? { ...prev, end: e.target.value || null } : prev)
-                    }
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <button className="px-4 py-2 bg-gray-200 rounded" onClick={() => setEditingTask(null)}>Cancel</button>
-                  <button
-                    className="px-4 py-2 bg-primary text-white rounded"
-                    onClick={async () => {
-                      if (!editingTask) return;
-                      try {
-                        await updateProjectActivity(Number(editingTask.id), {
-                          start_date: editingTask.start,
-                          end_date: editingTask.end,
-                        });
-                        setUpdates((prev) => ({
-                          ...prev,
-                          [editingTask.id]: { start: editingTask.start, end: editingTask.end },
-                        }));
-                      } catch (e) {
-                        console.error(e);
-                        alert("Failed to update activity. Try again.");
-                      } finally {
-                        setEditingTask(null);
-                      }
-                    }}
-                  >
-                    Update
-                  </button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
       </div>
     </Layout>
   );

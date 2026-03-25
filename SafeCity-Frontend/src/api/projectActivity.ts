@@ -61,18 +61,19 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
   const data = await get<any>(`project-gantt/${projectId}/`);
   console.log("Response from API:", data);
 
-  // Support both API formats
-  const tasksArray = Array.isArray(data) ? data : data?.data || [];
+  // ❌ WRONG
+  // const tasksArray = Array.isArray(data) ? data : data?.data || [];
+
+  // ✅ CORRECT
+  const tasksArray = data?.tasks || [];
 
   return tasksArray.map((act: any) => ({
-    // use the database record id for updates; keep activity_id for display
     id: String(act.id),
     activity_id: act.activity_id,
     label: act.activity_name || `#${act.activity_id}`,
     start: act.start_date || null,
     end: act.end_date || act.start_date || null,
     progress: act.progress ?? 0,
-    // optionally include a parent id if backend supplies it
     parent: act.parent_id ? String(act.parent_id) : undefined,
   }));
 }

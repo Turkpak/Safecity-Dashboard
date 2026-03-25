@@ -329,64 +329,111 @@ class ProjectSerializer(GeoFeatureModelSerializer):
 
         wbs = data["wbs"]
         tasks = data["tasks"]
+        dependencies = data["dependencies"]
 
         wbs_objects = {}
+        task_map = {}
 
-        # Create WBS nodes.
-        # IMPORTANT: create parents before children (dict iteration order is not guaranteed
-        # to match hierarchy), otherwise parent links can be lost.
-        def wbs_depth(wbs_id, _seen=None):
-            if _seen is None:
-                _seen = set()
-            if wbs_id in _seen:
-                return 0
-            _seen.add(wbs_id)
-            parent_id = (wbs.get(wbs_id) or {}).get("parent")
-            if not parent_id:
-                return 0
-            return 1 + wbs_depth(parent_id, _seen=_seen)
+        # ----------------------------------------
+        # 1. CREATE WBS (Summary Tasks)
+        # ----------------------------------------
+        for wbs_id, w in wbs.items():
 
-        for wbs_id in sorted(wbs.keys(), key=wbs_depth):
-            w = wbs[wbs_id]
-            parent = wbs_objects.get(w.get("parent"))
+            parent = wbs_objects.get(w["parent"])
+
             obj = ProjectActivity.objects.create(
                 project=project,
                 activity_id=wbs_id,
-                activity_name=w.get("name"),
+                activity_name=w["name"],
                 parent=parent,
+                task_type="wbs"   # optional but useful
             )
+
             wbs_objects[wbs_id] = obj
 
-        # Create tasks
+        # ----------------------------------------
+        # 2. CREATE TASKS
+        # ----------------------------------------
         for task in tasks:
 
             parent = wbs_objects.get(task["wbs_id"])
 
-            # Store as DateField (YYYY-MM-DD); strip time if present.
-            start = task.get("start_date")
-            end = task.get("end_date")
-            if isinstance(start, str):
-                start = start.split(" ")[0].split("T")[0]
-            if isinstance(end, str):
-                end = end.split(" ")[0].split("T")[0]
+            start = task["start_date"]
+            end = task["end_date"]
 
-            # Frontend expects progress in percent 0..100.
-            from .utils import normalize_progress_to_percent, recompute_project_activity_rollups
+            # Clean datetime → date only
+            if start:
+                start = start.split(" ")[0]
 
-            prog = normalize_progress_to_percent(task.get("progress"))
+            if end:
+                end = end.split(" ")[0]
 
-            ProjectActivity.objects.create(
+            # Detect milestone
+            task_type = "task"
+            if start == end:
+                task_type = "milestone"
+
+            obj = ProjectActivity.objects.create(
                 project=project,
                 activity_id=task["activity_id"],
                 activity_name=task["activity_name"],
                 parent=parent,
                 start_date=start,
                 end_date=end,
-                progress=prog
+                progress=task["progress"],
+                duration=task["duration"],
+                task_type=task_type
             )
 
-        # Roll up WBS/summary rows so Gantt/WBS can render correct header spans and progress.
-        recompute_project_activity_rollups(project)
+            # 🔥 IMPORTANT: store mapping
+            task_map[task["activity_id"]] = obj
+
+        # ----------------------------------------
+        # 3. CREATE DEPENDENCIES (VERY IMPORTANT)
+        # ----------------------------------------
+        for dep in dependencies:
+
+            task_obj = task_map.get(dep["task_id"])
+            pred_obj = task_map.get(dep["pred_task_id"])
+
+            # skip if mapping not found
+            if not task_obj or not pred_obj:
+                continue
+
+            TaskDependency.objects.create(
+                project=project,
+                task=task_obj,
+                predecessor=pred_obj,
+                type=dep["type"]  # FS, SS, FF
+            )
+    
+class TaskSerializer(serializers.ModelSerializer):
+    parent_id = serializers.PrimaryKeyRelatedField(
+        source='parent',
+        read_only=True
+    )
+
+    class Meta:
+        model = ProjectActivity
+        fields = [
+            "id",
+            "activity_id",
+            "activity_name",
+            "parent_id",
+
+            # planned
+            "start_date",
+            "end_date",
+
+            # actual
+            "actual_start",
+            "actual_end",
+
+            "progress",
+            "duration",
+            "task_type"
+        ]
+            
 class SubActivitySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectActivity

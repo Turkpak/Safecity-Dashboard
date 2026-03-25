@@ -300,7 +300,8 @@ def parse_xer(file_path):
                         "wbs_id": row.get("wbs_id"),
                         "start_date": row.get("early_start_date") or row.get("target_start_date"),
                         "end_date": row.get("early_end_date") or row.get("target_end_date"),
-                        "progress": float(row.get("phys_complete_pct") or 0) / 100
+                        "progress": float(row.get("phys_complete_pct") or 0),
+                        "duration": float(row.get("target_drtn_hr_cnt") or 0)
                     })
 
                 # Dependencies

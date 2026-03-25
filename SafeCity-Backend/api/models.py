@@ -239,10 +239,11 @@ class Project(models.Model):
         super().save(*args, **kwargs)
 
 class ProjectActivity(models.Model):
-
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="activities")
+
     activity_id = models.CharField(max_length=100, null=True, blank=True)
     activity_name = models.CharField(max_length=255, null=True, blank=True)
+
     parent = models.ForeignKey(
         "self",
         null=True,
@@ -250,16 +251,34 @@ class ProjectActivity(models.Model):
         related_name="children",
         on_delete=models.CASCADE
     )
+
+    # ✅ PLANNED (from XER)
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
+
+    # ✅ ACTUAL (user input)
+    actual_start = models.DateField(null=True, blank=True)
+    actual_end = models.DateField(null=True, blank=True)
+
+    # ✅ EXTRA
+    remarks = models.TextField(null=True, blank=True)
+
     progress = models.FloatField(default=0)
+    duration = models.FloatField(null=True, blank=True)
+
+    task_type = models.CharField(max_length=20, default="task")
 
     class Meta:
-        ordering = ["start_date"]
-
+        ordering = ["parent_id", "start_date"]
     def __str__(self):
         return f"{self.activity_name} ({self.project.project_name})"
-    
+
+class TaskDependency(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE)
+    task = models.ForeignKey(ProjectActivity, related_name="successors", on_delete=models.CASCADE)
+    predecessor = models.ForeignKey(ProjectActivity, related_name="predecessors", on_delete=models.CASCADE)
+    type = models.CharField(max_length=10)  # FS, SS, FF
+
 # --------------------------------------------------------
 # Pictorial Archive
 # --------------------------------------------------------
