@@ -554,7 +554,7 @@ export default function ProjectManagement() {
   const filteredProjects = useMemo(() => {
     const query = locationSearch.trim().toLowerCase();
 
-    return projectsData.filter((project) => {
+    const filtered = projectsData.filter((project) => {
       const divisionText = (project.division_name ?? String(project.division ?? "")).toLowerCase();
       const districtText = (project.district_name ?? String(project.district ?? "")).toLowerCase();
       const tehsilText = (project.tehsil_name ?? String(project.tehsil ?? "")).toLowerCase();
@@ -565,6 +565,23 @@ export default function ProjectManagement() {
         districtText.includes(query) ||
         tehsilText.includes(query)
       );
+    });
+    
+    const asTime = (value: unknown): number => {
+      if (typeof value !== "string") return Number.NaN;
+      const t = new Date(value).getTime();
+      return Number.isFinite(t) ? t : Number.NaN;
+    };
+
+    // Show most recently created projects first.
+    // If created_at is missing/invalid, fall back to id (higher id = newer).
+    return filtered.slice().sort((a, b) => {
+      const ta = asTime((a as any).created_at);
+      const tb = asTime((b as any).created_at);
+      if (Number.isFinite(ta) && Number.isFinite(tb)) return tb - ta;
+      if (Number.isFinite(tb)) return 1;
+      if (Number.isFinite(ta)) return -1;
+      return (b.id ?? 0) - (a.id ?? 0);
     });
   }, [projectsData, locationSearch]);
 

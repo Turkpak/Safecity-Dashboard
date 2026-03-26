@@ -48,6 +48,12 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   {
+    icon: UserCog,
+    label: "User Management",
+    href: "/user-management",
+    roles: ["super_admin"],
+  },
+  {
     icon: Navigation2,
     label: "Area Management",
     subItems: [
@@ -72,13 +78,6 @@ const NAV_ITEMS: NavItem[] = [
   { icon: BarChart3, label: "City Comparison", href: "/comparison" },
   { icon: LucideBanknote, label: "Finance & Budget", href: "/finance" },
   { icon: MapIcon, label: "GIS Layers", href: "/gis" },
-
-  {
-    icon: UserCog,
-    label: "User Management",
-    href: "/user-management",
-    roles: ["super_admin"],
-  },
 ];
 
 export function Sidebar() {
