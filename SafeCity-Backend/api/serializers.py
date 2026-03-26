@@ -211,6 +211,7 @@ class ProjectSerializer(GeoFeatureModelSerializer):
     project_starting_date = serializers.DateField(
         input_formats=["%Y-%m-%d", "%Y-%m-%d %H:%M"]
     )
+    boundary_file = serializers.FileField(write_only=True, required=False)
     class Meta:
         model = Project
         geo_field = "geom"
@@ -262,25 +263,31 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         project.stakeholder.set(stakeholders)
 
         # Assign XER file
-        if xer_file:
-            project.xer_file = xer_file
-            project.save()
-            self._save_activities(project)  # 🔥 Parse XER and save activities
+        if 'xer_file' in self.initial_data:
+            project.xer_file = self.initial_data.get('xer_file')
 
         # Handle GeoJSON
+
         if boundary_file:
             try:
                 boundary_file.seek(0)
                 geojson_data = json.load(boundary_file)
+
                 geometry = (
                     geojson_data["features"][0]["geometry"]
                     if geojson_data.get("type") == "FeatureCollection"
                     else geojson_data.get("geometry")
                 )
+
                 project.geom = GEOSGeometry(json.dumps(geometry))
-                project.boundary_file = boundary_file
+
+                # ❌ DO NOT SAVE FILE
+                # project.boundary_file = boundary_file  ← REMOVE THIS
+
             except Exception as e:
-                raise serializers.ValidationError({"boundary_file": f"Invalid GeoJSON: {e}"})
+                raise serializers.ValidationError({
+                    "boundary_file": f"Invalid GeoJSON: {e}"
+                })
 
         project.save()
         return project
@@ -309,23 +316,33 @@ class ProjectSerializer(GeoFeatureModelSerializer):
             try:
                 boundary_file.seek(0)
                 geojson_data = json.load(boundary_file)
+
                 geometry = (
                     geojson_data["features"][0]["geometry"]
                     if geojson_data.get("type") == "FeatureCollection"
                     else geojson_data.get("geometry")
                 )
+
                 instance.geom = GEOSGeometry(json.dumps(geometry))
-                instance.boundary_file = boundary_file
+
+                # ❌ REMOVE THIS
+                # instance.boundary_file = boundary_file
+
             except Exception as e:
-                raise serializers.ValidationError({"boundary_file": f"Invalid GeoJSON: {e}"})
+                raise serializers.ValidationError({
+                    "boundary_file": f"Invalid GeoJSON: {e}"
+                })
 
         instance.save()
         return instance
 
     # ---------- Private: Parse XER and save tasks ----------
-    def _save_activities(self, project):
+    def _save_activities(self, project, xer_file):
 
-        data = parse_xer(project.xer_file.path)
+        # ✅ IMPORTANT: reset file pointer
+        xer_file.seek(0)
+
+        data = parse_xer(xer_file)
 
         wbs = data["wbs"]
         tasks = data["tasks"]
@@ -334,11 +351,8 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         wbs_objects = {}
         task_map = {}
 
-        # ----------------------------------------
-        # 1. CREATE WBS (Summary Tasks)
-        # ----------------------------------------
+        # 1. WBS
         for wbs_id, w in wbs.items():
-
             parent = wbs_objects.get(w["parent"])
 
             obj = ProjectActivity.objects.create(
@@ -346,29 +360,22 @@ class ProjectSerializer(GeoFeatureModelSerializer):
                 activity_id=wbs_id,
                 activity_name=w["name"],
                 parent=parent,
-                task_type="wbs"   # optional but useful
+                task_type="wbs"
             )
-
             wbs_objects[wbs_id] = obj
 
-        # ----------------------------------------
-        # 2. CREATE TASKS
-        # ----------------------------------------
+        # 2. TASKS
         for task in tasks:
-
             parent = wbs_objects.get(task["wbs_id"])
 
             start = task["start_date"]
             end = task["end_date"]
 
-            # Clean datetime → date only
             if start:
                 start = start.split(" ")[0]
-
             if end:
                 end = end.split(" ")[0]
 
-            # Detect milestone
             task_type = "task"
             if start == end:
                 task_type = "milestone"
@@ -385,18 +392,13 @@ class ProjectSerializer(GeoFeatureModelSerializer):
                 task_type=task_type
             )
 
-            # 🔥 IMPORTANT: store mapping
             task_map[task["activity_id"]] = obj
 
-        # ----------------------------------------
-        # 3. CREATE DEPENDENCIES (VERY IMPORTANT)
-        # ----------------------------------------
+        # 3. DEPENDENCIES
         for dep in dependencies:
-
             task_obj = task_map.get(dep["task_id"])
             pred_obj = task_map.get(dep["pred_task_id"])
 
-            # skip if mapping not found
             if not task_obj or not pred_obj:
                 continue
 
@@ -404,7 +406,7 @@ class ProjectSerializer(GeoFeatureModelSerializer):
                 project=project,
                 task=task_obj,
                 predecessor=pred_obj,
-                type=dep["type"]  # FS, SS, FF
+                type=dep["type"]
             )
     
 class TaskSerializer(serializers.ModelSerializer):

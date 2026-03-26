@@ -257,7 +257,7 @@ class StandardResultsSetPagination(PageNumberPagination):
             'count': self.page.paginator.count,
             'results': data
         })
-def parse_xer(file_path):
+def parse_xer(file):
 
     wbs = {}
     tasks = []
@@ -266,51 +266,43 @@ def parse_xer(file_path):
     current_table = None
     fields = []
 
-    with open(file_path, "r", encoding="utf-8", errors="ignore") as file:
+    # ✅ read directly from uploaded file (NO disk)
+    for line in file:
+        line = line.decode("utf-8", errors="ignore").strip()
 
-        for line in file:
-            line = line.strip()
+        if line.startswith("%T"):
+            current_table = line.split("\t")[1]
 
-            if line.startswith("%T"):
-                current_table = line.split("\t")[1]
+        elif line.startswith("%F"):
+            fields = line.split("\t")[1:]
 
-            elif line.startswith("%F"):
-                fields = line.split("\t")[1:]
+        elif line.startswith("%R"):
+            values = line.split("\t")[1:]
+            row = dict(zip(fields, values))
 
-            elif line.startswith("%R"):
+            if current_table == "PROJWBS":
+                wbs[row["wbs_id"]] = {
+                    "name": row.get("wbs_name"),
+                    "parent": row.get("parent_wbs_id")
+                }
 
-                values = line.split("\t")[1:]
-                row = dict(zip(fields, values))
+            elif current_table == "TASK":
+                tasks.append({
+                    "activity_id": row.get("task_id"),
+                    "activity_name": row.get("task_name"),
+                    "wbs_id": row.get("wbs_id"),
+                    "start_date": row.get("early_start_date") or row.get("target_start_date"),
+                    "end_date": row.get("early_end_date") or row.get("target_end_date"),
+                    "progress": float(row.get("phys_complete_pct") or 0),
+                    "duration": float(row.get("target_drtn_hr_cnt") or 0)
+                })
 
-                # WBS hierarchy
-                if current_table == "PROJWBS":
-
-                    wbs[row["wbs_id"]] = {
-                        "name": row.get("wbs_name"),
-                        "parent": row.get("parent_wbs_id")
-                    }
-
-                # Activities
-                elif current_table == "TASK":
-
-                    tasks.append({
-                        "activity_id": row.get("task_id"),
-                        "activity_name": row.get("task_name"),
-                        "wbs_id": row.get("wbs_id"),
-                        "start_date": row.get("early_start_date") or row.get("target_start_date"),
-                        "end_date": row.get("early_end_date") or row.get("target_end_date"),
-                        "progress": float(row.get("phys_complete_pct") or 0),
-                        "duration": float(row.get("target_drtn_hr_cnt") or 0)
-                    })
-
-                # Dependencies
-                elif current_table == "TASKPRED":
-
-                    dependencies.append({
-                        "task_id": row.get("task_id"),
-                        "pred_task_id": row.get("pred_task_id"),
-                        "type": row.get("pred_type")
-                    })
+            elif current_table == "TASKPRED":
+                dependencies.append({
+                    "task_id": row.get("task_id"),
+                    "pred_task_id": row.get("pred_task_id"),
+                    "type": row.get("pred_type")
+                })
 
     return {
         "wbs": wbs,

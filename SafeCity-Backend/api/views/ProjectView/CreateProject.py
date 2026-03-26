@@ -11,7 +11,7 @@ class ProjectCreateView(viewsets.ViewSet):
             serializer = ProjectSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
 
-            project = serializer.save()   # 🔥 THIS is the key
+            project = serializer.save()   
 
             return ApiResponse(
                 status=status.HTTP_201_CREATED,

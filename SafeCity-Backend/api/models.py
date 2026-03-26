@@ -209,12 +209,12 @@ class Project(models.Model):
     budget_variance = models.CharField(max_length=200, null=True, blank=True)
     budget_remaining = models.CharField(max_length=200, null=True, blank=True)
     xer_file = models.FileField(upload_to=project_doc_file_path, validators=[FileExtensionValidator(allowed_extensions=['xer'])],null=True, blank=True, max_length=500) 
-    boundary_file = models.FileField(
-        upload_to=project_doc_file_path,
-        validators=[FileExtensionValidator(allowed_extensions=['geojson', 'json'])],
-        null=True,
-        blank=True, max_length=500
-    )
+    # boundary_file = models.FileField(
+    #     upload_to=project_doc_file_path,
+    #     validators=[FileExtensionValidator(allowed_extensions=['geojson', 'json'])],
+    #     null=True,
+    #     blank=True, max_length=500
+    # )
 
     geom = gis_models.MultiPolygonField(srid=4326, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True) 
@@ -269,7 +269,7 @@ class ProjectActivity(models.Model):
     task_type = models.CharField(max_length=20, default="task")
 
     class Meta:
-        ordering = ["parent_id", "start_date"]
+        ordering = []
     def __str__(self):
         return f"{self.activity_name} ({self.project.project_name})"
 
