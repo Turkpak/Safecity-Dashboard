@@ -217,18 +217,26 @@ export function ProjectGanttTree({ tasks }: { tasks: FlatGanttRow[] }) {
                 </div>
 
                 <div className="flex-1 relative h-12 overflow-visible bg-background/30">
-                  {/* Planned bar */}
+                  {/* Planned bar (top row) */}
                   <div
-                    className="absolute h-7 bg-blue-500/30 rounded-md top-2"
+                    className="absolute h-4 rounded-md top-2 bg-sky-600"
                     style={{ left: `${left}%`, width: `${width}%` }}
                     title={`Planned: ${t.start ?? "—"} → ${t.end ?? "—"}`}
-                  />
-                  {/* Actual/progress bar */}
+                  >
+                    <span className="absolute left-2 top-0.5 text-[10px] font-semibold text-white/90 select-none">
+                      P:{Math.round(clamp(t.progress ?? 0, 0, 100))}%
+                    </span>
+                  </div>
+                  {/* Actual/progress bar (bottom row) */}
                   <div
-                    className="absolute h-7 bg-blue-500 rounded-md top-2"
+                    className="absolute h-4 rounded-md top-7 bg-sky-300"
                     style={{ left: `${left}%`, width: `${actualWidth}%` }}
-                    title={`Progress: ${Math.round(t.progress ?? 0)}%`}
-                  />
+                    title={`Actual: ${Math.round(t.progress ?? 0)}%`}
+                  >
+                    <span className="absolute left-2 top-0.5 text-[10px] font-semibold text-slate-900/70 select-none">
+                      A:{Math.round(clamp(t.progress ?? 0, 0, 100))}%
+                    </span>
+                  </div>
                 </div>
 
                 <div className="w-20 border-l border-border/60 flex items-center justify-center">
