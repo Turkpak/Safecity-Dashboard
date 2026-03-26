@@ -14,8 +14,7 @@ interface GanttTask {
   label: string;
   start: string | null;
   end: string | null;
-  progress: number; // 0-1
-  delayLog?: string[];
+  progress: number; // 0-100
 }
 
 interface ProjectGanttChartProps {
@@ -52,23 +51,25 @@ export function ProjectGanttChart({ projectId: propProjectId, searchQuery = "" }
       try {
         setLoading(true);
         const fetchedTasks = await getProjectGanttData(selectedProjectId);
+        // Backend now provides real progress in 0..100 and proper dates (including rollups for WBS nodes).
+        const normalized = (fetchedTasks || []).map((t: any) => ({
+          ...t,
+          progress:
+            typeof t?.progress === "number" && Number.isFinite(t.progress)
+              ? Math.max(0, Math.min(100, t.progress))
+              : 0,
+        }));
 
-        const today = new Date();
-        const tasksWithDelay = fetchedTasks.map((t: any) => {
-          const endDate = t.end ? new Date(t.end) : null;
-          const isDelayed = endDate && t.progress < 1 && endDate < today;
-          return {
-            ...t,
-            progress: t.progress ?? Math.random() * 0.8,
-            delayLog: isDelayed ? [`Task delayed by ${Math.ceil((today.getTime() - endDate.getTime()) / (1000*60*60*24))} days`] : [],
-          };
-        });
+        setTasks(normalized);
 
-        setTasks(tasksWithDelay);
-
-        const starts = tasksWithDelay.map((t) => t.start && new Date(t.start)).filter(Boolean) as Date[];
-        const ends = tasksWithDelay.map((t) => t.end && new Date(t.end)).filter(Boolean) as Date[];
-        setDateRange({ start: new Date(Math.min(...starts.map((d) => d.getTime()))), end: new Date(Math.max(...ends.map((d) => d.getTime()))) });
+        const starts = normalized.map((t) => t.start && new Date(t.start)).filter(Boolean) as Date[];
+        const ends = normalized.map((t) => t.end && new Date(t.end)).filter(Boolean) as Date[];
+        if (starts.length && ends.length) {
+          setDateRange({
+            start: new Date(Math.min(...starts.map((d) => d.getTime()))),
+            end: new Date(Math.max(...ends.map((d) => d.getTime()))),
+          });
+        }
 
         setError(null);
       } catch (err) {
@@ -194,20 +195,13 @@ export function ProjectGanttChart({ projectId: propProjectId, searchQuery = "" }
               {filteredTasks.map((task) => {
                 const left = getTaskPosition(task.start);
                 const width = getTaskWidth(task.start, task.end);
-                const actualWidth = width * task.progress;
+                const actualWidth = width * (Math.max(0, Math.min(100, task.progress)) / 100);
                 return (
                   <div key={task.id} className="flex items-center gap-2">
                     <div className="w-56 text-xs font-medium truncate">{task.label}</div>
                     <div className="flex-1 relative h-8 rounded overflow-visible bg-transparent">
                       <div className="absolute h-4 bg-red-400 rounded top-1" style={{ left: `${left}%`, width: `${width}%` }} />
                       <div className="absolute h-2 bg-red-700 rounded top-4" style={{ left: `${left}%`, width: `${actualWidth}%` }} />
-                      {task.delayLog && task.delayLog.length > 0 && (
-                        <div
-                          className="absolute h-full bg-red-900 opacity-70 cursor-pointer"
-                          style={{ left: `${left + actualWidth}%`, width: `${width - actualWidth}%` }}
-                          onClick={() => setSelectedDelayLog(task.delayLog)}
-                        />
-                      )}
                     </div>
                   </div>
                 );
@@ -216,22 +210,6 @@ export function ProjectGanttChart({ projectId: propProjectId, searchQuery = "" }
           </div>
         </CardContent>
       </Card>
-
-      {/* Delay Modal */}
-      {selectedDelayLog && (
-        <Dialog open={true} onOpenChange={() => setSelectedDelayLog(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Delay Log</DialogTitle>
-            </DialogHeader>
-            <ul className="list-disc pl-6">
-              {selectedDelayLog.map((log, i) => (
-                <li key={i}>{log}</li>
-              ))}
-            </ul>
-          </DialogContent>
-        </Dialog>
-      )}
     </>
   );
 }

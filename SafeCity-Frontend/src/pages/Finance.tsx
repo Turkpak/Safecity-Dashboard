@@ -1,7 +1,7 @@
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, LucideBanknote, Wallet, AlertCircle, CheckCircle2, Filter } from "lucide-react";
-import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { TrendingUp, TrendingDown, LucideBanknote, Wallet, AlertCircle, CheckCircle2, Filter, FileSpreadsheet } from "lucide-react";
+import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useState, useMemo } from "react";
@@ -15,117 +15,51 @@ import {
   getDistrictsByDivision,
   getTehsilsByDivisionAndDistrict,
 } from "@/data/punjabHierarchy";
+import {
+  parseTehsilSchemesWorkbook,
+  excelTitleToAppDivision,
+  aggregateRows,
+  utilizationPctVsSpending,
+  type TehsilSchemeFinanceRow,
+} from "@/utils/parseTehsilSchemesFinance";
+
+const FINANCE_XLSX_PATH = "/Assets/Financial%20Data/Tehsil%20Schemes%20Financial%20Details.xlsx";
+
+/** Workbook figures are PKR millions; formatPKR expects rupees. */
+const millionsToRupees = (m: number) => m * 1_000_000;
 
 // Format PKR currency (Finance page: show in Millions instead of Crore)
 const formatPKR = (amount: number) => {
-  if (amount >= 1_000_000) {
-    return `PKR ${(amount / 1_000_000).toFixed(2)} M`;
-  } else if (amount >= 1_000) {
-    return `PKR ${(amount / 1_000).toFixed(2)} K`;
-  } else {
-    return `PKR ${amount.toLocaleString()}`;
+  const sign = amount < 0 ? "−" : "";
+  const abs = Math.abs(amount);
+  if (abs >= 1_000_000) {
+    return `${sign}PKR ${(abs / 1_000_000).toFixed(2)} M`;
   }
+  if (abs >= 1_000) {
+    return `${sign}PKR ${(abs / 1_000).toFixed(2)} K`;
+  }
+  return `${sign}PKR ${abs.toLocaleString()}`;
 };
 
-// Generate deterministic hash from string
-const hashString = (str: string): number => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return Math.abs(hash);
-};
+const STAGE_COLORS = ["#3b82f6", "#6366f1", "#8b5cf6", "#f59e0b", "#10b981"];
 
-// Generate mock finance data based on filter selection
-const generateFinanceData = (
-  division: string,
-  district: string,
-  tehsil: string
-): {
-  budgetData: Array<{ month: string; planned: number; actual: number; variance: number }>;
-  expenseData: Array<{ department: string; planned: number; actual: number; color: string }>;
-  kpiData: {
-    totalBudget: number;
-    ytdUtilization: number;
-    variance: number;
-    remaining: number;
-  };
-} => {
-  // Create a seed based on the filter selection
-  const filterKey = `${division}-${district}-${tehsil}`;
-  const seed = hashString(filterKey);
-
-  // Generate base multiplier based on hierarchy level
-  let baseMultiplier = 1;
-  if (division !== "all") {
-    baseMultiplier = 0.8 + (seed % 100) / 500; // 0.8 to 1.0
-    if (district !== "all") {
-      baseMultiplier = 0.5 + (seed % 100) / 400; // 0.5 to 0.75
-      if (tehsil !== "all") {
-        baseMultiplier = 0.2 + (seed % 100) / 500; // 0.2 to 0.4
-      }
-    }
-  }
-
-  // Generate monthly budget data
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'];
-  const budgetData = months.map((month, index) => {
-    const monthSeed = hashString(`${filterKey}-${month}`);
-    const planned = Math.floor((800000000 + (monthSeed % 500000000)) * baseMultiplier);
-    const variancePercent = -10 + ((monthSeed % 200) / 10); // -10% to +10%
-    const actual = Math.floor(planned * (1 + variancePercent / 100));
-    const variance = actual - planned;
-
-    return {
-      month,
-      planned,
-      actual,
-      variance,
-    };
+function findRowForDivision(rows: TehsilSchemeFinanceRow[], division: string): TehsilSchemeFinanceRow | undefined {
+  const d = division.trim().toLowerCase();
+  return rows.find((r) => {
+    const app = excelTitleToAppDivision(r.projectTitle);
+    return app?.trim().toLowerCase() === d;
   });
+}
 
-  // Generate department expense data
-  const departments = [
-    { name: "Infrastructure", color: "#3b82f6" },
-    { name: "Personnel", color: "#10b981" },
-    { name: "Maintenance", color: "#f59e0b" },
-    { name: "Software Licenses", color: "#a855f7" },
+function buildFlowChartData(row: TehsilSchemeFinanceRow) {
+  return [
+    { stage: "Approved Cost", totalM: row.approved.total, capitalM: row.approved.capital, revenueM: row.approved.revenue },
+    { stage: "Allocation", totalM: row.allocation.total, capitalM: row.allocation.capital, revenueM: row.allocation.revenue },
+    { stage: "P&D Release", totalM: row.pdRelease.total, capitalM: row.pdRelease.capital, revenueM: row.pdRelease.revenue },
+    { stage: "Spending Release", totalM: row.spendingRelease.total, capitalM: row.spendingRelease.capital, revenueM: row.spendingRelease.revenue },
+    { stage: "PIFRA Utilization", totalM: row.pifraUtilization.total, capitalM: row.pifraUtilization.capital, revenueM: row.pifraUtilization.revenue },
   ];
-
-  const expenseData = departments.map((dept, index) => {
-    const deptSeed = hashString(`${filterKey}-${dept.name}`);
-    const planned = Math.floor((200000000 + (deptSeed % 1500000000)) * baseMultiplier);
-    const variancePercent = -15 + ((deptSeed % 300) / 10); // -15% to +15%
-    const actual = Math.floor(planned * (1 + variancePercent / 100));
-
-    return {
-      department: dept.name,
-      planned,
-      actual,
-      color: dept.color,
-    };
-  });
-
-  // Calculate KPIs
-  const totalPlanned = budgetData.reduce((sum, item) => sum + item.planned, 0);
-  const totalActual = budgetData.reduce((sum, item) => sum + item.actual, 0);
-  const variance = totalActual - totalPlanned;
-  const remaining = totalPlanned - totalActual;
-  const ytdUtilization = totalActual;
-
-  return {
-    budgetData,
-    expenseData,
-    kpiData: {
-      totalBudget: totalPlanned,
-      ytdUtilization,
-      variance,
-      remaining,
-    },
-  };
-};
+}
 
 export default function Finance() {
   const { width } = useWindowSize();
@@ -135,7 +69,22 @@ export default function Finance() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
 
   const isMobile = width < 640;
-  const isTablet = width >= 640 && width < 1024;
+
+  const {
+    data: workbookParsed,
+    isLoading: financeFileLoading,
+    isError: financeFileError,
+    error: financeFileErr,
+  } = useQuery({
+    queryKey: ["tehsil-schemes-finance-xlsx"],
+    queryFn: async () => {
+      const res = await fetch(FINANCE_XLSX_PATH);
+      if (!res.ok) throw new Error(`Failed to load finance workbook (${res.status})`);
+      const ab = await res.arrayBuffer();
+      return parseTehsilSchemesWorkbook(ab);
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   const { data: projects = [] } = useQuery({
     queryKey: ["projects"],
@@ -160,7 +109,6 @@ export default function Finance() {
     return list;
   }, [projects, selectedDivision, selectedDistrict, selectedTehsil]);
 
-  // When a project is selected, sync division/district/tehsil from that project for finance data
   const effectiveDivision = useMemo(() => {
     if (selectedProjectId !== "all") {
       const p = filteredProjects.find((x) => String(x.id) === selectedProjectId);
@@ -168,32 +116,97 @@ export default function Finance() {
     }
     return selectedDivision;
   }, [selectedProjectId, filteredProjects, selectedDivision]);
-  const effectiveDistrict = useMemo(() => {
-    if (selectedProjectId !== "all") {
-      const p = filteredProjects.find((x) => String(x.id) === selectedProjectId);
-      return p?.district_name ?? selectedDistrict;
+
+  const activeFinanceRow = useMemo((): TehsilSchemeFinanceRow | null => {
+    if (!workbookParsed) return null;
+    const { rows, totals } = workbookParsed;
+    if (effectiveDivision === "all") {
+      if (totals && totals.category.toLowerCase() === "total") return totals;
+      return aggregateRows(rows);
     }
-    return selectedDistrict;
-  }, [selectedProjectId, filteredProjects, selectedDistrict]);
-  const effectiveTehsil = useMemo(() => {
-    if (selectedProjectId !== "all") {
-      const p = filteredProjects.find((x) => String(x.id) === selectedProjectId);
-      return p?.tehsil_name ?? selectedTehsil;
+    return findRowForDivision(rows, effectiveDivision) ?? null;
+  }, [workbookParsed, effectiveDivision]);
+
+  const flowChartData = useMemo(() => {
+    if (!activeFinanceRow) return [];
+    return buildFlowChartData(activeFinanceRow);
+  }, [activeFinanceRow]);
+
+  /** Division vs Approved / PIFRA for comparison chart (all divisions). */
+  const divisionComparisonData = useMemo(() => {
+    if (!workbookParsed) return [];
+    return workbookParsed.rows.map((r, i) => ({
+      division: excelTitleToAppDivision(r.projectTitle) ?? r.projectTitle.slice(0, 24) + "…",
+      approvedM: r.approved.total,
+      pifraM: r.pifraUtilization.total,
+      color: STAGE_COLORS[i % STAGE_COLORS.length],
+    }));
+  }, [workbookParsed]);
+
+  const kpiDerived = useMemo(() => {
+    if (!activeFinanceRow) {
+      return {
+        approvedRupees: 0,
+        pifraRupees: 0,
+        spendingRupees: 0,
+        varianceRupees: 0,
+        remainingRupees: 0,
+        utilVsApprovedPct: 0,
+        utilVsSpendingPct: 0,
+      };
     }
-    return selectedTehsil;
-  }, [selectedProjectId, filteredProjects, selectedTehsil]);
+    const r = activeFinanceRow;
+    const approvedRupees = millionsToRupees(r.approved.total);
+    const pifraRupees = millionsToRupees(r.pifraUtilization.total);
+    const spendingRupees = millionsToRupees(r.spendingRelease.total);
+    const varianceRupees = spendingRupees - pifraRupees;
+    const remainingRupees = approvedRupees - pifraRupees;
+    const utilVsApprovedPct = approvedRupees > 0 ? (pifraRupees / approvedRupees) * 100 : 0;
+    const utilVsSpendingPct = utilizationPctVsSpending(r);
+    return {
+      approvedRupees,
+      pifraRupees,
+      spendingRupees,
+      varianceRupees,
+      remainingRupees,
+      utilVsApprovedPct,
+      utilVsSpendingPct,
+    };
+  }, [activeFinanceRow]);
 
-  // Generate finance data based on effective filters (division/district/tehsil or selected project's location)
-  const financeData = useMemo(() => {
-    return generateFinanceData(effectiveDivision, effectiveDistrict, effectiveTehsil);
-  }, [effectiveDivision, effectiveDistrict, effectiveTehsil]);
+  const kpiDataWithIcons = {
+    totalBudget: {
+      value: kpiDerived.approvedRupees,
+      label: "Approved cost (total)",
+      icon: Wallet,
+      trend: kpiDerived.utilVsApprovedPct,
+    },
+    ytdUtilization: {
+      value: kpiDerived.pifraRupees,
+      label: "PIFRA utilization (total)",
+      icon: LucideBanknote,
+      trend: kpiDerived.utilVsSpendingPct,
+    },
+    variance: {
+      value: kpiDerived.varianceRupees,
+      label: "Spending release − PIFRA",
+      icon: AlertCircle,
+      trend: kpiDerived.utilVsSpendingPct,
+    },
+    remaining: {
+      value: kpiDerived.remainingRupees,
+      label: "Approved − PIFRA (balance)",
+      icon: CheckCircle2,
+      trend:
+        kpiDerived.approvedRupees > 0
+          ? (kpiDerived.remainingRupees / kpiDerived.approvedRupees) * 100
+          : 0,
+    },
+  };
 
-  const { budgetData, expenseData, kpiData } = financeData;
-
-  // Calculate utilization rate
-  const totalPlanned = budgetData.reduce((sum, item) => sum + item.planned, 0);
-  const totalActual = budgetData.reduce((sum, item) => sum + item.actual, 0);
-  const utilizationRate = totalPlanned > 0 ? (totalActual / totalPlanned) * 100 : 0;
+  const utilizationRate = kpiDerived.utilVsApprovedPct;
+  const totalPlanned = kpiDerived.approvedRupees;
+  const totalActual = kpiDerived.pifraRupees;
 
   const handleDivisionChange = (value: string) => {
     setSelectedDivision(value);
@@ -213,19 +226,11 @@ export default function Finance() {
     setSelectedProjectId("all");
   };
 
-  // Get display name for current selection
   const getLocationName = () => {
-    if (selectedDivision === "all") return "All Punjab";
+    if (selectedDivision === "all") return "All Punjab (aggregated)";
     if (selectedDistrict === "all") return selectedDivision;
     if (selectedTehsil === "all") return `${selectedDistrict}, ${selectedDivision}`;
     return `${selectedTehsil}, ${selectedDistrict}`;
-  };
-
-  const kpiDataWithIcons = {
-    totalBudget: { value: kpiData.totalBudget, label: "Total Budget Allocated", icon: Wallet, trend: 2.5 },
-    ytdUtilization: { value: kpiData.ytdUtilization, label: "YTD Utilization", icon: LucideBanknote, trend: utilizationRate },
-    variance: { value: kpiData.variance, label: "Projected Variance", icon: AlertCircle, trend: -1.2 },
-    remaining: { value: kpiData.remaining, label: "Remaining Budget", icon: CheckCircle2, trend: (kpiData.remaining / kpiData.totalBudget) * 100 },
   };
 
   const kpiCardVariants = {
@@ -277,17 +282,34 @@ export default function Finance() {
   } as const;
 
   const getKpiVariant = (key: string, value: number) => {
-    if (key === "variance") return value < 0 ? kpiCardVariants.varianceGood : kpiCardVariants.varianceBad;
+    if (key === "variance") return value <= 0 ? kpiCardVariants.varianceGood : kpiCardVariants.varianceBad;
     if (key === "totalBudget") return kpiCardVariants.totalBudget;
     if (key === "ytdUtilization") return kpiCardVariants.ytdUtilization;
     return kpiCardVariants.remaining;
   };
 
+  const stageBreakdownItems = useMemo(() => {
+    if (!activeFinanceRow) return [];
+    const r = activeFinanceRow;
+    const approved = r.approved.total || 1;
+    return [
+      { label: "Approved cost", triple: r.approved, color: STAGE_COLORS[0] },
+      { label: "Allocation", triple: r.allocation, color: STAGE_COLORS[1] },
+      { label: "P&D release", triple: r.pdRelease, color: STAGE_COLORS[2] },
+      { label: "Spending release", triple: r.spendingRelease, color: STAGE_COLORS[3] },
+      { label: "PIFRA utilization", triple: r.pifraUtilization, color: STAGE_COLORS[4] },
+    ].map((item) => ({
+      ...item,
+      totalM: item.triple.total,
+      pctOfApproved: approved > 0 ? (item.triple.total / approved) * 100 : 0,
+    }));
+  }, [activeFinanceRow]);
+
   return (
     <Layout title="Financial & Budget Analytics">
       <div className="flex flex-col gap-6">
-        {/* Filters — same style as GIS page: single row, Filter icon, Division / District / Tehsil / Project */}
-        <div className="flex flex-nowrap items-center gap-3">
+        {/* Filters */}
+        <div className="flex flex-nowrap items-center gap-3 overflow-x-auto pb-1">
           <Filter className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
           <div className="flex items-center gap-2 shrink-0">
             <label className="text-sm font-medium text-muted-foreground shrink-0">Division</label>
@@ -298,20 +320,21 @@ export default function Finance() {
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
                 {getAllDivisions().map((div) => (
-                  <SelectItem key={div} value={div}>{div}</SelectItem>
+                  <SelectItem key={div} value={div}>
+                    {div}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <label className="text-sm font-medium text-muted-foreground shrink-0">District</label>
-            <Select
-              value={selectedDistrict}
-              onValueChange={handleDistrictChange}
-              disabled={selectedDivision === "all"}
-            >
+            <Select value={selectedDistrict} onValueChange={handleDistrictChange} disabled={selectedDivision === "all"}>
               <SelectTrigger
-                className={`h-9 w-[140px] border-border/50 bg-background rounded-md ${selectedDivision === "all" ? "opacity-50 cursor-not-allowed" : ""}`}
+                className={cn(
+                  "h-9 w-[140px] border-border/50 bg-background rounded-md",
+                  selectedDivision === "all" && "opacity-50 cursor-not-allowed"
+                )}
                 disabled={selectedDivision === "all"}
               >
                 <SelectValue placeholder="All" />
@@ -320,7 +343,9 @@ export default function Finance() {
                 <SelectItem value="all">All</SelectItem>
                 {selectedDivision !== "all" &&
                   getDistrictsByDivision(selectedDivision).map((dist) => (
-                    <SelectItem key={dist} value={dist}>{dist}</SelectItem>
+                    <SelectItem key={dist} value={dist}>
+                      {dist}
+                    </SelectItem>
                   ))}
               </SelectContent>
             </Select>
@@ -333,7 +358,10 @@ export default function Finance() {
               disabled={selectedDivision === "all" || selectedDistrict === "all"}
             >
               <SelectTrigger
-                className={`h-9 w-[140px] border-border/50 bg-background rounded-md ${selectedDivision === "all" || selectedDistrict === "all" ? "opacity-50 cursor-not-allowed" : ""}`}
+                className={cn(
+                  "h-9 w-[140px] border-border/50 bg-background rounded-md",
+                  (selectedDivision === "all" || selectedDistrict === "all") && "opacity-50 cursor-not-allowed"
+                )}
                 disabled={selectedDivision === "all" || selectedDistrict === "all"}
               >
                 <SelectValue placeholder="All" />
@@ -343,7 +371,9 @@ export default function Finance() {
                 {selectedDivision !== "all" &&
                   selectedDistrict !== "all" &&
                   getTehsilsByDivisionAndDistrict(selectedDivision, selectedDistrict).map((teh) => (
-                    <SelectItem key={teh} value={teh}>{teh}</SelectItem>
+                    <SelectItem key={teh} value={teh}>
+                      {teh}
+                    </SelectItem>
                   ))}
               </SelectContent>
             </Select>
@@ -364,7 +394,10 @@ export default function Finance() {
               </SelectContent>
             </Select>
           </div>
-          {(selectedDivision !== "all" || selectedDistrict !== "all" || selectedTehsil !== "all" || selectedProjectId !== "all") && (
+          {(selectedDivision !== "all" ||
+            selectedDistrict !== "all" ||
+            selectedTehsil !== "all" ||
+            selectedProjectId !== "all") && (
             <Button
               variant="destructive"
               size="sm"
@@ -381,262 +414,274 @@ export default function Finance() {
           )}
         </div>
 
+        {financeFileLoading && (
+          <Card>
+            <CardContent className="py-12 text-center text-muted-foreground">Loading finance workbook…</CardContent>
+          </Card>
+        )}
 
-
-        {/* KPI Cards */}
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-          {Object.entries(kpiDataWithIcons).map(([key, kpi]) => {
-            const Icon = kpi.icon;
-            const isPositive = kpi.trend >= 0;
-            const isVariance = key === 'variance';
-            const variant = getKpiVariant(key, kpi.value);
-
-            return (
-              <Card
-                key={key}
-                className={cn(
-                  "relative overflow-hidden rounded-2xl border border-border/50 shadow-sm transition-all hover:shadow-lg",
-                  "border-l-4",
-                  variant.accent,
-                  variant.bg
-                )}
-              >
-                <div className={cn("absolute top-0 right-0 h-28 w-28 rounded-full blur-2xl -mr-12 -mt-12", variant.blob)} />
-                <CardHeader className="pb-2 relative">
-                  <div className="flex items-start justify-between gap-3">
-                    <CardTitle className="text-sm font-medium text-muted-foreground leading-tight">
-                      {kpi.label}
-                    </CardTitle>
-                    <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center border border-border/40 shadow-sm", variant.iconWrap)}>
-                      <Icon className={cn("h-5 w-5", variant.icon)} />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="relative">
-                  <div className={cn("text-2xl font-bold font-heading", isVariance ? variant.value : "text-foreground")}>
-                    {formatPKR(Math.abs(kpi.value))}
-                  </div>
-
-                  {!isVariance && (
-                    <div className="flex items-center gap-1 mt-2">
-                      {isPositive ? (
-                        <TrendingUp className={cn("h-3 w-3", variant.trend)} />
-                      ) : (
-                        <TrendingDown className={cn("h-3 w-3", variant.trend)} />
-                      )}
-                      <p className={cn("text-xs", variant.trend)}>
-                        {key === 'ytdUtilization'
-                          ? `${kpi.trend.toFixed(1)}% Utilized`
-                          : `${Math.abs(kpi.trend).toFixed(1)}% from last year`}
-                      </p>
-                    </div>
-                  )}
-
-                  {isVariance && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {kpi.value < 0 ? "Under budget (Good)" : "Over budget"}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-
-        {/* Budget vs Actual Charts */}
-        <div className="grid gap-6 lg:grid-cols-12">
-          {/* Main Budget vs Actual Chart */}
-          <Card className="lg:col-span-8 border-2 transition-colors hover:border-[#101a3c]">
+        {financeFileError && (
+          <Card className="border-destructive/50">
             <CardHeader>
-              <CardTitle>Planned vs Actual Budget</CardTitle>
-              <CardDescription>Monthly budget comparison in PKR</CardDescription>
+              <CardTitle className="text-destructive">Could not load finance data</CardTitle>
+              <CardDescription>
+                {financeFileErr instanceof Error ? financeFileErr.message : "Unknown error"}. Ensure the file exists at{" "}
+                <code className="text-xs">public/Assets/Financial Data/Tehsil Schemes Financial Details.xlsx</code>.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="h-[320px] sm:h-[380px] lg:h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={budgetData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorPlanned" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorActual" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis
-                    tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
-                    tickFormatter={(value) => `${(value / 1_000_000).toFixed(1)}M`}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      borderColor: "hsl(var(--border))",
-                      borderRadius: "8px"
-                    }}
-                    formatter={(value: number, name: string) => {
-                      // Map dataKey to display name
-                      let displayName = 'Variance';
-                      if (name === 'planned' || name === 'Planned') {
-                        displayName = 'Planned';
-                      } else if (name === 'actual' || name === 'Actual') {
-                        displayName = 'Actual';
-                      } else if (name === 'variance' || name === 'Variance') {
-                        displayName = 'Variance';
-                      }
-                      return [formatPKR(value), displayName];
-                    }}
-                  />
-                  <Legend />
-                  <Bar dataKey="planned" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Planned" />
-                  <Bar dataKey="actual" fill="#10b981" radius={[4, 4, 0, 0]} name="Actual" />
-                  <Line
-                    type="monotone"
-                    dataKey="variance"
-                    stroke="#ef4444"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    name="Variance"
-                    dot={{ fill: "#ef4444", r: 4 }}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
+          </Card>
+        )}
+
+        {!financeFileLoading && !financeFileError && !activeFinanceRow && (
+          <Card>
+            <CardContent className="py-12 text-center text-muted-foreground">
+              No finance row for this division. Check that the Excel file includes a scheme line for &quot;{effectiveDivision}&quot;.
             </CardContent>
           </Card>
+        )}
 
-          {/* Utilization Progress */}
-          <Card className="lg:col-span-4">
-            <CardHeader>
-              <CardTitle>Budget Utilization</CardTitle>
-              <CardDescription>Overall progress</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Utilized</span>
-                  <span className="font-bold">{utilizationRate.toFixed(1)}%</span>
-                </div>
-                <div className="w-full bg-muted h-3 rounded-full overflow-hidden">
-                  <div
-                    className="bg-primary h-full rounded-full transition-all"
-                    style={{ width: `${utilizationRate}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{formatPKR(totalActual)}</span>
-                  <span>{formatPKR(totalPlanned)}</span>
-                </div>
-              </div>
-
-              <div className="space-y-4 pt-4 border-t">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-medium">Remaining</span>
-                    <span className="font-bold text-emerald-600">
-                      {formatPKR(totalPlanned - totalActual)}
-                    </span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-medium">Variance</span>
-                    <span className={`font-bold ${totalActual < totalPlanned ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {formatPKR(totalActual - totalPlanned)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Department Expense Chart */}
-        <Card className="border-2 transition-colors hover:border-[#101a3c]">
-          <CardHeader>
-            <CardTitle>Department Budget Analysis</CardTitle>
-            <CardDescription>Planned vs Actual expenses by department</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[300px] sm:h-[330px] lg:h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={expenseData} margin={{ top: 10, right: 30, left: 0, bottom: 60 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                <XAxis
-                  dataKey="department"
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                />
-                <YAxis
-                  tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
-                  tickFormatter={(value) => `${(value / 1_000_000).toFixed(1)}M`}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    borderColor: "hsl(var(--border))",
-                    borderRadius: "8px"
-                  }}
-                  formatter={(value: number, name: string) => {
-                    // The name comes from the Bar component's name prop
-                    return [formatPKR(value), name];
-                  }}
-                />
-                <Legend />
-                <Bar dataKey="planned" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Planned" />
-                <Bar dataKey="actual" fill="#10b981" radius={[4, 4, 0, 0]} name="Actual" />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Department Drill-down */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Department Expense Breakdown</CardTitle>
-            <CardDescription>Detailed expense categorization in PKR</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {expenseData.map((item) => {
-                const utilization = (item.actual / item.planned) * 100;
-                const variance = item.actual - item.planned;
+        {!financeFileLoading && !financeFileError && activeFinanceRow && (
+          <>
+            {/* KPI Cards */}
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+              {Object.entries(kpiDataWithIcons).map(([key, kpi]) => {
+                const Icon = kpi.icon;
+                const isPositive = kpi.trend >= 0;
+                const isVariance = key === "variance";
+                const variant = getKpiVariant(key, kpi.value);
 
                 return (
-                  <div key={item.department} className="space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
-                      <span className="font-bold text-primary">{item.department}</span>
-                      <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-6 bg-muted/30 sm:bg-transparent p-2 sm:p-0 rounded-lg">
-                        <div className="text-left sm:text-right">
-                          <div className="font-mono text-[10px] text-muted-foreground">Planned: {formatPKR(item.planned)}</div>
-                          <div className="font-mono font-bold text-xs sm:text-sm">Actual: {formatPKR(item.actual)}</div>
-                        </div>
-                        <div className={`text-xs sm:text-sm font-bold whitespace-nowrap px-2 py-1 rounded ${variance < 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                          {variance < 0 ? '-' : '+'}{formatPKR(Math.abs(variance))}
+                  <Card
+                    key={key}
+                    className={cn(
+                      "relative overflow-hidden rounded-2xl border border-border/50 shadow-sm transition-all hover:shadow-lg",
+                      "border-l-4",
+                      variant.accent,
+                      variant.bg
+                    )}
+                  >
+                    <div className={cn("absolute top-0 right-0 h-28 w-28 rounded-full blur-2xl -mr-12 -mt-12", variant.blob)} />
+                    <CardHeader className="pb-2 relative">
+                      <div className="flex items-start justify-between gap-3">
+                        <CardTitle className="text-sm font-medium text-muted-foreground leading-tight">{kpi.label}</CardTitle>
+                        <div
+                          className={cn(
+                            "h-10 w-10 rounded-xl flex items-center justify-center border border-border/40 shadow-sm",
+                            variant.iconWrap
+                          )}
+                        >
+                          <Icon className={cn("h-5 w-5", variant.icon)} />
                         </div>
                       </div>
-                    </div>
-                    <div className="w-full bg-muted h-3 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all"
-                        style={{
-                          width: `${utilization}%`,
-                          backgroundColor: item.color
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>{utilization.toFixed(1)}% Utilized</span>
-                      <span>{variance < 0 ? 'Under' : 'Over'} Budget</span>
-                    </div>
-                  </div>
+                    </CardHeader>
+                    <CardContent className="relative">
+                      <div className={cn("text-2xl font-bold font-heading", isVariance ? variant.value : "text-foreground")}>
+                        {formatPKR(kpi.value)}
+                      </div>
+
+                      {!isVariance && (
+                        <div className="flex items-center gap-1 mt-2">
+                          {isPositive ? (
+                            <TrendingUp className={cn("h-3 w-3", variant.trend)} />
+                          ) : (
+                            <TrendingDown className={cn("h-3 w-3", variant.trend)} />
+                          )}
+                          <p className={cn("text-xs", variant.trend)}>
+                            {key === "ytdUtilization"
+                              ? `${kpi.trend.toFixed(1)}% of spending release (PIFRA)`
+                              : key === "totalBudget"
+                                ? `${kpi.trend.toFixed(1)}% utilized vs approved`
+                                : `${Math.abs(kpi.trend).toFixed(1)}% of approved`}
+                          </p>
+                        </div>
+                      )}
+
+                      {isVariance && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {kpi.value <= 0 ? "PIFRA ≥ spending release" : "PIFRA below spending release"}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
                 );
               })}
             </div>
-          </CardContent>
-        </Card>
+
+            {/* Financial flow + utilization */}
+            <div className="grid gap-6 lg:grid-cols-12">
+              <Card className="lg:col-span-8 border-2 transition-colors hover:border-[#101a3c]">
+                <CardHeader>
+                  <CardTitle>Scheme financial flow</CardTitle>
+                  <CardDescription>
+                    Totals (PKR millions) by stage — Approved → Allocation → P&D → Spending release → PIFRA
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="h-[320px] sm:h-[380px] lg:h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={flowChartData} margin={{ top: 10, right: 30, left: 0, bottom: isMobile ? 48 : 24 }}>
+                      <defs>
+                        <linearGradient id="colorFlowTotal" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                      <XAxis
+                        dataKey="stage"
+                        tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                        interval={0}
+                        angle={isMobile ? -35 : 0}
+                        textAnchor={isMobile ? "end" : "middle"}
+                        height={isMobile ? 70 : 40}
+                      />
+                      <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${v}M`} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          borderColor: "hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                        formatter={(value: number, name: string) => {
+                          if (name === "Total (M)") return [`PKR ${Number(value).toFixed(2)} M`, name];
+                          return [`PKR ${Number(value).toFixed(2)} M`, name];
+                        }}
+                      />
+                      <Legend />
+                      <Bar dataKey="totalM" fill="url(#colorFlowTotal)" radius={[4, 4, 0, 0]} name="Total (M)" />
+                      <Line
+                        type="monotone"
+                        dataKey="revenueM"
+                        stroke="#10b981"
+                        strokeWidth={2}
+                        name="Revenue (M)"
+                        dot={{ fill: "#10b981", r: 3 }}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card className="lg:col-span-4">
+                <CardHeader>
+                  <CardTitle>PIFRA vs approved</CardTitle>
+                  <CardDescription>Share of approved cost booked in PIFRA</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Utilized (PIFRA / approved)</span>
+                      <span className="font-bold">{utilizationRate.toFixed(1)}%</span>
+                    </div>
+                    <div className="w-full bg-muted h-3 rounded-full overflow-hidden">
+                      <div
+                        className="bg-primary h-full rounded-full transition-all"
+                        style={{ width: `${Math.min(100, utilizationRate)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>{formatPKR(totalActual)}</span>
+                      <span>{formatPKR(totalPlanned)}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium">Approved − PIFRA</span>
+                        <span className="font-bold text-emerald-600">{formatPKR(kpiDerived.remainingRupees)}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium">Spending release − PIFRA</span>
+                        <span
+                          className={cn(
+                            "font-bold",
+                            kpiDerived.varianceRupees <= 0 ? "text-emerald-600" : "text-red-600"
+                          )}
+                        >
+                          {formatPKR(kpiDerived.varianceRupees)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Division comparison */}
+            <Card className="border-2 transition-colors hover:border-[#101a3c]">
+              <CardHeader>
+                <CardTitle>Division comparison</CardTitle>
+                <CardDescription>Approved cost vs PIFRA utilization by division (PKR millions)</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[300px] sm:h-[330px] lg:h-[380px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={divisionComparisonData} margin={{ top: 10, right: 30, left: 0, bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                    <XAxis
+                      dataKey="division"
+                      angle={-40}
+                      textAnchor="end"
+                      height={90}
+                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    />
+                    <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${v}M`} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        borderColor: "hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                      formatter={(value: number, name: string) => [`PKR ${Number(value).toFixed(2)} M`, name]}
+                    />
+                    <Legend />
+                    <Bar dataKey="approvedM" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Approved (M)" />
+                    <Bar dataKey="pifraM" fill="#10b981" radius={[4, 4, 0, 0]} name="PIFRA (M)" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* Stage breakdown */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Stage breakdown (totals)</CardTitle>
+                <CardDescription>Capital / revenue / total in PKR millions; bar length vs approved cost total</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {stageBreakdownItems.map((item) => (
+                    <div key={item.label} className="space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+                        <span className="font-bold text-primary">{item.label}</span>
+                        <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-6 bg-muted/30 sm:bg-transparent p-2 sm:p-0 rounded-lg">
+                          <div className="text-left sm:text-right text-xs font-mono text-muted-foreground space-y-0.5">
+                            <div>C: {item.triple.capital.toFixed(2)} M</div>
+                            <div>R: {item.triple.revenue.toFixed(2)} M</div>
+                            <div className="font-bold text-foreground">T: {item.triple.total.toFixed(2)} M</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="w-full bg-muted h-3 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${Math.min(100, item.pctOfApproved)}%`,
+                            backgroundColor: item.color,
+                          }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>{item.pctOfApproved.toFixed(1)}% of approved total</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
     </Layout>
   );

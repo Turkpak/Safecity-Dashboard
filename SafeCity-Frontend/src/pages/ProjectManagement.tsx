@@ -268,6 +268,31 @@ export default function ProjectManagement() {
   const [areaFile, setAreaFile] = useState<File | null>(null);
   const [geoData, setGeoData] = useState<any>(null);
   const [isLoadingGeoData, setIsLoadingGeoData] = useState(false);
+  const [enableAllocation, setEnableAllocation] = useState(false);
+  const [allocationCapital, setAllocationCapital] = useState<string>("");
+  const [allocationRevenue, setAllocationRevenue] = useState<string>("");
+  const [allocationTotal, setAllocationTotal] = useState<string>("");
+
+  const [enablePdRelease, setEnablePdRelease] = useState(false);
+  const [pdReleaseCapital, setPdReleaseCapital] = useState<string>("");
+  const [pdReleaseRevenue, setPdReleaseRevenue] = useState<string>("");
+  const [pdReleaseTotal, setPdReleaseTotal] = useState<string>("");
+
+  const [enableSpendingRelease, setEnableSpendingRelease] = useState(false);
+  const [spendingReleaseCapital, setSpendingReleaseCapital] = useState<string>("");
+  const [spendingReleaseRevenue, setSpendingReleaseRevenue] = useState<string>("");
+  const [spendingReleaseTotal, setSpendingReleaseTotal] = useState<string>("");
+
+  const [enablePifraUtilization, setEnablePifraUtilization] = useState(false);
+  const [pifraCapital, setPifraCapital] = useState<string>("");
+  const [pifraRevenue, setPifraRevenue] = useState<string>("");
+  const [pifraTotal, setPifraTotal] = useState<string>("");
+  const [pifraDate, setPifraDate] = useState<string>("");
+
+  const [enableUtilPct, setEnableUtilPct] = useState(false);
+  const [utilPctCapital, setUtilPctCapital] = useState<string>("");
+  const [utilPctRevenue, setUtilPctRevenue] = useState<string>("");
+  const [utilPctTotal, setUtilPctTotal] = useState<string>("");
   /** When true, geography useEffects should not clear children (we're loading from project) */
   const skipGeographyClearRef = useRef(false);
 
@@ -405,6 +430,32 @@ export default function ProjectManagement() {
     setAreaFile(null);
     setGeoData(null);
     setCurrentStep(1);
+
+    setEnableAllocation(false);
+    setAllocationCapital("");
+    setAllocationRevenue("");
+    setAllocationTotal("");
+
+    setEnablePdRelease(false);
+    setPdReleaseCapital("");
+    setPdReleaseRevenue("");
+    setPdReleaseTotal("");
+
+    setEnableSpendingRelease(false);
+    setSpendingReleaseCapital("");
+    setSpendingReleaseRevenue("");
+    setSpendingReleaseTotal("");
+
+    setEnablePifraUtilization(false);
+    setPifraCapital("");
+    setPifraRevenue("");
+    setPifraTotal("");
+    setPifraDate("");
+
+    setEnableUtilPct(false);
+    setUtilPctCapital("");
+    setUtilPctRevenue("");
+    setUtilPctTotal("");
   };
 
   // Open dialog for editing a project — prefetch division/district/tehsil so dropdowns show selected values
@@ -474,20 +525,88 @@ export default function ProjectManagement() {
     return true;
   };
 
+  const validateStep3 = () => {
+    const requireAll = (enabled: boolean, fields: Array<{ label: string; value: string }>) => {
+      if (!enabled) return true;
+      for (const f of fields) {
+        if (!f.value.trim()) {
+          toast({
+            title: "Validation Error",
+            description: `Please enter ${f.label}.`,
+            variant: "destructive",
+          });
+          return false;
+        }
+      }
+      return true;
+    };
+
+    if (
+      !requireAll(enableAllocation, [
+        { label: "Allocation capital cost (M)", value: allocationCapital },
+        { label: "Allocation revenue cost (M)", value: allocationRevenue },
+        { label: "Allocation total cost (M)", value: allocationTotal },
+      ])
+    )
+      return false;
+
+    if (
+      !requireAll(enablePdRelease, [
+        { label: "P&D release capital cost (M)", value: pdReleaseCapital },
+        { label: "P&D release revenue cost (M)", value: pdReleaseRevenue },
+        { label: "P&D release total cost (M)", value: pdReleaseTotal },
+      ])
+    )
+      return false;
+
+    if (
+      !requireAll(enableSpendingRelease, [
+        { label: "Spending release capital cost (M)", value: spendingReleaseCapital },
+        { label: "Spending release revenue cost (M)", value: spendingReleaseRevenue },
+        { label: "Spending release total cost (M)", value: spendingReleaseTotal },
+      ])
+    )
+      return false;
+
+    if (
+      !requireAll(enablePifraUtilization, [
+        { label: "PIFRA utilization capital cost (M)", value: pifraCapital },
+        { label: "PIFRA utilization revenue cost (M)", value: pifraRevenue },
+        { label: "PIFRA utilization total cost (M)", value: pifraTotal },
+        { label: "PIFRA utilization date", value: pifraDate },
+      ])
+    )
+      return false;
+
+    if (
+      !requireAll(enableUtilPct, [
+        { label: "Capital %", value: utilPctCapital },
+        { label: "Revenue %", value: utilPctRevenue },
+        { label: "Total %", value: utilPctTotal },
+      ])
+    )
+      return false;
+
+    return true;
+  };
+
   // Handle next step
   const handleNext = () => {
     if (currentStep === 1) {
       if (validateStep1()) {
         setCurrentStep(2);
       }
+    } else if (currentStep === 2) {
+      if (validateStep2()) {
+        setCurrentStep(3);
+      }
     }
   };
 
   // Handle previous step
   const handlePrevious = () => {
-    if (currentStep === 2) {
-      setCurrentStep(1);
-    }
+    if (currentStep === 2) setCurrentStep(1);
+    if (currentStep === 3) setCurrentStep(2);
   };
 
   // Handle form submission
@@ -498,7 +617,11 @@ export default function ProjectManagement() {
       return;
     }
     if (currentStep === 2) {
-      if (!validateStep2()) return;
+      handleNext();
+      return;
+    }
+    if (currentStep === 3) {
+      if (!validateStep3()) return;
       const totalBudget = totalBudgetAllocated.trim() ? Number(totalBudgetAllocated) : 0;
       const utilized = budgetUtilized.trim() ? Number(budgetUtilized) : 0;
       const variance = totalBudget - utilized;
@@ -554,7 +677,7 @@ export default function ProjectManagement() {
   const filteredProjects = useMemo(() => {
     const query = locationSearch.trim().toLowerCase();
 
-    return projectsData.filter((project) => {
+    const filtered = projectsData.filter((project) => {
       const divisionText = (project.division_name ?? String(project.division ?? "")).toLowerCase();
       const districtText = (project.district_name ?? String(project.district ?? "")).toLowerCase();
       const tehsilText = (project.tehsil_name ?? String(project.tehsil ?? "")).toLowerCase();
@@ -565,6 +688,23 @@ export default function ProjectManagement() {
         districtText.includes(query) ||
         tehsilText.includes(query)
       );
+    });
+    
+    const asTime = (value: unknown): number => {
+      if (typeof value !== "string") return Number.NaN;
+      const t = new Date(value).getTime();
+      return Number.isFinite(t) ? t : Number.NaN;
+    };
+
+    // Show most recently created projects first.
+    // If created_at is missing/invalid, fall back to id (higher id = newer).
+    return filtered.slice().sort((a, b) => {
+      const ta = asTime((a as any).created_at);
+      const tb = asTime((b as any).created_at);
+      if (Number.isFinite(ta) && Number.isFinite(tb)) return tb - ta;
+      if (Number.isFinite(tb)) return 1;
+      if (Number.isFinite(ta)) return -1;
+      return (b.id ?? 0) - (a.id ?? 0);
     });
   }, [projectsData, locationSearch]);
 
@@ -863,7 +1003,7 @@ export default function ProjectManagement() {
                   </div>
                 </div>
               )}
-              {selectedProjectForView.geom && typeof selectedProjectForView.geom === "object" && (
+              {!!selectedProjectForView.geom && typeof selectedProjectForView.geom === "object" && (
                 <div>
                   <h4 className="text-sm font-medium mb-2">Project Area (Map)</h4>
                   <div className="rounded-md border overflow-hidden">
@@ -935,10 +1075,48 @@ export default function ProjectManagement() {
                 <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all ${
                   currentStep >= 2 ? "bg-primary text-primary-foreground border-primary" : "border-muted-foreground bg-background"
                 }`}>
-                  <span className="text-sm font-semibold">2</span>
+                  {currentStep > 2 ? <CheckCircle2 className="h-4 w-4" /> : <span className="text-sm font-semibold">2</span>}
                 </div>
                 <p className={`text-xs font-medium mt-2 ${currentStep === 2 ? "text-primary" : "text-muted-foreground"}`}>
                   Project Area
+                </p>
+              </div>
+
+              {/* Animated Progress Line */}
+              <div className="relative w-24 h-1 bg-muted rounded-full overflow-hidden mt-4">
+                {currentStep >= 3 && (
+                  <>
+                    <div className="absolute inset-0 bg-primary" />
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        background:
+                          "linear-gradient(90deg, transparent 30%, #ef4444 50%, transparent 70%)",
+                        backgroundSize: "200% 100%",
+                        animation: "shimmer 1.5s linear infinite",
+                      }}
+                    />
+                  </>
+                )}
+              </div>
+
+              {/* Step 3 */}
+              <div className="flex flex-col items-center">
+                <div
+                  className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all ${
+                    currentStep >= 3
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-muted-foreground bg-background"
+                  }`}
+                >
+                  <span className="text-sm font-semibold">3</span>
+                </div>
+                <p
+                  className={`text-xs font-medium mt-2 ${
+                    currentStep === 3 ? "text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  Add Financial Details
                 </p>
               </div>
             </div>
@@ -1470,6 +1648,135 @@ export default function ProjectManagement() {
               </div>
             )}
 
+            {/* Step 3: Add Financial Details (Frontend only) */}
+            {currentStep === 3 && (
+              <div className="space-y-6">
+                {/* Allocation */}
+                <div className="space-y-3 rounded-lg border p-4">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <Checkbox checked={enableAllocation} onCheckedChange={(v) => setEnableAllocation(Boolean(v))} />
+                    Allocation (M)
+                  </label>
+                  {enableAllocation && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label>Capital Cost (M)</Label>
+                        <Input value={allocationCapital} onChange={(e) => setAllocationCapital(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 0" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Revenue Cost (M)</Label>
+                        <Input value={allocationRevenue} onChange={(e) => setAllocationRevenue(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 643.615" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Total Cost (M)</Label>
+                        <Input value={allocationTotal} onChange={(e) => setAllocationTotal(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 643.615" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* P&D Release */}
+                <div className="space-y-3 rounded-lg border p-4">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <Checkbox checked={enablePdRelease} onCheckedChange={(v) => setEnablePdRelease(Boolean(v))} />
+                    P&amp;D Release (M)
+                  </label>
+                  {enablePdRelease && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label>Capital Cost (M)</Label>
+                        <Input value={pdReleaseCapital} onChange={(e) => setPdReleaseCapital(e.target.value)} type="number" min={0} step="any" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Revenue Cost (M)</Label>
+                        <Input value={pdReleaseRevenue} onChange={(e) => setPdReleaseRevenue(e.target.value)} type="number" min={0} step="any" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Total Cost (M)</Label>
+                        <Input value={pdReleaseTotal} onChange={(e) => setPdReleaseTotal(e.target.value)} type="number" min={0} step="any" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Spending Release */}
+                <div className="space-y-3 rounded-lg border p-4">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <Checkbox checked={enableSpendingRelease} onCheckedChange={(v) => setEnableSpendingRelease(Boolean(v))} />
+                    Spending Release (M)
+                  </label>
+                  {enableSpendingRelease && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label>Capital Cost (M)</Label>
+                        <Input value={spendingReleaseCapital} onChange={(e) => setSpendingReleaseCapital(e.target.value)} type="number" min={0} step="any" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Revenue Cost (M)</Label>
+                        <Input value={spendingReleaseRevenue} onChange={(e) => setSpendingReleaseRevenue(e.target.value)} type="number" min={0} step="any" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Total Cost (M)</Label>
+                        <Input value={spendingReleaseTotal} onChange={(e) => setSpendingReleaseTotal(e.target.value)} type="number" min={0} step="any" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* PIFRA Utilization */}
+                <div className="space-y-3 rounded-lg border p-4">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <Checkbox checked={enablePifraUtilization} onCheckedChange={(v) => setEnablePifraUtilization(Boolean(v))} />
+                    Pifra Utilization (M)
+                  </label>
+                  {enablePifraUtilization && (
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="space-y-2">
+                        <Label>Capital Cost (M)</Label>
+                        <Input value={pifraCapital} onChange={(e) => setPifraCapital(e.target.value)} type="number" min={0} step="any" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Revenue Cost (M)</Label>
+                        <Input value={pifraRevenue} onChange={(e) => setPifraRevenue(e.target.value)} type="number" min={0} step="any" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Total Cost (M)</Label>
+                        <Input value={pifraTotal} onChange={(e) => setPifraTotal(e.target.value)} type="number" min={0} step="any" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Date</Label>
+                        <Input value={pifraDate} onChange={(e) => setPifraDate(e.target.value)} type="date" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* % Utilization against Spending Release */}
+                <div className="space-y-3 rounded-lg border p-4">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <Checkbox checked={enableUtilPct} onCheckedChange={(v) => setEnableUtilPct(Boolean(v))} />
+                    %age Utilization against Spending Release
+                  </label>
+                  {enableUtilPct && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label>Capital %</Label>
+                        <Input value={utilPctCapital} onChange={(e) => setUtilPctCapital(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 0.0" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Revenue %</Label>
+                        <Input value={utilPctRevenue} onChange={(e) => setUtilPctRevenue(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 38.53" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Total Cost %</Label>
+                        <Input value={utilPctTotal} onChange={(e) => setUtilPctTotal(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 38.53" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <DialogFooter>
               <Button 
                 type="button" 
@@ -1492,6 +1799,23 @@ export default function ProjectManagement() {
                   <Button 
                     type="button" 
                     variant="outline" 
+                    onClick={handlePrevious}
+                    className="gap-2"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  <Button type="button" onClick={handleNext} className="gap-2">
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+              {currentStep === 3 && (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={handlePrevious}
                     className="gap-2"
                   >

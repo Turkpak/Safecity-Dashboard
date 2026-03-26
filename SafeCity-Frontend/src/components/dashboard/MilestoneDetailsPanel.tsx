@@ -1354,7 +1354,9 @@ function GanttMini({
   // Calculate grid columns: WBS column + month columns + Actions column
   const labelColWidth = isMobile ? '140px' : isTablet ? '180px' : '240px';
   const actionsColWidth = '48px';
-  const gridCols = `${labelColWidth} repeat(${n}, 1fr) ${actionsColWidth}`;
+  const monthColWidth = isMobile ? '44px' : '1fr';
+  const gridCols = `${labelColWidth} repeat(${n}, ${monthColWidth}) ${actionsColWidth}`;
+  const mobileMinChartWidth = isMobile ? `${140 + n * 44 + 48}px` : undefined;
 
   return (
     <div className="space-y-4">
@@ -1431,9 +1433,10 @@ function GanttMini({
       {/* Legend removed (delay logs feature removed) */}
 
       {/* Gantt Chart Container with full border */}
-      <div className="border-2 border-border rounded-lg overflow-hidden bg-background">
+      <div className="border-2 border-border rounded-lg bg-background overflow-x-auto">
+        <div style={mobileMinChartWidth ? { minWidth: mobileMinChartWidth } : undefined}>
         {/* Header row with month labels */}
-        <div className={`grid border-b-2 border-border bg-muted/30 ${isMobile ? 'overflow-x-auto min-w-full' : ''}`} style={{ gridTemplateColumns: gridCols }}>
+        <div className="grid border-b-2 border-border bg-muted/30" style={{ gridTemplateColumns: gridCols }}>
           <div className={`${isMobile ? 'p-1.5 text-[10px]' : 'p-2 text-xs'} font-bold text-muted-foreground border-r-2 border-border bg-muted/40`}>WBS Subprocess</div>
           {months.map((m, idx) => {
             const { label, dateRange } = getMonthHeaderLabel(m, GANTT_CHART_YEAR);
@@ -1453,7 +1456,7 @@ function GanttMini({
         </div>
 
         {/* Task rows */}
-        <div className={`space-y-1 ${isMobile ? 'overflow-x-auto min-w-full' : ''}`}>
+        <div className="space-y-1">
           {tasks.map((t) => {
             const isExpanded = expanded[t.id] ?? true;
             const hasChildren = (t.children?.length ?? 0) > 0;
@@ -1466,7 +1469,7 @@ function GanttMini({
             return (
               <div key={t.id} className="space-y-1">
                 {/* Parent task row */}
-                <div className={`grid border-l-2 border-r-2 border-b-2 border-border relative ${isMobile ? 'min-w-full' : 'overflow-hidden'} bg-background`} style={{ gridTemplateColumns: gridCols }}>
+                <div className="grid border-l-2 border-r-2 border-b-2 border-border relative bg-background overflow-hidden" style={{ gridTemplateColumns: gridCols }}>
                   {/* Left label column */}
                   <div className="p-2 border-r-2 border-border flex items-center gap-2 min-w-0 relative z-5 bg-muted/20" onClick={(e) => e.stopPropagation()}>
                     {hasChildren && (
@@ -1739,7 +1742,7 @@ function GanttMini({
                       return (
                         <div
                           key={c.id}
-                          className={`grid border-l-2 border-r-2 border-b-2 border-border relative ${isMobile ? 'min-w-full' : 'overflow-hidden'} bg-background`}
+                          className="grid border-l-2 border-r-2 border-b-2 border-border relative bg-background overflow-hidden"
                           style={{ gridTemplateColumns: gridCols }}
                         >
                           {/* Left label column */}
@@ -2020,6 +2023,7 @@ function GanttMini({
               </div>
             );
           })}
+        </div>
         </div>
       </div>
     </div>
@@ -2329,11 +2333,11 @@ export function MilestoneDetailsPanel({
           </>
         ) : (
           <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
-            <TabsList className={`w-full ${isMobile ? 'grid grid-cols-2 sm:grid-cols-4' : 'flex flex-wrap justify-start gap-1'}`}>
-              <TabsTrigger value="gantt" className={isMobile ? 'text-xs' : ''}>Gantt</TabsTrigger>
-              <TabsTrigger value="wbs" className={isMobile ? 'text-xs' : ''}>WBS Breakdown</TabsTrigger>
-              <TabsTrigger value="scurves" className={isMobile ? 'text-xs' : ''}>S-Curves</TabsTrigger>
-              <TabsTrigger value="photos" className={isMobile ? 'text-xs' : ''}>Photos & Docs</TabsTrigger>
+            <TabsList className={`w-full ${isMobile ? 'flex items-center gap-1 overflow-x-auto whitespace-nowrap p-1' : 'flex flex-wrap justify-start gap-1'}`}>
+              <TabsTrigger value="gantt" className={isMobile ? 'text-xs shrink-0 px-3' : ''}>Gantt</TabsTrigger>
+              <TabsTrigger value="wbs" className={isMobile ? 'text-xs shrink-0 px-3' : ''}>WBS Breakdown</TabsTrigger>
+              <TabsTrigger value="scurves" className={isMobile ? 'text-xs shrink-0 px-3' : ''}>S-Curves</TabsTrigger>
+              <TabsTrigger value="photos" className={isMobile ? 'text-xs shrink-0 px-3' : ''}>Photos & Docs</TabsTrigger>
             </TabsList>
 
             <TabsContent value="gantt" className="mt-4">

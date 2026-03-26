@@ -7,6 +7,7 @@ import { PlannedVsActualChart } from "@/components/dashboard/PlannedVsActualChar
 import { HierarchyCard } from "@/components/dashboard/HierarchyCard";
 import { SubProject } from "@/components/dashboard/SubProjectCard";
 import { MilestoneDetailsPanel } from "@/components/dashboard/MilestoneDetailsPanel";
+import { ProjectGanttTree } from "@/components/dashboard/ProjectGanttTree";
 import { exportDashboardToPPTX } from "@/utils/exportToPPTX";
 import {
   PieChart,
@@ -58,6 +59,14 @@ import { CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { listProjects, getProjectById } from "@/api/project";
 
 // Enhanced installation progress data with sub-projects and planned vs actual
@@ -137,7 +146,15 @@ function diffDaysInclusive(start: string | null | undefined, end: string | null 
   return Math.max(1, days);
 }
 
-function buildPhaseFromProjectGantt(tasks: ProjectGanttTask[]): { actual: number; planned: number; subProjects: SubProject[]; timeline: { month: string; actual: number; planned: number }[] } {
+function buildPhaseFromProjectGantt(
+  tasks: ProjectGanttTask[],
+  options?: { subtreeRootName?: string | null },
+): {
+  actual: number;
+  planned: number;
+  subProjects: SubProject[];
+  timeline: { month: string; actual: number; planned: number }[];
+} {
   const planned = 100;
   if (!tasks || tasks.length === 0) {
     return { actual: 0, planned, subProjects: [], timeline: [] };
@@ -150,7 +167,7 @@ function buildPhaseFromProjectGantt(tasks: ProjectGanttTask[]): { actual: number
     plannedProgress: number;
     start: string;
     end: string;
-    parentId: string;
+    parentId?: string;
   };
 
   // 1) Filter out null-date rows (exclude from chart entirely)
@@ -159,7 +176,6 @@ function buildPhaseFromProjectGantt(tasks: ProjectGanttTask[]): { actual: number
     const t = tasks[i];
     if (!t) continue;
     if (!t.start || !t.end) continue;
-    if (!t.parent) continue; // must have a parent_id to group; no-parent rows aren't shown in chart
     datedRows.push({
       id: String(t.id),
       name: t.label,
@@ -167,7 +183,7 @@ function buildPhaseFromProjectGantt(tasks: ProjectGanttTask[]): { actual: number
       plannedProgress: planned,
       start: t.start,
       end: t.end,
-      parentId: String(t.parent),
+      parentId: t.parent ? String(t.parent) : undefined,
     });
   }
 
@@ -181,10 +197,90 @@ function buildPhaseFromProjectGantt(tasks: ProjectGanttTask[]): { actual: number
     datedById.set(datedRows[i].id, datedRows[i]);
   }
 
+  // Optional: limit the whole phase to a single tehsil subtree based on tehsil name.
+  // This prevents the WBS pie + S-curves from including other geographies inside the same XER.
+  const applySubtreeFilter = (subtreeRootName?: string | null): string | null => {
+    if (!subtreeRootName) return null;
+    const needle = subtreeRootName.trim().toLowerCase();
+    if (!needle) return null;
+
+    // Build children map across all dated rows.
+    const childrenByParent = new Map<string | undefined, Row[]>();
+    for (const r of datedRows) {
+      const pid = r.parentId ? String(r.parentId) : undefined;
+      const list = childrenByParent.get(pid) ?? [];
+      list.push(r);
+      childrenByParent.set(pid, list);
+    }
+
+    // Candidate roots: rows whose name matches the selected tehsil name.
+    const candidates = datedRows.filter((r) => r.name.trim().toLowerCase() === needle || r.name.toLowerCase().includes(needle));
+    if (candidates.length === 0) return null;
+
+    // Pick the candidate whose subtree contains the most nodes (most likely the correct tehsil node).
+    const subtreeSize = (rootId: string) => {
+      const seen = new Set<string>();
+      const queue: string[] = [rootId];
+      while (queue.length) {
+        const cur = queue.shift()!;
+        if (seen.has(cur)) continue;
+        seen.add(cur);
+        const kids = childrenByParent.get(cur) ?? [];
+        for (const k of kids) queue.push(k.id);
+      }
+      return seen.size;
+    };
+
+    let bestRoot: string | null = null;
+    let bestSize = -1;
+    for (const c of candidates) {
+      const size = subtreeSize(c.id);
+      if (size > bestSize) {
+        bestSize = size;
+        bestRoot = c.id;
+      }
+    }
+
+    if (!bestRoot) return null;
+
+    // Compute all descendants ids.
+    const allowed = new Set<string>();
+    const stack: string[] = [bestRoot];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      if (allowed.has(cur)) continue;
+      allowed.add(cur);
+      const kids = childrenByParent.get(cur) ?? [];
+      for (const k of kids) stack.push(k.id);
+    }
+
+    // Mutate datedRows in place by filtering to allowed subtree.
+    for (let i = datedRows.length - 1; i >= 0; i--) {
+      if (!allowed.has(datedRows[i].id)) {
+        datedRows.splice(i, 1);
+      }
+    }
+
+    // Rebuild lookup map after filtering.
+    datedById.clear();
+    for (let i = 0; i < datedRows.length; i++) {
+      datedById.set(datedRows[i].id, datedRows[i]);
+    }
+
+    return bestRoot;
+  };
+
+  const filteredRootId = applySubtreeFilter(options?.subtreeRootName);
+  if (datedRows.length === 0) {
+    return { actual: 0, planned, subProjects: [], timeline: [] };
+  }
+
   // 2) Group by parent_id
   const groupMap = new Map<string, Row[]>();
   for (let i = 0; i < datedRows.length; i++) {
     const r = datedRows[i];
+    // Only child rows (with parentId) participate in grouping.
+    if (!r.parentId) continue;
     const list = groupMap.get(r.parentId);
     if (list) list.push(r);
     else groupMap.set(r.parentId, [r]);
@@ -193,18 +289,34 @@ function buildPhaseFromProjectGantt(tasks: ProjectGanttTask[]): { actual: number
   type Group = { header: Row; children: Row[] };
   const groups: Group[] = [];
 
+  // When in tehsil scope, only show tehsil-level nodes (depth 1 under the subtree root).
+  // For non-tehsil usage, keep existing behaviour.
+  const depthById = new Map<string, number>();
+  if (filteredRootId) {
+    depthById.set(filteredRootId, 0);
+    const stack: string[] = [filteredRootId];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      const kids = groupMap.get(cur) ?? [];
+      for (const k of kids) {
+        if (!depthById.has(k.id)) {
+          depthById.set(k.id, (depthById.get(cur) ?? 0) + 1);
+          stack.push(k.id);
+        }
+      }
+    }
+  }
+
   for (const [parentId, rows] of Array.from(groupMap.entries())) {
-    // Prefer using the “real parent” row when it exists as a dated activity with id=parentId.
     const realParent = datedById.get(parentId);
-    if (realParent) {
-      const children = rows.filter((r) => r.id !== realParent.id);
-      groups.push({ header: realParent, children });
-      continue;
+    const header = realParent ?? rows[0];
+    const children = realParent ? rows.filter((r) => r.id !== realParent.id) : rows.slice(1);
+
+    if (filteredRootId) {
+      const depth = depthById.get(header.id);
+      if (depth !== 1) continue; // tehsil-level only
     }
 
-    // Otherwise: pick first dated row in API order as header; remaining are children.
-    const header = rows[0];
-    const children = rows.slice(1);
     groups.push({ header, children });
   }
 
@@ -217,8 +329,6 @@ function buildPhaseFromProjectGantt(tasks: ProjectGanttTask[]): { actual: number
   }
   groups.sort((a, b) => (apiIndex.get(a.header.id) ?? 0) - (apiIndex.get(b.header.id) ?? 0));
 
-  const rootWeight = groups.length > 0 ? 1 / groups.length : 0;
-
   const subProjects: SubProject[] = groups.map((g) => {
     const milestones = g.children.map((c) => ({
       id: c.id,
@@ -229,11 +339,6 @@ function buildPhaseFromProjectGantt(tasks: ProjectGanttTask[]): { actual: number
       progress: c.progress,
       plannedProgress: c.plannedProgress,
     }));
-
-    const parentProgress =
-      milestones.length > 0
-        ? clamp01(milestones.reduce((sum, m: any) => sum + (Number(m.progress) || 0), 0) / milestones.length)
-        : g.header.progress;
 
     const dates: Date[] = [];
     const hs = safeParseDate(g.header.start);
@@ -252,14 +357,29 @@ function buildPhaseFromProjectGantt(tasks: ProjectGanttTask[]): { actual: number
     return {
       id: g.header.id,
       name: g.header.name,
-      actualProgress: parentProgress,
+      actualProgress: clamp01(Number(g.header.progress ?? 0)),
       plannedProgress: planned,
-      weight: rootWeight,
+      // Weight is derived from total duration of direct children (data-driven, not hardcoded).
+      weight: Math.max(
+        0,
+        milestones.reduce((sum, m) => sum + (Number(m.duration) || 0), 0),
+      ),
       startDate,
       finishDate,
       milestones: milestones as any,
     };
   });
+
+  // Normalize weight to 0..1 for the pie chart.
+  const weightSum = subProjects.reduce((sum, sp) => sum + (Number(sp.weight) || 0), 0);
+  if (weightSum > 0) {
+    for (const sp of subProjects) {
+      sp.weight = (sp.weight || 0) / weightSum;
+    }
+  } else if (subProjects.length > 0) {
+    const w = 1 / subProjects.length;
+    for (const sp of subProjects) sp.weight = w;
+  }
 
   const overallActual = clamp01(
     subProjects.reduce((sum, sp) => sum + sp.actualProgress * sp.weight, 0) /
@@ -544,8 +664,11 @@ export default function Dashboard() {
   const [selectedProjectForDetails, setSelectedProjectForDetails] = useState<Project | null>(null);
   const [selectedProjectGanttTasks, setSelectedProjectGanttTasks] = useState<ProjectGanttTask[]>([]);
   const selectedProjectPhase = useMemo(
-    () => buildPhaseFromProjectGantt(selectedProjectGanttTasks),
-    [selectedProjectGanttTasks],
+    () =>
+      buildPhaseFromProjectGantt(selectedProjectGanttTasks, {
+        subtreeRootName: selectedItemType === "tehsil" ? selectedItemName : null,
+      }),
+    [selectedProjectGanttTasks, selectedItemType, selectedItemName],
   );
 
   const { theme, toggleTheme } = useTheme();
@@ -741,10 +864,12 @@ export default function Dashboard() {
     }
   }, [selectedItemType, viewType]);
 
-  // When drilled into a specific geography, collapse filter choices into icon-only state.
+  // Keep filter controls open at top-level, collapse while drilled in.
   useEffect(() => {
     if (selectedItemType) {
       setShowFilters(false);
+    } else {
+      setShowFilters(true);
     }
   }, [selectedItemType]);
 
@@ -1355,6 +1480,9 @@ export default function Dashboard() {
                 phaseColor="#3b82f6"
                 onClear={() => setSelectedProjectForDetails(null)}
               />
+              <div className="mt-4">
+                <ProjectGanttTree tasks={selectedProjectGanttTasks as any} />
+              </div>
             </div>
           )}
         </div>
@@ -1860,8 +1988,8 @@ export default function Dashboard() {
                 : "pb-2 px-3 sm:px-4 pt-2 sm:pt-3"
             }`}
           >
-            <div className="flex items-center justify-between gap-2 sm:gap-4 flex-wrap">
-              <div className="flex items-center gap-2 sm:gap-4 flex-wrap flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2 sm:gap-4">
+              <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0 overflow-hidden">
                 {/* Filters Label / Toggle */}
                 <div
                   className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
@@ -1883,7 +2011,7 @@ export default function Dashboard() {
                       animate={{ width: "auto", opacity: 1, x: 0 }}
                       exit={{ width: 0, opacity: 0, x: -20 }}
                       transition={{ duration: 0.4, ease: "circOut" }}
-                      className="overflow-hidden flex items-center min-w-0"
+                      className="overflow-x-auto overflow-y-hidden flex items-center min-w-0 w-full pb-1"
                     >
                       <RadioGroup
                         value={viewType}
@@ -1910,9 +2038,9 @@ export default function Dashboard() {
                           }
                           setTehsilSearchQuery("");
                         }}
-                        className="flex items-center gap-2 sm:gap-4 md:gap-6 whitespace-nowrap pl-1 sm:pl-2 flex-wrap"
+                        className="flex items-center gap-2 sm:gap-4 md:gap-6 whitespace-nowrap pl-1 sm:pl-2"
                       >
-                        <div className="flex items-center space-x-1.5 sm:space-x-2">
+                        <div className="flex items-center space-x-1.5 sm:space-x-2 rounded-md bg-background/40 px-2 py-1">
                           <RadioGroupItem
                             value="divisions"
                             id="divisions"
@@ -1928,7 +2056,7 @@ export default function Dashboard() {
                             <span className="sm:hidden">Divisions</span>
                           </Label>
                         </div>
-                        <div className="flex items-center space-x-1.5 sm:space-x-2">
+                        <div className="flex items-center space-x-1.5 sm:space-x-2 rounded-md bg-background/40 px-2 py-1">
                           <RadioGroupItem
                             value="districts"
                             id="districts"
@@ -1944,7 +2072,7 @@ export default function Dashboard() {
                             <span className="sm:hidden">Districts</span>
                           </Label>
                         </div>
-                        <div className="flex items-center space-x-1.5 sm:space-x-2">
+                        <div className="flex items-center space-x-1.5 sm:space-x-2 rounded-md bg-background/40 px-2 py-1">
                           <RadioGroupItem
                             value="tehsils"
                             id="tehsils"
@@ -1960,7 +2088,7 @@ export default function Dashboard() {
                             <span className="sm:hidden">Tehsils</span>
                           </Label>
                         </div>
-                        <div className="flex items-center space-x-1.5 sm:space-x-2">
+                        <div className="flex items-center space-x-1.5 sm:space-x-2 rounded-md bg-background/40 px-2 py-1">
                           <RadioGroupItem
                             value="projects"
                             id="projects"
@@ -2208,10 +2336,9 @@ export default function Dashboard() {
                       }
                     }}
                   >
-                    <FileDown className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">
-                      Export Operation pptx
-                    </span>
+                    <FileDown className="h-4 w-4 mr-2" />
+                    <span className="sm:hidden">Export</span>
+                    <span className="hidden sm:inline">Export Operation pptx</span>
                   </Button>
                 )}
             </div>
@@ -2250,13 +2377,39 @@ export default function Dashboard() {
 
               return (
                 <div className="space-y-6">
-                  <div>
-                    <h2 className="text-lg sm:text-2xl font-bold font-heading">
-                      Districts in {selectedItemName} Division
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedItemName} Division
-                    </p>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg sm:text-2xl font-bold font-heading">
+                        Districts in {selectedItemName} Division
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedItemName} Division
+                      </p>
+                    </div>
+
+                    <Breadcrumb className="shrink-0">
+                      <BreadcrumbList className="justify-end">
+                        <BreadcrumbItem>
+                          <BreadcrumbLink asChild>
+                            <button
+                              type="button"
+                              onClick={() => handleNavigateToLevel("all")}
+                              className="hover:underline"
+                            >
+                              Divisions
+                            </button>
+                          </BreadcrumbLink>
+                        </BreadcrumbItem>
+                        <BreadcrumbSeparator>
+                          <span className="text-muted-foreground/70 font-mono">
+                            {"<>"}
+                          </span>
+                        </BreadcrumbSeparator>
+                        <BreadcrumbItem>
+                          <BreadcrumbPage>{selectedItemName} Division</BreadcrumbPage>
+                        </BreadcrumbItem>
+                      </BreadcrumbList>
+                    </Breadcrumb>
                   </div>
 
                   {/* District Cards */}
@@ -2345,14 +2498,57 @@ export default function Dashboard() {
 
               return (
                 <div className="space-y-6">
-                  <div>
-                    <h2 className="text-lg sm:text-2xl font-bold font-heading">
-                      Tehsils in {selectedItemName} District (
-                      {parentDivisionName} Division)
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedItemName} District
-                    </p>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg sm:text-2xl font-bold font-heading">
+                        Tehsils in {selectedItemName} District ({parentDivisionName}{" "}
+                        Division)
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedItemName} District
+                      </p>
+                    </div>
+
+                    <Breadcrumb className="shrink-0">
+                      <BreadcrumbList className="justify-end">
+                        <BreadcrumbItem>
+                          <BreadcrumbLink asChild>
+                            <button
+                              type="button"
+                              onClick={() => handleNavigateToLevel("all")}
+                              className="hover:underline"
+                            >
+                              Divisions
+                            </button>
+                          </BreadcrumbLink>
+                        </BreadcrumbItem>
+                        <BreadcrumbSeparator>
+                          <span className="text-muted-foreground/70 font-mono">
+                            {"<>"}
+                          </span>
+                        </BreadcrumbSeparator>
+                        <BreadcrumbItem>
+                          <BreadcrumbLink asChild>
+                            <button
+                              type="button"
+                              onClick={() => handleNavigateToLevel("division")}
+                              className="hover:underline"
+                              disabled={!parentDivisionName}
+                            >
+                              {parentDivisionName} Division
+                            </button>
+                          </BreadcrumbLink>
+                        </BreadcrumbItem>
+                        <BreadcrumbSeparator>
+                          <span className="text-muted-foreground/70 font-mono">
+                            {"<>"}
+                          </span>
+                        </BreadcrumbSeparator>
+                        <BreadcrumbItem>
+                          <BreadcrumbPage>{selectedItemName} District</BreadcrumbPage>
+                        </BreadcrumbItem>
+                      </BreadcrumbList>
+                    </Breadcrumb>
                   </div>
 
                   {/* Tehsil Cards */}
@@ -2422,13 +2618,79 @@ export default function Dashboard() {
 
               return (
                 <div className="space-y-6">
-                  <div>
-                    <h2 className="text-lg sm:text-2xl font-bold font-heading">
-                      Ongoing projects in {selectedItemName} Tehsil
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedItemName} Tehsil
-                    </p>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg sm:text-2xl font-bold font-heading">
+                        Ongoing projects in {selectedItemName} Tehsil
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedItemName} Tehsil
+                      </p>
+                    </div>
+
+                    <Breadcrumb className="shrink-0">
+                      <BreadcrumbList className="justify-end">
+                        <BreadcrumbItem>
+                          <BreadcrumbLink asChild>
+                            <button
+                              type="button"
+                              onClick={() => handleNavigateToLevel("all")}
+                              className="hover:underline"
+                            >
+                              Divisions
+                            </button>
+                          </BreadcrumbLink>
+                        </BreadcrumbItem>
+                        {parentDivisionName && (
+                          <>
+                            <BreadcrumbSeparator>
+                              <span className="text-muted-foreground/70 font-mono">
+                                {"<>"}
+                              </span>
+                            </BreadcrumbSeparator>
+                            <BreadcrumbItem>
+                              <BreadcrumbLink asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => handleNavigateToLevel("division")}
+                                  className="hover:underline"
+                                >
+                                  {parentDivisionName} Division
+                                </button>
+                              </BreadcrumbLink>
+                            </BreadcrumbItem>
+                          </>
+                        )}
+                        {parentDistrictName && (
+                          <>
+                            <BreadcrumbSeparator>
+                              <span className="text-muted-foreground/70 font-mono">
+                                {"<>"}
+                              </span>
+                            </BreadcrumbSeparator>
+                            <BreadcrumbItem>
+                              <BreadcrumbLink asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => handleNavigateToLevel("district")}
+                                  className="hover:underline"
+                                >
+                                  {parentDistrictName} District
+                                </button>
+                              </BreadcrumbLink>
+                            </BreadcrumbItem>
+                          </>
+                        )}
+                        <BreadcrumbSeparator>
+                          <span className="text-muted-foreground/70 font-mono">
+                            {"<>"}
+                          </span>
+                        </BreadcrumbSeparator>
+                        <BreadcrumbItem>
+                          <BreadcrumbPage>{selectedItemName} Tehsil</BreadcrumbPage>
+                        </BreadcrumbItem>
+                      </BreadcrumbList>
+                    </Breadcrumb>
                   </div>
 
                   {/* Project Cards from API */}
