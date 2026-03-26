@@ -14,6 +14,8 @@ type FlatGanttRow = {
   end: string | null;
   progress: number; // 0..100
   parent?: string;
+  /** Optional stable ordering index (insertion order from API flattening). */
+  order?: number;
 };
 
 function clamp(n: number, min: number, max: number) {
@@ -62,16 +64,13 @@ export function ProjectGanttTree({ tasks }: { tasks: FlatGanttRow[] }) {
       list.push(t);
       childrenByParent.set(pid, list);
     }
-    // Stable sort within siblings by start date then label
-    for (const entry of Array.from(childrenByParent.entries())) {
-      const k = entry[0];
-      const list = entry[1];
-      list.sort((a: FlatGanttRow, b: FlatGanttRow) => {
-        const as = a.start ?? "";
-        const bs = b.start ?? "";
-        if (as !== bs) return as.localeCompare(bs);
-        return (a.label ?? "").localeCompare(b.label ?? "");
-      });
+    // IMPORTANT: preserve API/XER ordering exactly.
+    // If an explicit `order` is provided, use it; otherwise keep insertion order.
+    for (const [k, list] of Array.from(childrenByParent.entries())) {
+      const hasOrder = list.some((x) => typeof x.order === "number" && Number.isFinite(x.order as number));
+      if (hasOrder) {
+        list.sort((a, b) => (Number(a.order ?? 0) - Number(b.order ?? 0)));
+      }
       childrenByParent.set(k, list);
     }
     const roots = childrenByParent.get(undefined) ?? [];

@@ -262,9 +262,9 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         # Assign ManyToMany
         project.stakeholder.set(stakeholders)
 
-        # Assign XER file
-        if 'xer_file' in self.initial_data:
-            project.xer_file = self.initial_data.get('xer_file')
+        # Assign XER file (and parse activities immediately)
+        if xer_file:
+            project.xer_file = xer_file
 
         # Handle GeoJSON
 
@@ -290,6 +290,16 @@ class ProjectSerializer(GeoFeatureModelSerializer):
                 })
 
         project.save()
+
+        # If an XER was provided, populate ProjectActivity rows so gantt endpoints work immediately.
+        # IMPORTANT: do NOT delete or overwrite existing activities (risk control).
+        # Guard against double-parsing (e.g., retries) by only parsing when empty.
+        if xer_file and not project.activities.exists():
+            try:
+                self._save_activities(project, xer_file)
+            except Exception:
+                # Keep project creation successful even if parsing fails; gantt will be empty until fixed.
+                pass
         return project
 
     # ---------- Update ----------
@@ -307,9 +317,13 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         if xer_file:
             instance.xer_file = xer_file
             instance.save()
-            # Delete old activities and parse new ones
-            instance.activities.all().delete()
-            self._save_activities(instance)
+            # IMPORTANT: do NOT delete or overwrite existing activities (risk control).
+            # Safe default: only parse if there are no activities yet.
+            if not instance.activities.exists():
+                try:
+                    self._save_activities(instance, xer_file)
+                except Exception:
+                    pass
 
         # Handle GeoJSON
         if boundary_file:

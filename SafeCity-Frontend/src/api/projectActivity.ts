@@ -49,6 +49,8 @@ export interface GanttTask {
   end: string | null;
   progress: number;
   parent?: string;
+  /** Stable ordering index to preserve API/XER sibling order. */
+  order?: number;
 }
 
 export interface GanttResponse {
@@ -93,6 +95,7 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
   };
 
   const out: GanttTask[] = [];
+  let orderCounter = 0;
   const flattenNested = (node: any, parent?: string) => {
     const id = String(node?._id ?? node?.id ?? "");
     if (!id) return;
@@ -105,6 +108,7 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
       end: range.end,
       progress: 0,
       parent,
+      order: orderCounter++,
     });
     const children: any[] = Array.isArray(node?.subtasks) ? node.subtasks : [];
     for (const c of children) flattenNested(c, id);
@@ -119,7 +123,7 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
   // Fallback: if backend returned old flat schema for some reason.
   const legacy = await get<any>(`project-gantt/${projectId}/`);
   const tasksArray = legacy?.tasks || [];
-  return tasksArray.map((act: any) => ({
+  return tasksArray.map((act: any, idx: number) => ({
     id: String(act.id),
     activity_id: act.activity_id,
     label: act.activity_name || `#${act.activity_id}`,
@@ -127,5 +131,6 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
     end: act.end_date || act.start_date || null,
     progress: act.progress ?? 0,
     parent: act.parent_id ? String(act.parent_id) : undefined,
+    order: idx,
   }));
 }
