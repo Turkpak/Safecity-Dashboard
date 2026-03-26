@@ -58,15 +58,67 @@ export interface GanttResponse {
 export async function getProjectGanttData(projectId: number): Promise<GanttTask[]> {
   if (!projectId) return [];
 
-  const data = await get<any>(`project-gantt/${projectId}/`);
-  console.log("Response from API:", data);
+  // New API (nested): /api/project-gantt-nested/:id/
+  // Old API (flat):   /api/project-gantt/:id/
+  // We prefer the new nested endpoint, but keep a safe fallback.
+  const data = await get<any>(`project-gantt-nested/${projectId}/`);
 
-  // ❌ WRONG
-  // const tasksArray = Array.isArray(data) ? data : data?.data || [];
+  const asDate = (v: any): string | null => {
+    if (!v) return null;
+    const s = String(v).trim();
+    if (!s) return null;
+    const t = new Date(s).getTime();
+    return Number.isFinite(t) ? s : null;
+  };
 
-  // ✅ CORRECT
-  const tasksArray = data?.tasks || [];
+  const rollupRange = (node: any): { start: string | null; end: string | null } => {
+    const ownStart = asDate(node?.start_date);
+    const ownEnd = asDate(node?.end_date) ?? ownStart;
+    const children: any[] = Array.isArray(node?.subtasks) ? node.subtasks : [];
+    if (children.length === 0) return { start: ownStart, end: ownEnd };
 
+    let minStart: number | null = ownStart ? new Date(ownStart).getTime() : null;
+    let maxEnd: number | null = ownEnd ? new Date(ownEnd).getTime() : null;
+    for (const c of children) {
+      const r = rollupRange(c);
+      const cs = r.start ? new Date(r.start).getTime() : null;
+      const ce = r.end ? new Date(r.end).getTime() : null;
+      if (cs != null) minStart = minStart == null ? cs : Math.min(minStart, cs);
+      if (ce != null) maxEnd = maxEnd == null ? ce : Math.max(maxEnd, ce);
+    }
+    return {
+      start: minStart != null ? new Date(minStart).toISOString().slice(0, 10) : null,
+      end: maxEnd != null ? new Date(maxEnd).toISOString().slice(0, 10) : null,
+    };
+  };
+
+  const out: GanttTask[] = [];
+  const flattenNested = (node: any, parent?: string) => {
+    const id = String(node?._id ?? node?.id ?? "");
+    if (!id) return;
+    const range = rollupRange(node);
+    out.push({
+      id,
+      activity_id: undefined,
+      label: String(node?.name ?? node?.activity_name ?? `#${id}`),
+      start: range.start,
+      end: range.end,
+      progress: 0,
+      parent,
+    });
+    const children: any[] = Array.isArray(node?.subtasks) ? node.subtasks : [];
+    for (const c of children) flattenNested(c, id);
+  };
+
+  const schedules: any[] = Array.isArray(data?.schedules) ? data.schedules : [];
+  if (schedules.length > 0 && Array.isArray(schedules[0]?.tasks)) {
+    for (const t of schedules[0].tasks) flattenNested(t, undefined);
+    return out;
+  }
+
+  // Fallback: if backend returned old flat schema for some reason.
+  const legacy = await get<any>(`project-gantt/${projectId}/`);
+  const tasksArray = legacy?.tasks || [];
   return tasksArray.map((act: any) => ({
     id: String(act.id),
     activity_id: act.activity_id,

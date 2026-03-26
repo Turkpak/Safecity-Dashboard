@@ -1,4 +1,11 @@
 import React, { useMemo, useState } from "react";
+import { MoreVertical, Plus, Upload, FileText } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type FlatGanttRow = {
   id: string;
@@ -130,12 +137,17 @@ export function ProjectGanttTree({ tasks }: { tasks: FlatGanttRow[] }) {
     return <div className="py-6 text-center text-muted-foreground">No schedule tasks found for this project.</div>;
   }
 
+  // Frontend-only derived weight: share of overall schedule duration (rough, but gives the UI a meaningful number).
+  const overallMs = Math.max(1, dateRange.end.getTime() - dateRange.start.getTime());
+
   return (
     <div className="overflow-x-auto">
       <div className="min-w-[1200px]">
         {/* Header */}
-        <div className="flex border-b mb-4">
-          <div className="w-80 font-semibold text-sm">Activity</div>
+        <div className="flex border-b mb-3">
+          <div className="w-80 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2">
+            WBS Subprocess
+          </div>
           <div className="flex-1 grid grid-flow-col auto-cols-[120px] text-xs text-center">
             {monthsArray.map((d, i) => (
               <div key={i} className="border-l py-2 font-medium">
@@ -143,6 +155,9 @@ export function ProjectGanttTree({ tasks }: { tasks: FlatGanttRow[] }) {
                 <div className="text-[10px] text-muted-foreground">{d.getFullYear()}</div>
               </div>
             ))}
+          </div>
+          <div className="w-20 font-semibold text-sm bg-muted/40 border-l border-border/60 px-3 py-2 text-center">
+            Options
           </div>
         </div>
 
@@ -152,12 +167,24 @@ export function ProjectGanttTree({ tasks }: { tasks: FlatGanttRow[] }) {
             const left = getTaskLeftPct(t.start);
             const width = getTaskWidthPct(t.start, t.end);
             const actualWidth = width * (clamp(t.progress ?? 0, 0, 100) / 100);
+            const s = parseDate(t.start);
+            const e = parseDate(t.end);
+            const w =
+              s && e
+                ? Math.max(0, Math.min(100, ((e.getTime() - s.getTime()) / overallMs) * 100))
+                : 0;
+            const depthFont =
+              t.depth === 0
+                ? "text-sm font-bold"
+                : t.depth === 1
+                  ? "text-xs font-semibold"
+                  : "text-xs font-medium";
 
             return (
-              <div key={t.id} className="flex items-center gap-2">
+              <div key={t.id} className="flex items-stretch gap-0 rounded-lg border border-border/60 bg-card/50">
                 <div
-                  className="w-80 text-xs font-medium truncate flex items-center gap-2"
-                  style={{ paddingLeft: `${t.depth * 14}px` }}
+                  className="w-80 min-w-[20rem] border-r border-border/60 px-3 py-2 truncate flex items-center gap-2"
+                  style={{ paddingLeft: `${12 + t.depth * 18}px` }}
                   title={t.label}
                 >
                   {t.hasChildren ? (
@@ -178,23 +205,62 @@ export function ProjectGanttTree({ tasks }: { tasks: FlatGanttRow[] }) {
                   ) : (
                     <span className="inline-block w-5" />
                   )}
-                  <span className="truncate">{t.label}</span>
-                  <span className="text-[10px] text-muted-foreground flex-shrink-0">{Math.round(t.progress ?? 0)}%</span>
+                  <div className="min-w-0 flex-1">
+                    <div className={depthFont}>
+                      <span className="truncate block">{t.label}</span>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      Weight {w.toFixed(0)}%{" "}
+                      <span className="text-red-600 font-semibold">• Behind</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex-1 relative h-8 rounded overflow-visible bg-muted/20 border border-border/40">
+                <div className="flex-1 relative h-12 overflow-visible bg-background/30">
                   {/* Planned bar */}
                   <div
-                    className="absolute h-4 bg-blue-400/70 rounded top-1"
+                    className="absolute h-7 bg-blue-500/30 rounded-md top-2"
                     style={{ left: `${left}%`, width: `${width}%` }}
                     title={`Planned: ${t.start ?? "—"} → ${t.end ?? "—"}`}
                   />
                   {/* Actual/progress bar */}
                   <div
-                    className="absolute h-2 bg-blue-700 rounded top-4"
+                    className="absolute h-7 bg-blue-500 rounded-md top-2"
                     style={{ left: `${left}%`, width: `${actualWidth}%` }}
                     title={`Progress: ${Math.round(t.progress ?? 0)}%`}
                   />
+                </div>
+
+                <div className="w-20 border-l border-border/60 flex items-center justify-center">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="h-9 w-9 rounded-lg border border-border/60 bg-background hover:bg-muted/60 flex items-center justify-center"
+                        aria-label="Options"
+                      >
+                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add delay log
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Add picture
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Add documents
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add progress
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             );

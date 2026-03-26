@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { listProjects, getProjectGanttData } from "@/api";
+import { ProjectGanttTree } from "@/components/dashboard/ProjectGanttTree";
 
 interface GanttTask {
   id: string;
@@ -15,6 +16,7 @@ interface GanttTask {
   start: string | null;
   end: string | null;
   progress: number; // 0-100
+  parent?: string;
 }
 
 interface ProjectGanttChartProps {
@@ -175,39 +177,8 @@ export function ProjectGanttChart({ projectId: propProjectId, searchQuery = "" }
         <CardHeader>
           <CardTitle>Project Timeline (Gantt Chart)</CardTitle>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
-          <div className="min-w-[1200px]">
-            {/* Header */}
-            <div className="flex border-b mb-4">
-              <div className="w-56 font-semibold text-sm">Activity</div>
-              <div className="flex-1 grid grid-flow-col auto-cols-[120px] text-xs text-center">
-                {monthsArray.map((d, i) => (
-                  <div key={i} className="border-l py-2 font-medium">
-                    {d.toLocaleDateString("en-US", { month: "short" })}
-                    <div className="text-[10px] text-muted-foreground">{d.getFullYear()}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Tasks */}
-            <div className="space-y-2">
-              {filteredTasks.map((task) => {
-                const left = getTaskPosition(task.start);
-                const width = getTaskWidth(task.start, task.end);
-                const actualWidth = width * (Math.max(0, Math.min(100, task.progress)) / 100);
-                return (
-                  <div key={task.id} className="flex items-center gap-2">
-                    <div className="w-56 text-xs font-medium truncate">{task.label}</div>
-                    <div className="flex-1 relative h-8 rounded overflow-visible bg-transparent">
-                      <div className="absolute h-4 bg-red-400 rounded top-1" style={{ left: `${left}%`, width: `${width}%` }} />
-                      <div className="absolute h-2 bg-red-700 rounded top-4" style={{ left: `${left}%`, width: `${actualWidth}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+        <CardContent>
+          <ProjectGanttTree tasks={filteredTasks as any} />
         </CardContent>
       </Card>
     </>

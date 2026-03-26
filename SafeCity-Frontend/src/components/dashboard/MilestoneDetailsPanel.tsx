@@ -20,6 +20,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ProjectGanttTree } from "@/components/dashboard/ProjectGanttTree";
 
 type PhaseTimelinePoint = {
   month: string;
@@ -2036,12 +2037,22 @@ export function MilestoneDetailsPanel({
   phaseColor,
   onClear,
   showAllTabs = false,
+  flatGanttTasks,
 }: {
   milestoneTitle: string;
   phase: MilestonePhaseProgress;
   phaseColor: string;
   onClear?: () => void;
   showAllTabs?: boolean;
+  /** Optional: API-driven project gantt rows (id/label/start/end/progress/parent). */
+  flatGanttTasks?: Array<{
+    id: string;
+    label: string;
+    start: string | null;
+    end: string | null;
+    progress: number;
+    parent?: string;
+  }>;
 }) {
   const [tab, setTab] = useState<"gantt" | "wbs" | "scurves" | "photos" | "logs">("gantt");
 
@@ -2341,18 +2352,24 @@ export function MilestoneDetailsPanel({
             </TabsList>
 
             <TabsContent value="gantt" className="mt-4">
-              <GanttMini
-                tasks={ganttTasks}
-                months={months}
-                baseColor={phaseColor}
-                subProjects={adjustedSubProjects}
-                delayLogs={delayLogs}
-                onAddDelayLog={handleAddDelayLog}
-                onDeleteDelayLog={handleDeleteDelayLog}
-                onOpenAddPhoto={openAddPhotoFromGantt}
-                onOpenAddDocument={openAddDocumentFromGantt}
-              />
-              {/* Delay Logs removed (were hardcoded) */}
+              {flatGanttTasks && flatGanttTasks.length > 0 ? (
+                <ProjectGanttTree tasks={flatGanttTasks as any} />
+              ) : (
+                <>
+                  <GanttMini
+                    tasks={ganttTasks}
+                    months={months}
+                    baseColor={phaseColor}
+                    subProjects={adjustedSubProjects}
+                    delayLogs={delayLogs}
+                    onAddDelayLog={handleAddDelayLog}
+                    onDeleteDelayLog={handleDeleteDelayLog}
+                    onOpenAddPhoto={openAddPhotoFromGantt}
+                    onOpenAddDocument={openAddDocumentFromGantt}
+                  />
+                  {/* Delay Logs removed (were hardcoded) */}
+                </>
+              )}
             </TabsContent>
 
             <TabsContent value="wbs" className="mt-4">

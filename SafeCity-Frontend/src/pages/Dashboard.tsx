@@ -1478,11 +1478,9 @@ export default function Dashboard() {
                 milestoneTitle={`${selectedProjectForDetails!.project_name || `Project ${selectedProjectForDetails!.id}`} - Project Gantt`}
                 phase={selectedProjectPhase}
                 phaseColor="#3b82f6"
+                flatGanttTasks={selectedProjectGanttTasks as any}
                 onClear={() => setSelectedProjectForDetails(null)}
               />
-              <div className="mt-4">
-                <ProjectGanttTree tasks={selectedProjectGanttTasks as any} />
-              </div>
             </div>
           )}
         </div>
@@ -2771,6 +2769,7 @@ export default function Dashboard() {
                         milestoneTitle={`${selectedProjectForDetails.project_name} - Project Gantt`}
                         phase={selectedProjectPhase}
                         phaseColor="#3b82f6"
+                        flatGanttTasks={selectedProjectGanttTasks as any}
                         onClear={() => setSelectedProjectForDetails(null)}
                       />
                     )}
@@ -3259,6 +3258,7 @@ export default function Dashboard() {
                   milestoneTitle={`${selectedProjectForDetails.project_name} - Project Gantt`}
                   phase={selectedProjectPhase}
                   phaseColor="#3b82f6"
+                  flatGanttTasks={selectedProjectGanttTasks as any}
                   onClear={() => setSelectedProjectForDetails(null)}
                 />
               )}
