@@ -59,6 +59,14 @@ import { CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { listProjects, getProjectById } from "@/api/project";
 
 // Enhanced installation progress data with sub-projects and planned vs actual
@@ -2369,13 +2377,39 @@ export default function Dashboard() {
 
               return (
                 <div className="space-y-6">
-                  <div>
-                    <h2 className="text-lg sm:text-2xl font-bold font-heading">
-                      Districts in {selectedItemName} Division
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedItemName} Division
-                    </p>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg sm:text-2xl font-bold font-heading">
+                        Districts in {selectedItemName} Division
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedItemName} Division
+                      </p>
+                    </div>
+
+                    <Breadcrumb className="shrink-0">
+                      <BreadcrumbList className="justify-end">
+                        <BreadcrumbItem>
+                          <BreadcrumbLink asChild>
+                            <button
+                              type="button"
+                              onClick={() => handleNavigateToLevel("all")}
+                              className="hover:underline"
+                            >
+                              Divisions
+                            </button>
+                          </BreadcrumbLink>
+                        </BreadcrumbItem>
+                        <BreadcrumbSeparator>
+                          <span className="text-muted-foreground/70 font-mono">
+                            {"<>"}
+                          </span>
+                        </BreadcrumbSeparator>
+                        <BreadcrumbItem>
+                          <BreadcrumbPage>{selectedItemName} Division</BreadcrumbPage>
+                        </BreadcrumbItem>
+                      </BreadcrumbList>
+                    </Breadcrumb>
                   </div>
 
                   {/* District Cards */}
@@ -2464,14 +2498,57 @@ export default function Dashboard() {
 
               return (
                 <div className="space-y-6">
-                  <div>
-                    <h2 className="text-lg sm:text-2xl font-bold font-heading">
-                      Tehsils in {selectedItemName} District (
-                      {parentDivisionName} Division)
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedItemName} District
-                    </p>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg sm:text-2xl font-bold font-heading">
+                        Tehsils in {selectedItemName} District ({parentDivisionName}{" "}
+                        Division)
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedItemName} District
+                      </p>
+                    </div>
+
+                    <Breadcrumb className="shrink-0">
+                      <BreadcrumbList className="justify-end">
+                        <BreadcrumbItem>
+                          <BreadcrumbLink asChild>
+                            <button
+                              type="button"
+                              onClick={() => handleNavigateToLevel("all")}
+                              className="hover:underline"
+                            >
+                              Divisions
+                            </button>
+                          </BreadcrumbLink>
+                        </BreadcrumbItem>
+                        <BreadcrumbSeparator>
+                          <span className="text-muted-foreground/70 font-mono">
+                            {"<>"}
+                          </span>
+                        </BreadcrumbSeparator>
+                        <BreadcrumbItem>
+                          <BreadcrumbLink asChild>
+                            <button
+                              type="button"
+                              onClick={() => handleNavigateToLevel("division")}
+                              className="hover:underline"
+                              disabled={!parentDivisionName}
+                            >
+                              {parentDivisionName} Division
+                            </button>
+                          </BreadcrumbLink>
+                        </BreadcrumbItem>
+                        <BreadcrumbSeparator>
+                          <span className="text-muted-foreground/70 font-mono">
+                            {"<>"}
+                          </span>
+                        </BreadcrumbSeparator>
+                        <BreadcrumbItem>
+                          <BreadcrumbPage>{selectedItemName} District</BreadcrumbPage>
+                        </BreadcrumbItem>
+                      </BreadcrumbList>
+                    </Breadcrumb>
                   </div>
 
                   {/* Tehsil Cards */}
@@ -2541,13 +2618,79 @@ export default function Dashboard() {
 
               return (
                 <div className="space-y-6">
-                  <div>
-                    <h2 className="text-lg sm:text-2xl font-bold font-heading">
-                      Ongoing projects in {selectedItemName} Tehsil
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedItemName} Tehsil
-                    </p>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg sm:text-2xl font-bold font-heading">
+                        Ongoing projects in {selectedItemName} Tehsil
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedItemName} Tehsil
+                      </p>
+                    </div>
+
+                    <Breadcrumb className="shrink-0">
+                      <BreadcrumbList className="justify-end">
+                        <BreadcrumbItem>
+                          <BreadcrumbLink asChild>
+                            <button
+                              type="button"
+                              onClick={() => handleNavigateToLevel("all")}
+                              className="hover:underline"
+                            >
+                              Divisions
+                            </button>
+                          </BreadcrumbLink>
+                        </BreadcrumbItem>
+                        {parentDivisionName && (
+                          <>
+                            <BreadcrumbSeparator>
+                              <span className="text-muted-foreground/70 font-mono">
+                                {"<>"}
+                              </span>
+                            </BreadcrumbSeparator>
+                            <BreadcrumbItem>
+                              <BreadcrumbLink asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => handleNavigateToLevel("division")}
+                                  className="hover:underline"
+                                >
+                                  {parentDivisionName} Division
+                                </button>
+                              </BreadcrumbLink>
+                            </BreadcrumbItem>
+                          </>
+                        )}
+                        {parentDistrictName && (
+                          <>
+                            <BreadcrumbSeparator>
+                              <span className="text-muted-foreground/70 font-mono">
+                                {"<>"}
+                              </span>
+                            </BreadcrumbSeparator>
+                            <BreadcrumbItem>
+                              <BreadcrumbLink asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => handleNavigateToLevel("district")}
+                                  className="hover:underline"
+                                >
+                                  {parentDistrictName} District
+                                </button>
+                              </BreadcrumbLink>
+                            </BreadcrumbItem>
+                          </>
+                        )}
+                        <BreadcrumbSeparator>
+                          <span className="text-muted-foreground/70 font-mono">
+                            {"<>"}
+                          </span>
+                        </BreadcrumbSeparator>
+                        <BreadcrumbItem>
+                          <BreadcrumbPage>{selectedItemName} Tehsil</BreadcrumbPage>
+                        </BreadcrumbItem>
+                      </BreadcrumbList>
+                    </Breadcrumb>
                   </div>
 
                   {/* Project Cards from API */}
