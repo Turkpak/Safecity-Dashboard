@@ -35,10 +35,15 @@ class ProjectGanttNestedView(APIView):
 
                 node = {
                     "_id": new_id,   # ✅ GENERATED HIERARCHICAL ID
+                    "id": act.id,     # ✅ DB ID (needed for updates)
+                    "activity_id": act.activity_id,
                     "name": act.activity_name,
                     "duration": act.duration or 0,
                     "start_date": act.start_date.isoformat() if act.start_date else None,
                     "end_date": act.end_date.isoformat() if act.end_date else None,
+                    "progress": act.progress or 0,
+                    "actual_start": act.actual_start.isoformat() if act.actual_start else None,
+                    "actual_end": act.actual_end.isoformat() if act.actual_end else None,
                     "subtasks": build_tree(act.id, new_id)
                 }
 

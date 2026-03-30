@@ -305,6 +305,23 @@ export interface Project {
   budget_utilized: string | null;
   budget_variance?: string | null;
   budget_remaining?: string | null;
+  allocation_capital_cost?: string | null;
+  allocation_revenue_cost?: string | null;
+  allocation_total_cost?: string | null;
+  pd_release_capital_cost?: string | null;
+  /** Backend field name is pd_release_cost (matches "Revenue Cost" in UI) */
+  pd_release_cost?: string | null;
+  pd_release_total_cost?: string | null;
+  spending_release_capital_cost?: string | null;
+  spending_release_revenue_cost?: string | null;
+  spending_release_total_cost?: string | null;
+  pifra_utilization_capital_cost?: string | null;
+  pifra_utilization_revenue_cost?: string | null;
+  pifra_utilization_total_cost?: string | null;
+  pifra_utilization_date?: string | null;
+  percentage_utilization_capital?: string | null;
+  percentage_utilization_revenue?: string | null;
+  percentage_utilization_total?: string | null;
   xer_file: string | null;
   boundary_file: string | null;
   geom?: unknown;
@@ -326,6 +343,22 @@ export interface ProjectCreateInput {
   tehsil: number;
   total_budget_allocated?: number | string | null;
   budget_utilized?: number | string | null;
+  allocation_capital_cost?: number | string | null;
+  allocation_revenue_cost?: number | string | null;
+  allocation_total_cost?: number | string | null;
+  pd_release_capital_cost?: number | string | null;
+  pd_release_cost?: number | string | null;
+  pd_release_total_cost?: number | string | null;
+  spending_release_capital_cost?: number | string | null;
+  spending_release_revenue_cost?: number | string | null;
+  spending_release_total_cost?: number | string | null;
+  pifra_utilization_capital_cost?: number | string | null;
+  pifra_utilization_revenue_cost?: number | string | null;
+  pifra_utilization_total_cost?: number | string | null;
+  pifra_utilization_date?: string | null;
+  percentage_utilization_capital?: number | string | null;
+  percentage_utilization_revenue?: number | string | null;
+  percentage_utilization_total?: number | string | null;
   /** .xer file for project schedule */
   xer_file?: File | null;
   /** Boundary: .geojson (sent as-is) or .kml/.kmz/.zip/.shp (converted to GeoJSON on frontend) */
@@ -347,6 +380,22 @@ export interface ProjectUpdateInput {
   budget_utilized?: string | null;
   budget_variance?: string | null;
   budget_remaining?: string | null;
+  allocation_capital_cost?: number | string | null;
+  allocation_revenue_cost?: number | string | null;
+  allocation_total_cost?: number | string | null;
+  pd_release_capital_cost?: number | string | null;
+  pd_release_cost?: number | string | null;
+  pd_release_total_cost?: number | string | null;
+  spending_release_capital_cost?: number | string | null;
+  spending_release_revenue_cost?: number | string | null;
+  spending_release_total_cost?: number | string | null;
+  pifra_utilization_capital_cost?: number | string | null;
+  pifra_utilization_revenue_cost?: number | string | null;
+  pifra_utilization_total_cost?: number | string | null;
+  pifra_utilization_date?: string | null;
+  percentage_utilization_capital?: number | string | null;
+  percentage_utilization_revenue?: number | string | null;
+  percentage_utilization_total?: number | string | null;
 }
 
 // ---------------------------------------------------------------------------

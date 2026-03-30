@@ -69,6 +69,22 @@ export async function createProject(payload: ProjectCreateInput): Promise<Projec
     appendFormValue(form, "tehsil", payload.tehsil);
     appendFormValue(form, "total_budget_allocated", payload.total_budget_allocated ?? "");
     appendFormValue(form, "budget_utilized", payload.budget_utilized ?? "");
+    appendFormValue(form, "allocation_capital_cost", payload.allocation_capital_cost);
+    appendFormValue(form, "allocation_revenue_cost", payload.allocation_revenue_cost);
+    appendFormValue(form, "allocation_total_cost", payload.allocation_total_cost);
+    appendFormValue(form, "pd_release_capital_cost", payload.pd_release_capital_cost);
+    appendFormValue(form, "pd_release_cost", payload.pd_release_cost);
+    appendFormValue(form, "pd_release_total_cost", payload.pd_release_total_cost);
+    appendFormValue(form, "spending_release_capital_cost", payload.spending_release_capital_cost);
+    appendFormValue(form, "spending_release_revenue_cost", payload.spending_release_revenue_cost);
+    appendFormValue(form, "spending_release_total_cost", payload.spending_release_total_cost);
+    appendFormValue(form, "pifra_utilization_capital_cost", payload.pifra_utilization_capital_cost);
+    appendFormValue(form, "pifra_utilization_revenue_cost", payload.pifra_utilization_revenue_cost);
+    appendFormValue(form, "pifra_utilization_total_cost", payload.pifra_utilization_total_cost);
+    appendFormValue(form, "pifra_utilization_date", payload.pifra_utilization_date);
+    appendFormValue(form, "percentage_utilization_capital", payload.percentage_utilization_capital);
+    appendFormValue(form, "percentage_utilization_revenue", payload.percentage_utilization_revenue);
+    appendFormValue(form, "percentage_utilization_total", payload.percentage_utilization_total);
 
     if (payload.xer_file) form.append("xer_file", payload.xer_file);
 
@@ -93,6 +109,22 @@ export async function createProject(payload: ProjectCreateInput): Promise<Projec
     tehsil: payload.tehsil,
     total_budget_allocated: payload.total_budget_allocated ?? null,
     budget_utilized: payload.budget_utilized ?? null,
+    allocation_capital_cost: payload.allocation_capital_cost ?? null,
+    allocation_revenue_cost: payload.allocation_revenue_cost ?? null,
+    allocation_total_cost: payload.allocation_total_cost ?? null,
+    pd_release_capital_cost: payload.pd_release_capital_cost ?? null,
+    pd_release_cost: payload.pd_release_cost ?? null,
+    pd_release_total_cost: payload.pd_release_total_cost ?? null,
+    spending_release_capital_cost: payload.spending_release_capital_cost ?? null,
+    spending_release_revenue_cost: payload.spending_release_revenue_cost ?? null,
+    spending_release_total_cost: payload.spending_release_total_cost ?? null,
+    pifra_utilization_capital_cost: payload.pifra_utilization_capital_cost ?? null,
+    pifra_utilization_revenue_cost: payload.pifra_utilization_revenue_cost ?? null,
+    pifra_utilization_total_cost: payload.pifra_utilization_total_cost ?? null,
+    pifra_utilization_date: payload.pifra_utilization_date ?? null,
+    percentage_utilization_capital: payload.percentage_utilization_capital ?? null,
+    percentage_utilization_revenue: payload.percentage_utilization_revenue ?? null,
+    percentage_utilization_total: payload.percentage_utilization_total ?? null,
   });
 }
 

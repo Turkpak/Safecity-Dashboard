@@ -6,6 +6,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { useToast } from "@/hooks/use-toast";
+import { updateTaskActual, createPictorialArchive } from "@/api";
 
 type FlatGanttRow = {
   id: string;
@@ -16,6 +23,8 @@ type FlatGanttRow = {
   parent?: string;
   /** Optional stable ordering index (insertion order from API flattening). */
   order?: number;
+  /** Database id of ProjectActivity (required for update-task-actual). */
+  db_id?: number;
 };
 
 function clamp(n: number, min: number, max: number) {
@@ -39,8 +48,26 @@ function buildMonthsArray(rangeStart: Date, rangeEnd: Date) {
   return months;
 }
 
-export function ProjectGanttTree({ tasks }: { tasks: FlatGanttRow[] }) {
+export function ProjectGanttTree({
+  tasks,
+  projectName,
+  projectId,
+  onOpenAddDocument,
+}: {
+  tasks: FlatGanttRow[];
+  projectName?: string;
+  projectId?: number;
+  onOpenAddDocument?: (taskId: string, taskName: string) => void;
+}) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const { toast } = useToast();
+
+  const [progressOpen, setProgressOpen] = useState(false);
+  const [activeRow, setActiveRow] = useState<FlatGanttRow | null>(null);
+  const [progressValue, setProgressValue] = useState<number>(0);
+  const [progressDate, setProgressDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [progressImage, setProgressImage] = useState<File | null>(null);
+  const [savingProgress, setSavingProgress] = useState(false);
 
   const normalized = useMemo(() => {
     return (tasks || []).map((t) => ({
@@ -254,15 +281,32 @@ export function ProjectGanttTree({ tasks }: { tasks: FlatGanttRow[] }) {
                         <Plus className="h-4 w-4 mr-2" />
                         Add delay log
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                        <Upload className="h-4 w-4 mr-2" />
-                        Add picture
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                      <DropdownMenuItem
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          if (onOpenAddDocument) {
+                            onOpenAddDocument(t.id, t.label);
+                            return;
+                          }
+                          toast({
+                            title: "Documents not available here",
+                            description: "Open the Photos & Docs tab to add documents for this project.",
+                          });
+                        }}
+                      >
                         <FileText className="h-4 w-4 mr-2" />
                         Add documents
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                      <DropdownMenuItem
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          setActiveRow(t);
+                          setProgressValue(typeof t.progress === "number" && Number.isFinite(t.progress) ? t.progress : 0);
+                          setProgressDate(new Date().toISOString().slice(0, 10));
+                          setProgressImage(null);
+                          setProgressOpen(true);
+                        }}
+                      >
                         <Plus className="h-4 w-4 mr-2" />
                         Add progress
                       </DropdownMenuItem>
@@ -274,6 +318,177 @@ export function ProjectGanttTree({ tasks }: { tasks: FlatGanttRow[] }) {
           })}
         </div>
       </div>
+
+      <Dialog
+        open={progressOpen}
+        onOpenChange={(open) => {
+          setProgressOpen(open);
+          if (!open) {
+            setActiveRow(null);
+            setProgressImage(null);
+            setSavingProgress(false);
+          }
+        }}
+      >
+        <DialogContent className="w-[95vw] max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Add Progress</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Project</Label>
+                <Input value={projectName ?? (projectId != null ? `Project #${projectId}` : "—")} readOnly />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Activity</Label>
+                <Input value={activeRow?.label ?? ""} readOnly />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <Label>Progress</Label>
+                <span className="text-sm font-semibold tabular-nums">{Math.round(progressValue)}%</span>
+              </div>
+              <Slider
+                value={[progressValue]}
+                min={0}
+                max={100}
+                step={1}
+                onValueChange={(v) => setProgressValue(v?.[0] ?? 0)}
+              />
+              <div className="flex justify-between text-[11px] text-muted-foreground">
+                {[0, 20, 40, 60, 80, 100].map((m) => (
+                  <span key={m}>{m}%</span>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Progress date</Label>
+                <Input type="date" value={progressDate} onChange={(e) => setProgressDate(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Picture (optional)</Label>
+              <div
+                className={`relative border-2 border-dashed rounded-lg p-5 flex items-center justify-between gap-4 transition-all ${
+                  progressImage
+                    ? "border-primary bg-primary/5"
+                    : "border-muted-foreground/20 hover:border-primary/50 cursor-pointer"
+                }`}
+                onClick={() => document.getElementById("gantt-progress-image-input")?.click()}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    document.getElementById("gantt-progress-image-input")?.click();
+                  }
+                }}
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">
+                    {progressImage ? progressImage.name : "Click to upload a progress picture"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {progressImage
+                      ? `${(progressImage.size / 1024).toFixed(1)} KB`
+                      : "PNG, JPG, JPEG"}
+                  </p>
+                </div>
+
+                {progressImage ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setProgressImage(null);
+                    }}
+                  >
+                    Remove
+                  </Button>
+                ) : (
+                  <Button type="button" variant="outline" size="sm" onClick={(e) => e.preventDefault()}>
+                    Choose file
+                  </Button>
+                )}
+
+                <Input
+                  id="gantt-progress-image-input"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => setProgressImage(e.target.files?.[0] ?? null)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setProgressOpen(false)} disabled={savingProgress}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={savingProgress || !activeRow}
+              onClick={async () => {
+                if (!activeRow) return;
+                if (!activeRow.db_id || !Number.isFinite(activeRow.db_id)) {
+                  toast({
+                    title: "Cannot update this activity",
+                    description: "Missing activity id from API. Please refresh and try again.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                try {
+                  setSavingProgress(true);
+                  await updateTaskActual(activeRow.db_id, {
+                    progress: Math.max(0, Math.min(100, Number(progressValue))),
+                    actual_end: progressDate || null,
+                  });
+
+                  if (progressImage && projectId != null) {
+                    await createPictorialArchive({
+                      project: projectId,
+                      image: progressImage,
+                      image_date: progressDate || new Date().toISOString().slice(0, 10),
+                      description: `Progress update • Activity: ${activeRow.label} • ${Math.round(progressValue)}%`,
+                    });
+                  }
+
+                  toast({
+                    title: "Progress saved",
+                    description: progressImage
+                      ? projectId != null
+                        ? "Progress updated and picture attached."
+                        : "Progress updated (picture not saved: missing project context)."
+                      : "Progress updated successfully.",
+                  });
+                  setProgressOpen(false);
+                } catch (err) {
+                  toast({
+                    title: "Failed to save progress",
+                    description: err instanceof Error ? err.message : "Please try again.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setSavingProgress(false);
+                }
+              }}
+            >
+              {savingProgress ? "Saving..." : "Save progress"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
