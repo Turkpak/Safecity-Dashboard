@@ -12,7 +12,7 @@ import type { LoginResponse } from "@/api/types";
 
 const USER_STORAGE_KEY = "safecity_user";
 const SESSION_EXPIRES_AT_KEY = "safecity_session_expires_at";
-const DEFAULT_SESSION_MS = 15 * 60 * 1000; // 15 minutes
+const DEFAULT_SESSION_MS = 60 * 60 * 1000; // 60 minutes (match backend ACCESS_TOKEN_LIFETIME)
 
 /** All localStorage keys used for auth/session — clear every one on logout */
 const AUTH_STORAGE_KEYS = [
