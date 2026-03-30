@@ -225,6 +225,11 @@ class ProjectSerializer(GeoFeatureModelSerializer):
             'total_budget_allocated', 'budget_utilized',
             'budget_variance', 'budget_remaining',
             'xer_file', 'boundary_file', 'geom',
+            'allocation_capital_cost', 'allocation_revenue_cost', 'allocation_total_cost', 
+            'pd_release_capital_cost', 'pd_release_cost', 'pd_release_total_cost',
+            'spending_release_capital_cost', 'spending_release_revenue_cost', 'spending_release_total_cost',
+            'pifra_utilization_capital_cost', 'pifra_utilization_revenue_cost', 'pifra_utilization_total_cost', 'pifra_utilization_date',
+            'percentage_utilization_capital', 'percentage_utilization_revenue', 'percentage_utilization_total',
             'created_at', 'updated_at', "activities"
         ]
 
@@ -289,6 +294,7 @@ class ProjectSerializer(GeoFeatureModelSerializer):
                     "boundary_file": f"Invalid GeoJSON: {e}"
                 })
 
+        
         project.save()
 
         # If an XER was provided, populate ProjectActivity rows so gantt endpoints work immediately.

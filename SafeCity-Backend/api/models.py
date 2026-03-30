@@ -209,23 +209,40 @@ class Project(models.Model):
     budget_variance = models.CharField(max_length=200, null=True, blank=True)
     budget_remaining = models.CharField(max_length=200, null=True, blank=True)
     xer_file = models.FileField(upload_to=project_doc_file_path, validators=[FileExtensionValidator(allowed_extensions=['xer'])],null=True, blank=True, max_length=500) 
-    # boundary_file = models.FileField(
-    #     upload_to=project_doc_file_path,
-    #     validators=[FileExtensionValidator(allowed_extensions=['geojson', 'json'])],
-    #     null=True,
-    #     blank=True, max_length=500
-    # )
 
     geom = gis_models.MultiPolygonField(srid=4326, null=True, blank=True)
+
+    allocation_capital_cost = models.FloatField(default=0, null=True, blank=True)
+    allocation_revenue_cost = models.FloatField(default=0, null=True, blank=True)  
+    allocation_total_cost = models.FloatField(default=0, null=True, blank=True)
+
+    pd_release_capital_cost = models.FloatField(default=0, null=True, blank=True)
+    pd_release_cost = models.FloatField(default=0, null=True, blank=True)
+    pd_release_total_cost = models.FloatField(default=0, null=True, blank=True)
+
+    spending_release_capital_cost = models.FloatField(default=0, null=True, blank=True)
+    spending_release_revenue_cost = models.FloatField(default=0, null=True, blank=True)
+    spending_release_total_cost = models.FloatField(default=0, null=True, blank=True)   
+
+    pifra_utilization_capital_cost = models.FloatField(default=0, null=True, blank=True)
+    pifra_utilization_revenue_cost = models.FloatField(default=0, null=True, blank=True)
+    pifra_utilization_total_cost = models.FloatField(default=0, null=True, blank=True)
+    pifra_utilization_date = models.DateField(null=True, blank=True)
+
+    percentage_utilization_capital = models.FloatField(default=0, null=True, blank=True)
+    percentage_utilization_revenue = models.FloatField(default=0, null=True, blank=True)
+    percentage_utilization_total = models.FloatField(default=0, null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True) 
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.project_name
 
-    def save(self, *args, **kwargs):
-        is_new = self.pk is None
 
+    def save(self, *args, **kwargs):
+
+        # ---------- Budget ----------
         try:
             total = float(self.total_budget_allocated or 0)
             utilized = float(self.budget_utilized or 0)
@@ -235,6 +252,58 @@ class Project(models.Model):
 
         self.budget_variance = total - utilized
         self.budget_remaining = max(total - utilized, 0)
+
+        # ---------- Allocation ----------
+        self.allocation_total_cost = (
+            (self.allocation_capital_cost or 0) +
+            (self.allocation_revenue_cost or 0)
+        )
+
+        # ---------- PD Release ----------
+        self.pd_release_total_cost = (
+            (self.pd_release_capital_cost or 0) +
+            (self.pd_release_cost or 0)
+        )
+
+        # ---------- Spending Release ----------
+        self.spending_release_total_cost = (
+            (self.spending_release_capital_cost or 0) +
+            (self.spending_release_revenue_cost or 0)
+        )
+
+        # ---------- PIFRA Utilization ----------
+        self.pifra_utilization_total_cost = (
+            (self.pifra_utilization_capital_cost or 0) +
+            (self.pifra_utilization_revenue_cost or 0)
+        )
+
+        # =====================================================
+        # 🔥 PERCENTAGE FORMULAS (FINAL CORRECT VERSION)
+        # =====================================================
+
+        # ---------- TOTAL % ----------
+        if self.allocation_total_cost and self.allocation_total_cost > 0:
+            self.percentage_utilization_total = round(
+                (self.pifra_utilization_total_cost / self.allocation_total_cost) * 100, 2
+            )
+        else:
+            self.percentage_utilization_total = 0
+
+        # ---------- CAPITAL % ----------
+        if self.allocation_capital_cost and self.allocation_capital_cost > 0:
+            self.percentage_utilization_capital = round(
+                (self.pifra_utilization_capital_cost / self.allocation_capital_cost) * 100, 2
+            )
+        else:
+            self.percentage_utilization_capital = 0
+
+        # ---------- REVENUE % ----------
+        if self.allocation_revenue_cost and self.allocation_revenue_cost > 0:
+            self.percentage_utilization_revenue = round(
+                (self.pifra_utilization_revenue_cost / self.allocation_revenue_cost) * 100, 2
+            )
+        else:
+            self.percentage_utilization_revenue = 0
 
         super().save(*args, **kwargs)
 
