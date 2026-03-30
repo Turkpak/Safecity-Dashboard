@@ -31,7 +31,7 @@ import { login as apiLogin } from "@/api/auth";
 
 export default function AuthPage() {
     const [, setLocation] = useLocation();
-    const { setUser } = useAuth();
+    const { setUser, startSession } = useAuth();
     const { toast } = useToast();
     const [isLogin, setIsLogin] = useState(true);
     const [showPassword, setShowPassword] = useState(false);
@@ -47,6 +47,7 @@ export default function AuthPage() {
             try {
                 const data = await apiLogin({ email, password });
                 setUser(data);
+                startSession(); // 15 minutes from login
                 const roleForNav = data.role ?? (data.is_admin ? "admin" : (data.stakeholder_type?.toLowerCase() || stakeholderType?.toLowerCase() || ""));
                 localStorage.setItem("userRole", roleForNav);
                 setLocation("/");

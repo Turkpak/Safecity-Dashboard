@@ -22,6 +22,8 @@ export function CityCompletionChart({ cityData, description = "District Wise Pro
   const sortedData = [...cityData].sort((a, b) => b.completion - a.completion);
   const isMobile = width < 640;
   const isTablet = width >= 640 && width < 1024;
+  // Keep bar width visually consistent even when the number of divisions changes.
+  const barSize = isMobile ? 28 : isTablet ? 34 : 42;
 
   return (
     <Card className="shadow-lg border-border/50 border-2 transition-colors hover:border-[#101a3c]">
@@ -34,11 +36,13 @@ export function CityCompletionChart({ cityData, description = "District Wise Pro
           <ResponsiveContainer width="100%" height="100%">
             <BarChart 
               data={sortedData} 
+              barCategoryGap={isMobile ? 12 : 18}
+              barGap={4}
               margin={{ 
                 top: isMobile ? 5 : 10, 
                 right: isMobile ? 5 : 10, 
-                left: isMobile ? 5 : 10, 
-                bottom: isMobile ? 110 : isTablet ? 90 : 80 
+                left: isMobile ? 18 : 30, 
+                bottom: isMobile ? 130 : isTablet ? 110 : 95 
               }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -86,14 +90,20 @@ export function CityCompletionChart({ cityData, description = "District Wise Pro
                 }}
                 iconType="circle"
               />
-              <Bar dataKey="completion" radius={[4, 4, 0, 0]}>
+              <Bar
+                dataKey="completion"
+                radius={[4, 4, 0, 0]}
+                barSize={barSize}
+              >
                 {sortedData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={getColor(entry.completion)} />
                 ))}
                 {!isMobile && (
                   <LabelList 
                     dataKey="completion" 
-                    position="top" 
+                    // Use insideTop so the "100%" label never overlaps the 100% grid line.
+                    position="insideTop"
+                    offset={6}
                     formatter={(value: number) => `${value}%`}
                     style={{ 
                       fontSize: isTablet ? "9px" : "11px", 

@@ -12,6 +12,8 @@ interface InstallationCardProps {
   plannedProgress?: number;
   onClick?: () => void;
   selected?: boolean;
+  /** When true, card is display-only (no click/hover lift). */
+  nonInteractive?: boolean;
 }
 
 export function InstallationCard({ 
@@ -24,6 +26,7 @@ export function InstallationCard({
   plannedProgress,
   onClick,
   selected = false,
+  nonInteractive = false,
 }: InstallationCardProps) {
   const showDualProgress = actualProgress !== undefined && plannedProgress !== undefined;
   
@@ -95,20 +98,23 @@ export function InstallationCard({
 
   return (
     <Card className={cn(
-      "relative overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 group",
+      "relative overflow-hidden transition-all duration-300 group",
+      !nonInteractive && "hover:shadow-2xl hover:-translate-y-1.5",
       colors.border,
-      "border-r border-t border-b border-border/40 hover:border-border",
+      "border-r border-t border-b border-border/40",
+      !nonInteractive && "hover:border-border",
       "bg-gradient-to-br from-card to-card/95",
-      onClick && "cursor-pointer select-none",
+      onClick && !nonInteractive && "cursor-pointer select-none",
+      nonInteractive && "cursor-default",
       selected && colors.selectedRing,
       selected && "shadow-2xl",
       className
     )}
-      role={onClick ? "button" : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onClick={onClick}
+      role={onClick && !nonInteractive ? "button" : undefined}
+      tabIndex={onClick && !nonInteractive ? 0 : undefined}
+      onClick={nonInteractive ? undefined : onClick}
       onKeyDown={(e) => {
-        if (!onClick) return;
+        if (!onClick || nonInteractive) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onClick();
