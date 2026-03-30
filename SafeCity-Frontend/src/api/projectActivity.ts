@@ -44,6 +44,8 @@ export async function deleteProjectActivity(id: number): Promise<void> {
 export interface GanttTask {
   id: string;
   activity_id?: string;
+  /** Database id of ProjectActivity (required for update-task-actual). */
+  db_id?: number;
   label: string;
   start: string | null;
   end: string | null;
@@ -102,11 +104,12 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
     const range = rollupRange(node);
     out.push({
       id,
-      activity_id: undefined,
+      activity_id: node?.activity_id ? String(node.activity_id) : undefined,
+      db_id: typeof node?.id === "number" ? node.id : node?.id ? Number(node.id) : undefined,
       label: String(node?.name ?? node?.activity_name ?? `#${id}`),
       start: range.start,
       end: range.end,
-      progress: 0,
+      progress: typeof node?.progress === "number" && Number.isFinite(node.progress) ? node.progress : 0,
       parent,
       order: orderCounter++,
     });
@@ -126,6 +129,7 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
   return tasksArray.map((act: any, idx: number) => ({
     id: String(act.id),
     activity_id: act.activity_id,
+    db_id: typeof act.id === "number" ? act.id : Number(act.id),
     label: act.activity_name || `#${act.activity_id}`,
     start: act.start_date || null,
     end: act.end_date || act.start_date || null,
@@ -133,4 +137,17 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
     parent: act.parent_id ? String(act.parent_id) : undefined,
     order: idx,
   }));
+}
+
+export type UpdateTaskActualInput = {
+  progress: number;
+  /** ISO date (YYYY-MM-DD) */
+  actual_start?: string | null;
+  /** ISO date (YYYY-MM-DD) */
+  actual_end?: string | null;
+  remarks?: string | null;
+};
+
+export async function updateTaskActual(taskId: number, payload: UpdateTaskActualInput): Promise<{ status: boolean; message: string }> {
+  return post<{ status: boolean; message: string }>(`update-task-actual/${taskId}/`, payload as any);
 }

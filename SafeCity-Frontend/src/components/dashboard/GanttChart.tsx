@@ -178,7 +178,15 @@ export function ProjectGanttChart({ projectId: propProjectId, searchQuery = "" }
           <CardTitle>Project Timeline (Gantt Chart)</CardTitle>
         </CardHeader>
         <CardContent>
-          <ProjectGanttTree tasks={filteredTasks as any} />
+          <ProjectGanttTree
+            tasks={filteredTasks as any}
+            projectId={selectedProjectId ?? undefined}
+            projectName={
+              selectedProjectId != null
+                ? projects.find((p) => p.id === selectedProjectId)?.project_name ?? `#${selectedProjectId}`
+                : undefined
+            }
+          />
         </CardContent>
       </Card>
     </>

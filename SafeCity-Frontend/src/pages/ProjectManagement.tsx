@@ -1,6 +1,6 @@
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { FolderKanban, Plus, Upload, FileText, MapPin, X, File, ChevronRight, ChevronLeft, CheckCircle2, Calendar, Eye, Pencil, ChevronDown, Building2 } from "lucide-react";
+import { FolderKanban, Plus, Upload, FileText, MapPin, X, File, ChevronRight, ChevronLeft, CheckCircle2, Calendar, Eye, Pencil, ChevronDown, Building2, Wallet, Landmark, HandCoins, Percent, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/command";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -484,6 +485,46 @@ export default function ProjectManagement() {
     setSelectedTehsilId(String(project.tehsil));
     setTotalBudgetAllocated(project.total_budget_allocated ?? "");
     setBudgetUtilized(project.budget_utilized ?? "");
+
+    const hasAny = (...vals: Array<unknown>) =>
+      vals.some((v) => v !== null && v !== undefined && String(v).trim() !== "");
+
+    const allocationEnabled = hasAny(project.allocation_capital_cost, project.allocation_revenue_cost, project.allocation_total_cost);
+    setEnableAllocation(allocationEnabled);
+    setAllocationCapital(project.allocation_capital_cost ?? "");
+    setAllocationRevenue(project.allocation_revenue_cost ?? "");
+    setAllocationTotal(project.allocation_total_cost ?? "");
+
+    const pdEnabled = hasAny(project.pd_release_capital_cost, project.pd_release_cost, project.pd_release_total_cost);
+    setEnablePdRelease(pdEnabled);
+    setPdReleaseCapital(project.pd_release_capital_cost ?? "");
+    setPdReleaseRevenue(project.pd_release_cost ?? "");
+    setPdReleaseTotal(project.pd_release_total_cost ?? "");
+
+    const spendingEnabled = hasAny(project.spending_release_capital_cost, project.spending_release_revenue_cost, project.spending_release_total_cost);
+    setEnableSpendingRelease(spendingEnabled);
+    setSpendingReleaseCapital(project.spending_release_capital_cost ?? "");
+    setSpendingReleaseRevenue(project.spending_release_revenue_cost ?? "");
+    setSpendingReleaseTotal(project.spending_release_total_cost ?? "");
+
+    const pifraEnabled = hasAny(
+      project.pifra_utilization_capital_cost,
+      project.pifra_utilization_revenue_cost,
+      project.pifra_utilization_total_cost,
+      project.pifra_utilization_date,
+    );
+    setEnablePifraUtilization(pifraEnabled);
+    setPifraCapital(project.pifra_utilization_capital_cost ?? "");
+    setPifraRevenue(project.pifra_utilization_revenue_cost ?? "");
+    setPifraTotal(project.pifra_utilization_total_cost ?? "");
+    setPifraDate(project.pifra_utilization_date ? project.pifra_utilization_date.slice(0, 10) : "");
+
+    const pctEnabled = hasAny(project.percentage_utilization_capital, project.percentage_utilization_revenue, project.percentage_utilization_total);
+    setEnableUtilPct(pctEnabled);
+    setUtilPctCapital(project.percentage_utilization_capital ?? "");
+    setUtilPctRevenue(project.percentage_utilization_revenue ?? "");
+    setUtilPctTotal(project.percentage_utilization_total ?? "");
+
     setXerFile(null);
     setAreaFile(null);
     setGeoData(project.geom && typeof project.geom === "object" ? (project.geom as object) : null);
@@ -627,6 +668,65 @@ export default function ProjectManagement() {
       const variance = totalBudget - utilized;
       const remaining = Math.max(0, totalBudget - utilized);
 
+      const n = (v: string): number => Number(v);
+      const allocationPayload = enableAllocation
+        ? {
+            allocation_capital_cost: n(allocationCapital),
+            allocation_revenue_cost: n(allocationRevenue),
+            allocation_total_cost: n(allocationTotal),
+          }
+        : {
+            allocation_capital_cost: null,
+            allocation_revenue_cost: null,
+            allocation_total_cost: null,
+          };
+      const pdPayload = enablePdRelease
+        ? {
+            pd_release_capital_cost: n(pdReleaseCapital),
+            pd_release_cost: n(pdReleaseRevenue),
+            pd_release_total_cost: n(pdReleaseTotal),
+          }
+        : {
+            pd_release_capital_cost: null,
+            pd_release_cost: null,
+            pd_release_total_cost: null,
+          };
+      const spendingPayload = enableSpendingRelease
+        ? {
+            spending_release_capital_cost: n(spendingReleaseCapital),
+            spending_release_revenue_cost: n(spendingReleaseRevenue),
+            spending_release_total_cost: n(spendingReleaseTotal),
+          }
+        : {
+            spending_release_capital_cost: null,
+            spending_release_revenue_cost: null,
+            spending_release_total_cost: null,
+          };
+      const pifraPayload = enablePifraUtilization
+        ? {
+            pifra_utilization_capital_cost: n(pifraCapital),
+            pifra_utilization_revenue_cost: n(pifraRevenue),
+            pifra_utilization_total_cost: n(pifraTotal),
+            pifra_utilization_date: pifraDate,
+          }
+        : {
+            pifra_utilization_capital_cost: null,
+            pifra_utilization_revenue_cost: null,
+            pifra_utilization_total_cost: null,
+            pifra_utilization_date: null,
+          };
+      const pctPayload = enableUtilPct
+        ? {
+            percentage_utilization_capital: n(utilPctCapital),
+            percentage_utilization_revenue: n(utilPctRevenue),
+            percentage_utilization_total: n(utilPctTotal),
+          }
+        : {
+            percentage_utilization_capital: null,
+            percentage_utilization_revenue: null,
+            percentage_utilization_total: null,
+          };
+
       if (editingProject) {
         updateProjectMutation.mutate({
           id: editingProject.id,
@@ -644,6 +744,11 @@ export default function ProjectManagement() {
             budget_utilized: budgetUtilized.trim() || null,
             budget_variance: String(variance),
             budget_remaining: String(remaining),
+            ...allocationPayload,
+            ...pdPayload,
+            ...spendingPayload,
+            ...pifraPayload,
+            ...pctPayload,
           },
         });
       } else {
@@ -659,6 +764,42 @@ export default function ProjectManagement() {
           tehsil: Number(selectedTehsilId),
           total_budget_allocated: totalBudget,
           budget_utilized: utilized,
+          ...(enableAllocation
+            ? {
+                allocation_capital_cost: n(allocationCapital),
+                allocation_revenue_cost: n(allocationRevenue),
+                allocation_total_cost: n(allocationTotal),
+              }
+            : {}),
+          ...(enablePdRelease
+            ? {
+                pd_release_capital_cost: n(pdReleaseCapital),
+                pd_release_cost: n(pdReleaseRevenue),
+                pd_release_total_cost: n(pdReleaseTotal),
+              }
+            : {}),
+          ...(enableSpendingRelease
+            ? {
+                spending_release_capital_cost: n(spendingReleaseCapital),
+                spending_release_revenue_cost: n(spendingReleaseRevenue),
+                spending_release_total_cost: n(spendingReleaseTotal),
+              }
+            : {}),
+          ...(enablePifraUtilization
+            ? {
+                pifra_utilization_capital_cost: n(pifraCapital),
+                pifra_utilization_revenue_cost: n(pifraRevenue),
+                pifra_utilization_total_cost: n(pifraTotal),
+                pifra_utilization_date: pifraDate,
+              }
+            : {}),
+          ...(enableUtilPct
+            ? {
+                percentage_utilization_capital: n(utilPctCapital),
+                percentage_utilization_revenue: n(utilPctRevenue),
+                percentage_utilization_total: n(utilPctTotal),
+              }
+            : {}),
           xer_file: xerFile ?? undefined,
           boundary_file: areaFile ?? undefined,
         });
@@ -728,8 +869,8 @@ export default function ProjectManagement() {
     <Layout title="Project Management">
       <div className="flex flex-col min-h-[calc(100vh-8rem)]">
         {/* Header with search and Add Project button */}
-        <div className="flex items-center justify-between flex-wrap gap-2 shrink-0 mb-4">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0 mb-4">
+          <div className="min-w-0">
             <h1 className="text-3xl font-bold tracking-tight">Added Projects</h1>
             <p className="text-muted-foreground mt-1">
               {!projectsLoading && projectsData.length > 0
@@ -739,9 +880,9 @@ export default function ProjectManagement() {
                 : "Manage and view project details below"}
             </p>
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
             {!projectsLoading && projectsData.length > 0 && (
-              <div className="w-full sm:w-[280px] md:w-[300px]">
+              <div className="w-full sm:w-[280px] md:w-[320px]">
                 <Input
                   value={locationSearch}
                   onChange={(e) => setLocationSearch(e.target.value)}
@@ -750,7 +891,7 @@ export default function ProjectManagement() {
                 />
               </div>
             )}
-            <Button onClick={() => setShowAddProjectDialog(true)} className="gap-2 shrink-0">
+            <Button onClick={() => setShowAddProjectDialog(true)} className="gap-2 w-full sm:w-auto">
               <Plus className="h-4 w-4" />
               Add New Project
             </Button>
@@ -774,7 +915,7 @@ export default function ProjectManagement() {
           </Card>
         ) : (
           <div className="flex-1 flex flex-col min-h-0">
-          <div className="grid gap-5 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-5 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
             {paginatedProjects.map((project: ApiProject) => {
               const isSelected = selectedProjectForView?.id === project.id;
               const accent = getProjectAccent(project.id);
@@ -920,97 +1061,283 @@ export default function ProjectManagement() {
                 <X className="h-5 w-5" />
               </Button>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {selectedProjectForView.project_description && (
-                <div>
-                  <h4 className="text-sm font-medium mb-1">Description</h4>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedProjectForView.project_description}</p>
-                </div>
-              )}
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <Building2 className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Stakeholder</p>
-                    <p className="text-sm font-medium">
-                      {formatProjectStakeholder(selectedProjectForView)}
-                    </p>
+            <CardContent className="space-y-4">
+              <Tabs defaultValue="overview">
+                <TabsList className="w-full justify-start gap-1 overflow-x-auto whitespace-nowrap flex-nowrap">
+                  <TabsTrigger value="overview" className="shrink-0">Project Info</TabsTrigger>
+                  <TabsTrigger value="financial" className="shrink-0">Financial Details</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="overview" className="mt-4 space-y-6">
+                  {selectedProjectForView.project_description && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-1">Description</h4>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedProjectForView.project_description}</p>
+                    </div>
+                  )}
+
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="flex items-center gap-3 rounded-lg border p-3">
+                      <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 flex items-center justify-center">
+                        <Building2 className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Stakeholder</p>
+                        <p className="text-sm font-medium">
+                          {formatProjectStakeholder(selectedProjectForView)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 rounded-lg border p-3">
+                      <div className="h-10 w-10 rounded-xl bg-violet-500/10 text-violet-700 dark:text-violet-300 flex items-center justify-center">
+                        <Calendar className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Start Date</p>
+                        <p className="text-sm font-medium">
+                          {selectedProjectForView.project_starting_date
+                            ? new Date(selectedProjectForView.project_starting_date).toLocaleDateString()
+                            : "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 rounded-lg border p-3">
+                      <div className="h-10 w-10 rounded-xl bg-sky-500/10 text-sky-700 dark:text-sky-300 flex items-center justify-center">
+                        <FileText className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Reference No</p>
+                        <p className="text-sm font-medium">{selectedProjectForView.project_reference_no || "N/A"}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 rounded-lg border p-3">
+                      <div className="h-10 w-10 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-300 flex items-center justify-center">
+                        <MapPin className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Location</p>
+                        <p className="text-sm font-medium">
+                          {selectedProjectForView.tehsil_name ?? String(selectedProjectForView.tehsil)}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <Calendar className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Start Date</p>
-                    <p className="text-sm font-medium">
-                      {selectedProjectForView.project_starting_date
-                        ? new Date(selectedProjectForView.project_starting_date).toLocaleDateString()
-                        : "N/A"}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Reference No</p>
-                    <p className="text-sm font-medium">{selectedProjectForView.project_reference_no || "N/A"}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <MapPin className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Location</p>
-                    <p className="text-sm font-medium">
-                      {selectedProjectForView.tehsil_name ?? String(selectedProjectForView.tehsil)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              {(selectedProjectForView.total_budget_allocated != null || selectedProjectForView.budget_utilized != null) && (
-                <div className="rounded-lg border p-4">
-                  <h4 className="text-sm font-medium mb-3">Budget</h4>
-                  <div className="flex flex-wrap gap-4 text-sm">
-                    {selectedProjectForView.total_budget_allocated != null && selectedProjectForView.total_budget_allocated !== "" && (
-                      <span className="text-muted-foreground">
-                        Allocated: <strong className="text-foreground">{selectedProjectForView.total_budget_allocated}</strong>
-                      </span>
-                    )}
-                    {selectedProjectForView.budget_utilized != null && selectedProjectForView.budget_utilized !== "" && (
-                      <span className="text-muted-foreground">
-                        Utilized: <strong className="text-foreground">{selectedProjectForView.budget_utilized}</strong>
-                      </span>
-                    )}
-                    {selectedProjectForView.budget_remaining != null && selectedProjectForView.budget_remaining !== "" && (
-                      <span className="text-muted-foreground">
-                        Remaining: <strong className="text-foreground">{selectedProjectForView.budget_remaining}</strong>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-              {selectedProjectForView.xer_file && (
-                <div className="rounded-lg border p-3 flex items-center gap-3">
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground">XER File</p>
-                    <a
-                      href={selectedProjectForView.xer_file.startsWith("http") ? selectedProjectForView.xer_file : `${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"}${selectedProjectForView.xer_file.startsWith("/") ? "" : "/"}${selectedProjectForView.xer_file}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm font-medium text-primary hover:underline truncate block"
-                    >
-                      {selectedProjectForView.xer_file.split("/").pop() ?? selectedProjectForView.xer_file}
-                    </a>
-                  </div>
-                </div>
-              )}
-              {!!selectedProjectForView.geom && typeof selectedProjectForView.geom === "object" && (
-                <div>
-                  <h4 className="text-sm font-medium mb-2">Project Area (Map)</h4>
-                  <div className="rounded-md border overflow-hidden">
-                    <ProjectAreaMap geoData={selectedProjectForView.geom} />
-                  </div>
-                </div>
-              )}
+
+                  {(selectedProjectForView.total_budget_allocated != null || selectedProjectForView.budget_utilized != null) && (
+                    <div className="rounded-lg border p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 flex items-center justify-center">
+                          <Wallet className="h-4 w-4" />
+                        </div>
+                        <h4 className="text-sm font-medium">Budget</h4>
+                      </div>
+                      <div className="flex flex-wrap gap-4 text-sm">
+                        {selectedProjectForView.total_budget_allocated != null && selectedProjectForView.total_budget_allocated !== "" && (
+                          <span className="text-muted-foreground">
+                            Allocated: <strong className="text-foreground">{selectedProjectForView.total_budget_allocated}</strong>
+                          </span>
+                        )}
+                        {selectedProjectForView.budget_utilized != null && selectedProjectForView.budget_utilized !== "" && (
+                          <span className="text-muted-foreground">
+                            Utilized: <strong className="text-foreground">{selectedProjectForView.budget_utilized}</strong>
+                          </span>
+                        )}
+                        {selectedProjectForView.budget_remaining != null && selectedProjectForView.budget_remaining !== "" && (
+                          <span className="text-muted-foreground">
+                            Remaining: <strong className="text-foreground">{selectedProjectForView.budget_remaining}</strong>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedProjectForView.xer_file && (
+                    <div className="rounded-lg border p-3 flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-sky-500/10 text-sky-700 dark:text-sky-300 flex items-center justify-center">
+                        <FileText className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">XER File</p>
+                        <a
+                          href={selectedProjectForView.xer_file.startsWith("http") ? selectedProjectForView.xer_file : `${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"}${selectedProjectForView.xer_file.startsWith("/") ? "" : "/"}${selectedProjectForView.xer_file}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-primary hover:underline truncate block"
+                        >
+                          {selectedProjectForView.xer_file.split("/").pop() ?? selectedProjectForView.xer_file}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {!!selectedProjectForView.geom && typeof selectedProjectForView.geom === "object" && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Project Area (Map)</h4>
+                      <div className="rounded-md border overflow-hidden">
+                        <ProjectAreaMap geoData={selectedProjectForView.geom} />
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="financial" className="mt-4">
+                  {(() => {
+                    const p = selectedProjectForView as any;
+                    const hasAny = (...vals: Array<unknown>) =>
+                      vals.some((v) => v !== null && v !== undefined && String(v).trim() !== "");
+                    const showAllocation = hasAny(p.allocation_capital_cost, p.allocation_revenue_cost, p.allocation_total_cost);
+                    const showPd = hasAny(p.pd_release_capital_cost, p.pd_release_cost, p.pd_release_total_cost);
+                    const showSpending = hasAny(p.spending_release_capital_cost, p.spending_release_revenue_cost, p.spending_release_total_cost);
+                    const showPifra = hasAny(
+                      p.pifra_utilization_capital_cost,
+                      p.pifra_utilization_revenue_cost,
+                      p.pifra_utilization_total_cost,
+                      p.pifra_utilization_date,
+                    );
+                    const showPct = hasAny(p.percentage_utilization_capital, p.percentage_utilization_revenue, p.percentage_utilization_total);
+
+                    if (!showAllocation && !showPd && !showSpending && !showPifra && !showPct) {
+                      return (
+                        <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
+                          No financial details were provided for this project.
+                        </div>
+                      );
+                    }
+
+                    const formatNum = (v: unknown) => {
+                      if (v === "" || v == null) return "—";
+                      const n = typeof v === "number" ? v : Number(String(v));
+                      if (!Number.isFinite(n)) return String(v);
+                      return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(n);
+                    };
+
+                    const Stat = ({ label, value }: { label: string; value: unknown }) => (
+                      <div className="rounded-lg border bg-muted/20 p-3">
+                        <p className="text-[11px] font-semibold text-muted-foreground">{label}</p>
+                        <p className="mt-1 text-base font-semibold tabular-nums">{formatNum(value)}</p>
+                      </div>
+                    );
+
+                    const Section = ({
+                      title,
+                      icon,
+                      badgeClassName,
+                      children,
+                    }: {
+                      title: string;
+                      icon: React.ReactNode;
+                      badgeClassName: string;
+                      children: React.ReactNode;
+                    }) => (
+                      <div className="rounded-xl border p-4">
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${badgeClassName}`}>
+                            {icon}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold leading-tight">{title}</p>
+                            <p className="text-xs text-muted-foreground">Values in millions (M)</p>
+                          </div>
+                        </div>
+                        {children}
+                      </div>
+                    );
+
+                    return (
+                      <div className="space-y-4">
+                        {showAllocation && (
+                          <Section
+                            title="Allocation"
+                            icon={<Landmark className="h-4 w-4" />}
+                            badgeClassName="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                          >
+                            <div className="grid gap-3 sm:grid-cols-3">
+                              <Stat label="Capital (M)" value={p.allocation_capital_cost} />
+                              <Stat label="Revenue (M)" value={p.allocation_revenue_cost} />
+                              <Stat label="Total (M)" value={p.allocation_total_cost} />
+                            </div>
+                          </Section>
+                        )}
+
+                        {showPd && (
+                          <Section
+                            title="P&D Release"
+                            icon={<HandCoins className="h-4 w-4" />}
+                            badgeClassName="bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                          >
+                            <div className="grid gap-3 sm:grid-cols-3">
+                              <Stat label="Capital (M)" value={p.pd_release_capital_cost} />
+                              <Stat label="Revenue (M)" value={p.pd_release_cost} />
+                              <Stat label="Total (M)" value={p.pd_release_total_cost} />
+                            </div>
+                          </Section>
+                        )}
+
+                        {showSpending && (
+                          <Section
+                            title="Spending Release"
+                            icon={<Wallet className="h-4 w-4" />}
+                            badgeClassName="bg-sky-500/10 text-sky-700 dark:text-sky-300"
+                          >
+                            <div className="grid gap-3 sm:grid-cols-3">
+                              <Stat label="Capital (M)" value={p.spending_release_capital_cost} />
+                              <Stat label="Revenue (M)" value={p.spending_release_revenue_cost} />
+                              <Stat label="Total (M)" value={p.spending_release_total_cost} />
+                            </div>
+                          </Section>
+                        )}
+
+                        {showPifra && (
+                          <div className="rounded-xl border p-4">
+                            <div className="flex items-center gap-2 mb-4">
+                              <div className="h-8 w-8 rounded-lg bg-violet-500/10 text-violet-700 dark:text-violet-300 flex items-center justify-center">
+                                <Wallet className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold leading-tight">PIFRA Utilization</p>
+                                <p className="text-xs text-muted-foreground">Values in millions (M)</p>
+                              </div>
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-4">
+                              <Stat label="Capital (M)" value={p.pifra_utilization_capital_cost} />
+                              <Stat label="Revenue (M)" value={p.pifra_utilization_revenue_cost} />
+                              <Stat label="Total (M)" value={p.pifra_utilization_total_cost} />
+                              <div className="rounded-lg border bg-muted/20 p-3">
+                                <p className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
+                                  <CalendarDays className="h-3.5 w-3.5" />
+                                  Date
+                                </p>
+                                <p className="mt-1 text-base font-semibold tabular-nums">
+                                  {p.pifra_utilization_date ? String(p.pifra_utilization_date).slice(0, 10) : "—"}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {showPct && (
+                          <div className="rounded-xl border p-4">
+                            <div className="flex items-center gap-2 mb-4">
+                              <div className="h-8 w-8 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-300 flex items-center justify-center">
+                                <Percent className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold leading-tight">% Utilization vs Spending Release</p>
+                                <p className="text-xs text-muted-foreground">Percent values (%)</p>
+                              </div>
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-3">
+                              <Stat label="Capital %" value={p.percentage_utilization_capital} />
+                              <Stat label="Revenue %" value={p.percentage_utilization_revenue} />
+                              <Stat label="Total %" value={p.percentage_utilization_total} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         )}
@@ -1024,7 +1351,7 @@ export default function ProjectManagement() {
           setEditingProject(null);
         }
       }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingProject ? "Update Project" : "Add New Project"}</DialogTitle>
             <DialogDescription>

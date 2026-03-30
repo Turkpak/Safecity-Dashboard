@@ -2353,7 +2353,11 @@ export function MilestoneDetailsPanel({
 
             <TabsContent value="gantt" className="mt-4">
               {flatGanttTasks && flatGanttTasks.length > 0 ? (
-                <ProjectGanttTree tasks={flatGanttTasks as any} />
+                <ProjectGanttTree
+                  tasks={flatGanttTasks as any}
+                  projectName={milestoneTitle}
+                  onOpenAddDocument={openAddDocumentFromGantt}
+                />
               ) : (
                 <>
                   <GanttMini
