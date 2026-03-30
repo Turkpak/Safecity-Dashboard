@@ -1,23 +1,59 @@
 import { Layout } from "@/components/layout/Layout";
 import { CityCompletionChart } from "@/components/comparison/CityCompletionChart";
-import { PhaseComparisonPieChart } from "@/components/comparison/PhaseComparisonPieChart";
 import { StackedPhaseChart } from "@/components/comparison/StackedPhaseChart";
 import { RadarComparisonChart } from "@/components/comparison/RadarComparisonChart";
 import { HeatmapChart } from "@/components/comparison/HeatmapChart";
 import { CITY_INSTALLATION_DATA, CITY_NAMES } from "@/data/cityData";
-import { getAllDivisions } from "@/data/punjabHierarchy";
-import { getAllDivisionData } from "@/data/punjabInstallationData";
+import { useQuery } from "@tanstack/react-query";
+import { listDivisions, listProjects } from "@/api";
+import type { Division, Project } from "@/api/types";
+import { useMemo } from "react";
 
 export default function Comparison() {
-  // Prepare data for division completion chart (Punjab Division-wise progress)
-  const divisionDataMap = getAllDivisionData();
-  const divisionCompletionData = getAllDivisions().map((division) => {
-    const key = division.toLowerCase().replace(/\s+/g, "");
-    return {
-      city: `${division} Division`,
-      completion: divisionDataMap[key]?.overall ?? 0,
-    };
+  // Division completion chart should be API-driven:
+  // completion % per division is calculated from all projects under that division
+  // (projects already belong to district -> tehsil -> project, and also carry division id).
+  const {
+    data: divisions = [],
+    isLoading: divisionsLoading,
+  } = useQuery<Division[]>({
+    queryKey: ["divisions"],
+    queryFn: () => listDivisions(),
   });
+
+  const {
+    data: projects = [],
+    isLoading: projectsLoading,
+  } = useQuery<Project[]>({
+    queryKey: ["projects"],
+    queryFn: () => listProjects(),
+  });
+
+  const divisionCompletionData = useMemo(() => {
+    if (divisionsLoading || projectsLoading) return [];
+    if (!Array.isArray(divisions) || divisions.length === 0) return [];
+
+    return divisions
+      .map((div) => {
+        const divProjects = projects.filter((p) => p.division === div.id);
+        let allocated = 0;
+        let utilized = 0;
+
+        for (const p of divProjects) {
+          allocated += parseFloat(p.total_budget_allocated ?? "0") || 0;
+          utilized += parseFloat(p.budget_utilized ?? "0") || 0;
+        }
+
+        const completion =
+          allocated > 0 ? Math.round((utilized / allocated) * 100) : 0;
+
+        return {
+          city: `${div.division_name} Division`,
+          completion: Math.min(100, Math.max(0, completion)),
+        };
+      })
+      .sort((a, b) => b.completion - a.completion);
+  }, [divisionsLoading, projectsLoading, divisions, projects]);
 
   // Prepare data for stacked phase chart
   const stackedData = Object.entries(CITY_INSTALLATION_DATA).map(([key, data]) => ({
@@ -76,13 +112,16 @@ export default function Comparison() {
 
 
         {/* City Completion Comparison Chart */}
-        <CityCompletionChart cityData={divisionCompletionData} description="Division Wise Progress" />
+        <CityCompletionChart
+          cityData={divisionCompletionData}
+          description="Division Wise Progress"
+        />
 
         {/* Heatmap Chart */}
         <HeatmapChart data={stackedData} />
 
         {/* Stacked Phase Chart */}
-        <StackedPhaseChart data={stackedData} />
+        {/* <StackedPhaseChart data={stackedData} /> */}
 
         {/* Radar Chart - Full Width */}
         <RadarComparisonChart data={radarData} cities={cities} />

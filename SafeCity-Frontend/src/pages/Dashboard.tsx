@@ -1071,6 +1071,21 @@ export default function Dashboard() {
     return getAggregatedDataFromProjects(apiProjects);
   }, [apiProjects]);
 
+  /** Top projects by budget utilization for root "All Punjab *" views (real API data, not duplicate phase placeholders). */
+  const topProjectsForAggregateViews = useMemo((): Project[] => {
+    if (apiProjects.length === 0) return [];
+    return [...apiProjects]
+      .map((p) => {
+        const total = parseFloat(p.total_budget_allocated || "0") || 0;
+        const utilized = parseFloat(p.budget_utilized || "0") || 0;
+        const ratio = total > 0 ? utilized / total : 0;
+        return { p, ratio };
+      })
+      .sort((a, b) => b.ratio - a.ratio)
+      .map((x) => x.p)
+      .slice(0, 6);
+  }, [apiProjects]);
+
   // Context theme: follow the currently visible/selected area overall %
   const contextOverall = useMemo(() => {
     if (selectedItemName && singleItemData) return singleItemData.overall ?? 0;
@@ -1291,6 +1306,8 @@ export default function Dashboard() {
     title: string,
     data: CityInstallationData,
     projectsInGeography?: Project[],
+    /** When false (division/district drill-down), project cards are display-only — no Gantt fetch. */
+    projectCardsInteractive: boolean = true,
   ) => {
     const isAggregatedView = title.startsWith("All Punjab");
     const useProjectCards =
@@ -1368,6 +1385,7 @@ export default function Dashboard() {
         : 0;
 
     const isSelectedProjectInThisScope =
+      projectCardsInteractive &&
       useProjectCards &&
       !!selectedProjectForDetails &&
       projectsInGeography!.some((p) => p.id === selectedProjectForDetails.id);
@@ -1407,7 +1425,9 @@ export default function Dashboard() {
                 type="button"
                 onClick={() => {
                   setSelectedMilestoneKey(null);
-                  if (useProjectCards) setSelectedProjectForDetails(null);
+                  if (useProjectCards && projectCardsInteractive) {
+                    setSelectedProjectForDetails(null);
+                  }
                 }}
                 className="h-8 px-3 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700 border-0 transition-colors whitespace-nowrap flex-shrink-0"
               >
@@ -1423,8 +1443,9 @@ export default function Dashboard() {
                   ) || 0;
                   const utilized =
                     parseFloat(project.budget_utilized || "0") || 0;
-                  const percentage =
+                  const rawPct =
                     total > 0 ? Math.round((utilized / total) * 100) : 0;
+                  const percentage = Math.min(100, Math.max(0, rawPct));
                   const displayName =
                     project.project_name || `Project ${project.id}`;
                   return (
@@ -1436,13 +1457,21 @@ export default function Dashboard() {
                       color={PROJECT_CARD_COLORS[index % PROJECT_CARD_COLORS.length]}
                       actualProgress={percentage}
                       plannedProgress={100}
-                      selected={selectedProjectForDetails?.id === project.id}
-                      onClick={() => {
-                        setSelectedMilestoneKey(null);
-                        setSelectedProjectForDetails((prev) =>
-                          prev?.id === project.id ? null : project,
-                        );
-                      }}
+                      selected={
+                        projectCardsInteractive &&
+                        selectedProjectForDetails?.id === project.id
+                      }
+                      nonInteractive={!projectCardsInteractive}
+                      onClick={
+                        projectCardsInteractive
+                          ? () => {
+                              setSelectedMilestoneKey(null);
+                              setSelectedProjectForDetails((prev) =>
+                                prev?.id === project.id ? null : project,
+                              );
+                            }
+                          : undefined
+                      }
                     />
                   );
                 })
@@ -2436,6 +2465,7 @@ export default function Dashboard() {
                         selectedItemName + " Division",
                         singleItemData,
                         projectsInSelectedGeography,
+                        false,
                       )}
                     </>
                   ) : (
@@ -2575,6 +2605,7 @@ export default function Dashboard() {
                         selectedItemName + " District",
                         singleItemData,
                         projectsInSelectedGeography,
+                        false,
                       )}
                     </>
                   ) : (
@@ -2854,7 +2885,14 @@ export default function Dashboard() {
               </div>
 
               {/* Aggregated Charts Section - Same as detail view */}
-              {renderAggregatedCharts("All Punjab Divisions", aggregatedData)}
+              {renderAggregatedCharts(
+                "All Punjab Divisions",
+                aggregatedData,
+                topProjectsForAggregateViews.length > 0
+                  ? topProjectsForAggregateViews
+                  : undefined,
+                false,
+              )}
             </div>
           ) : null)}
 
@@ -2937,7 +2975,14 @@ export default function Dashboard() {
               </div>
 
               {/* Aggregated Charts Section */}
-              {renderAggregatedCharts("All Punjab Districts", aggregatedData)}
+              {renderAggregatedCharts(
+                "All Punjab Districts",
+                aggregatedData,
+                topProjectsForAggregateViews.length > 0
+                  ? topProjectsForAggregateViews
+                  : undefined,
+                false,
+              )}
             </div>
           ) : null)}
 
@@ -3196,7 +3241,14 @@ export default function Dashboard() {
                   )}
 
                   {/* Aggregated Charts Section */}
-                  {renderAggregatedCharts("All Punjab Tehsils", aggregatedData)}
+                  {renderAggregatedCharts(
+                    "All Punjab Tehsils",
+                    aggregatedData,
+                    topProjectsForAggregateViews.length > 0
+                      ? topProjectsForAggregateViews
+                      : undefined,
+                    false,
+                  )}
                 </div>
               );
             })()
