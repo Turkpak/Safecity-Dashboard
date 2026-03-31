@@ -4,62 +4,27 @@ import { TrendingUp, TrendingDown, LucideBanknote, Wallet, AlertCircle, CheckCir
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useWindowSize } from "@/hooks/use-window-size";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
-import { listProjects } from "@/api";
+import { getProjectById, getProjectSummary, listProjects } from "@/api";
 import type { Project } from "@/api/types";
 import {
   getAllDivisions,
   getDistrictsByDivision,
   getTehsilsByDivisionAndDistrict,
 } from "@/data/punjabHierarchy";
-import {
-  parseTehsilSchemesWorkbook,
-  excelTitleToAppDivision,
-  aggregateRows,
-  utilizationPctVsSpending,
-  type TehsilSchemeFinanceRow,
-} from "@/utils/parseTehsilSchemesFinance";
 
-const FINANCE_XLSX_PATH = "/Assets/Financial%20Data/Tehsil%20Schemes%20Financial%20Details.xlsx";
-
-/** Workbook figures are PKR millions; formatPKR expects rupees. */
-const millionsToRupees = (m: number) => m * 1_000_000;
-
-// Format PKR currency (Finance page: show in Millions instead of Crore)
-const formatPKR = (amount: number) => {
-  const sign = amount < 0 ? "−" : "";
-  const abs = Math.abs(amount);
-  if (abs >= 1_000_000) {
-    return `${sign}PKR ${(abs / 1_000_000).toFixed(2)} M`;
-  }
-  if (abs >= 1_000) {
-    return `${sign}PKR ${(abs / 1_000).toFixed(2)} K`;
-  }
-  return `${sign}PKR ${abs.toLocaleString()}`;
+// Backend project financials are PKR millions (M).
+const formatPKRMillions = (m: number) => {
+  const sign = m < 0 ? "−" : "";
+  const abs = Math.abs(m);
+  return `${sign}PKR ${abs.toFixed(2)} M`;
 };
 
 const STAGE_COLORS = ["#3b82f6", "#6366f1", "#8b5cf6", "#f59e0b", "#10b981"];
-
-function findRowForDivision(rows: TehsilSchemeFinanceRow[], division: string): TehsilSchemeFinanceRow | undefined {
-  const d = division.trim().toLowerCase();
-  return rows.find((r) => {
-    const app = excelTitleToAppDivision(r.projectTitle);
-    return app?.trim().toLowerCase() === d;
-  });
-}
-
-function buildFlowChartData(row: TehsilSchemeFinanceRow) {
-  return [
-    { stage: "Approved Cost", totalM: row.approved.total, capitalM: row.approved.capital, revenueM: row.approved.revenue },
-    { stage: "Allocation", totalM: row.allocation.total, capitalM: row.allocation.capital, revenueM: row.allocation.revenue },
-    { stage: "P&D Release", totalM: row.pdRelease.total, capitalM: row.pdRelease.capital, revenueM: row.pdRelease.revenue },
-    { stage: "Spending Release", totalM: row.spendingRelease.total, capitalM: row.spendingRelease.capital, revenueM: row.spendingRelease.revenue },
-    { stage: "PIFRA Utilization", totalM: row.pifraUtilization.total, capitalM: row.pifraUtilization.capital, revenueM: row.pifraUtilization.revenue },
-  ];
-}
 
 export default function Finance() {
   const { width } = useWindowSize();
@@ -70,25 +35,22 @@ export default function Finance() {
 
   const isMobile = width < 640;
 
-  const {
-    data: workbookParsed,
-    isLoading: financeFileLoading,
-    isError: financeFileError,
-    error: financeFileErr,
-  } = useQuery({
-    queryKey: ["tehsil-schemes-finance-xlsx"],
-    queryFn: async () => {
-      const res = await fetch(FINANCE_XLSX_PATH);
-      if (!res.ok) throw new Error(`Failed to load finance workbook (${res.status})`);
-      const ab = await res.arrayBuffer();
-      return parseTehsilSchemesWorkbook(ab);
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
   const { data: projects = [] } = useQuery({
     queryKey: ["projects"],
     queryFn: listProjects,
+  });
+
+  const isAllFilters =
+    selectedDivision === "all" &&
+    selectedDistrict === "all" &&
+    selectedTehsil === "all" &&
+    selectedProjectId === "all";
+
+  const { data: projectSummary } = useQuery({
+    queryKey: ["project-summary"],
+    queryFn: getProjectSummary,
+    enabled: isAllFilters,
+    staleTime: 60 * 1000,
   });
 
   const filteredProjects = useMemo((): Project[] => {
@@ -109,104 +71,243 @@ export default function Finance() {
     return list;
   }, [projects, selectedDivision, selectedDistrict, selectedTehsil]);
 
-  const effectiveDivision = useMemo(() => {
-    if (selectedProjectId !== "all") {
-      const p = filteredProjects.find((x) => String(x.id) === selectedProjectId);
-      return p?.division_name ?? selectedDivision;
-    }
-    return selectedDivision;
-  }, [selectedProjectId, filteredProjects, selectedDivision]);
+  const aggregatedFinancials = useMemo(() => {
+    const toNum = (v: unknown) => {
+      const n = typeof v === "number" ? v : Number(String(v ?? ""));
+      return Number.isFinite(n) ? n : 0;
+    };
+    const sum = <K extends keyof Project>(key: K) =>
+      filteredProjects.reduce((acc, p) => acc + toNum((p as any)[key]), 0);
 
-  const activeFinanceRow = useMemo((): TehsilSchemeFinanceRow | null => {
-    if (!workbookParsed) return null;
-    const { rows, totals } = workbookParsed;
-    if (effectiveDivision === "all") {
-      if (totals && totals.category.toLowerCase() === "total") return totals;
-      return aggregateRows(rows);
-    }
-    return findRowForDivision(rows, effectiveDivision) ?? null;
-  }, [workbookParsed, effectiveDivision]);
+    return {
+      allocation_capital_cost: sum("allocation_capital_cost" as any),
+      allocation_revenue_cost: sum("allocation_revenue_cost" as any),
+      allocation_total_cost: sum("allocation_total_cost" as any),
+      pd_release_capital_cost: sum("pd_release_capital_cost" as any),
+      pd_release_cost: sum("pd_release_cost" as any),
+      pd_release_total_cost: sum("pd_release_total_cost" as any),
+      spending_release_capital_cost: sum("spending_release_capital_cost" as any),
+      spending_release_revenue_cost: sum("spending_release_revenue_cost" as any),
+      spending_release_total_cost: sum("spending_release_total_cost" as any),
+      pifra_utilization_capital_cost: sum("pifra_utilization_capital_cost" as any),
+      pifra_utilization_revenue_cost: sum("pifra_utilization_revenue_cost" as any),
+      pifra_utilization_total_cost: sum("pifra_utilization_total_cost" as any),
+      percentage_utilization_total: (() => {
+        const alloc = sum("allocation_total_cost" as any);
+        const pifra = sum("pifra_utilization_total_cost" as any);
+        return alloc > 0 ? (pifra / alloc) * 100 : 0;
+      })(),
+    };
+  }, [filteredProjects]);
+
+  const selectedProjectNumericId = selectedProjectId !== "all" ? Number(selectedProjectId) : null;
+  const { data: selectedProject } = useQuery({
+    queryKey: ["project-by-id", selectedProjectNumericId],
+    queryFn: async () => {
+      if (!selectedProjectNumericId) return null;
+      return await getProjectById(selectedProjectNumericId);
+    },
+    enabled: selectedProjectNumericId != null && Number.isFinite(selectedProjectNumericId),
+    staleTime: 30 * 1000,
+  });
+
+  // When a project is selected, auto-fill Division/District/Tehsil from API response.
+  useEffect(() => {
+    if (!selectedProject) return;
+    if (selectedProject.division_name) setSelectedDivision(selectedProject.division_name);
+    if (selectedProject.district_name) setSelectedDistrict(selectedProject.district_name);
+    if (selectedProject.tehsil_name) setSelectedTehsil(selectedProject.tehsil_name);
+  }, [selectedProject]);
 
   const flowChartData = useMemo(() => {
-    if (!activeFinanceRow) return [];
-    return buildFlowChartData(activeFinanceRow);
-  }, [activeFinanceRow]);
+    if (selectedProject) {
+      return [
+        {
+          stage: "Allocation",
+          totalM: Number(selectedProject.allocation_total_cost ?? 0),
+          capitalM: Number(selectedProject.allocation_capital_cost ?? 0),
+          revenueM: Number(selectedProject.allocation_revenue_cost ?? 0),
+        },
+        {
+          stage: "P&D Release",
+          totalM: Number(selectedProject.pd_release_total_cost ?? 0),
+          capitalM: Number(selectedProject.pd_release_capital_cost ?? 0),
+          revenueM: Number(selectedProject.pd_release_cost ?? 0),
+        },
+        {
+          stage: "Spending Release",
+          totalM: Number(selectedProject.spending_release_total_cost ?? 0),
+          capitalM: Number(selectedProject.spending_release_capital_cost ?? 0),
+          revenueM: Number(selectedProject.spending_release_revenue_cost ?? 0),
+        },
+        {
+          stage: "PIFRA Utilization",
+          totalM: Number(selectedProject.pifra_utilization_total_cost ?? 0),
+          capitalM: Number(selectedProject.pifra_utilization_capital_cost ?? 0),
+          revenueM: Number(selectedProject.pifra_utilization_revenue_cost ?? 0),
+        },
+      ];
+    }
+    // If filtering by area (but not selecting a single project), aggregate from list-project.
+    if (!isAllFilters && selectedProjectId === "all") {
+      return [
+        {
+          stage: "Allocation",
+          totalM: aggregatedFinancials.allocation_total_cost,
+          capitalM: aggregatedFinancials.allocation_capital_cost,
+          revenueM: aggregatedFinancials.allocation_revenue_cost,
+        },
+        {
+          stage: "P&D Release",
+          totalM: aggregatedFinancials.pd_release_total_cost,
+          capitalM: aggregatedFinancials.pd_release_capital_cost,
+          revenueM: aggregatedFinancials.pd_release_cost,
+        },
+        {
+          stage: "Spending Release",
+          totalM: aggregatedFinancials.spending_release_total_cost,
+          capitalM: aggregatedFinancials.spending_release_capital_cost,
+          revenueM: aggregatedFinancials.spending_release_revenue_cost,
+        },
+        {
+          stage: "PIFRA Utilization",
+          totalM: aggregatedFinancials.pifra_utilization_total_cost,
+          capitalM: aggregatedFinancials.pifra_utilization_capital_cost,
+          revenueM: aggregatedFinancials.pifra_utilization_revenue_cost,
+        },
+      ];
+    }
+    if (projectSummary) {
+      return [
+        { stage: "Allocation", totalM: Number(projectSummary.total_allocation ?? 0), capitalM: 0, revenueM: 0 },
+        { stage: "P&D Release", totalM: Number(projectSummary.total_pd_release ?? 0), capitalM: 0, revenueM: 0 },
+        { stage: "Spending Release", totalM: Number(projectSummary.total_spending_release ?? 0), capitalM: 0, revenueM: 0 },
+        { stage: "PIFRA Utilization", totalM: Number(projectSummary.total_pifra ?? 0), capitalM: 0, revenueM: 0 },
+      ];
+    }
+    return [];
+  }, [selectedProject, projectSummary, aggregatedFinancials, isAllFilters, selectedProjectId]);
 
-  /** Division vs Approved / PIFRA for comparison chart (all divisions). */
   const divisionComparisonData = useMemo(() => {
-    if (!workbookParsed) return [];
-    return workbookParsed.rows.map((r, i) => ({
-      division: excelTitleToAppDivision(r.projectTitle) ?? r.projectTitle.slice(0, 24) + "…",
-      approvedM: r.approved.total,
-      pifraM: r.pifraUtilization.total,
+    // Compare projects by Allocation vs PIFRA (using current filters).
+    return filteredProjects.map((p, i) => ({
+      division: p.project_name || `#${p.id}`,
+      approvedM: Number(p.allocation_total_cost ?? 0),
+      pifraM: Number(p.pifra_utilization_total_cost ?? 0),
       color: STAGE_COLORS[i % STAGE_COLORS.length],
     }));
-  }, [workbookParsed]);
+  }, [filteredProjects]);
 
   const kpiDerived = useMemo(() => {
-    if (!activeFinanceRow) {
+    const allocationM = selectedProject
+      ? Number(selectedProject.allocation_total_cost ?? 0)
+      : !isAllFilters
+        ? aggregatedFinancials.allocation_total_cost
+        : Number(projectSummary?.total_allocation ?? 0);
+    const spendingM = selectedProject
+      ? Number(selectedProject.spending_release_total_cost ?? 0)
+      : !isAllFilters
+        ? aggregatedFinancials.spending_release_total_cost
+        : Number(projectSummary?.total_spending_release ?? 0);
+    const pifraM = selectedProject
+      ? Number(selectedProject.pifra_utilization_total_cost ?? 0)
+      : !isAllFilters
+        ? aggregatedFinancials.pifra_utilization_total_cost
+        : Number(projectSummary?.total_pifra ?? 0);
+
+    const utilVsAllocationPct = allocationM > 0 ? (pifraM / allocationM) * 100 : 0;
+    const utilVsSpendingPct = spendingM > 0 ? (pifraM / spendingM) * 100 : 0;
+    return { allocationM, spendingM, pifraM, utilVsAllocationPct, utilVsSpendingPct };
+  }, [selectedProject, projectSummary, aggregatedFinancials, isAllFilters]);
+
+  const kpiDataWithIcons = useMemo(() => {
+    if (selectedProject) {
       return {
-        approvedRupees: 0,
-        pifraRupees: 0,
-        spendingRupees: 0,
-        varianceRupees: 0,
-        remainingRupees: 0,
-        utilVsApprovedPct: 0,
-        utilVsSpendingPct: 0,
-      };
+        allocation: {
+          valueM: Number(selectedProject.allocation_total_cost ?? 0),
+          label: "Allocation (total)",
+          icon: Wallet,
+          trend: kpiDerived.utilVsAllocationPct,
+        },
+        pdRelease: {
+          valueM: Number(selectedProject.pd_release_total_cost ?? 0),
+          label: "P&D release (total)",
+          icon: LucideBanknote,
+          trend: 0,
+        },
+        pifra: {
+          valueM: Number(selectedProject.pifra_utilization_total_cost ?? 0),
+          label: "PIFRA utilization (total)",
+          icon: CheckCircle2,
+          trend: kpiDerived.utilVsSpendingPct,
+        },
+        pct: {
+          valueM: Number(selectedProject.percentage_utilization_total ?? 0),
+          label: "% utilization (total)",
+          icon: AlertCircle,
+          trend: Number(selectedProject.percentage_utilization_total ?? 0),
+        },
+      } as const;
     }
-    const r = activeFinanceRow;
-    const approvedRupees = millionsToRupees(r.approved.total);
-    const pifraRupees = millionsToRupees(r.pifraUtilization.total);
-    const spendingRupees = millionsToRupees(r.spendingRelease.total);
-    const varianceRupees = spendingRupees - pifraRupees;
-    const remainingRupees = approvedRupees - pifraRupees;
-    const utilVsApprovedPct = approvedRupees > 0 ? (pifraRupees / approvedRupees) * 100 : 0;
-    const utilVsSpendingPct = utilizationPctVsSpending(r);
+    if (!isAllFilters) {
+      return {
+        allocation: {
+          valueM: aggregatedFinancials.allocation_total_cost,
+          label: `Allocation (total) • ${filteredProjects.length} project${filteredProjects.length === 1 ? "" : "s"}`,
+          icon: Wallet,
+          trend: kpiDerived.utilVsAllocationPct,
+        },
+        pdRelease: {
+          valueM: aggregatedFinancials.pd_release_total_cost,
+          label: "P&D release (total)",
+          icon: LucideBanknote,
+          trend: 0,
+        },
+        spendingRelease: {
+          valueM: aggregatedFinancials.spending_release_total_cost,
+          label: "Spending release (total)",
+          icon: AlertCircle,
+          trend: 0,
+        },
+        pifra: {
+          valueM: aggregatedFinancials.pifra_utilization_total_cost,
+          label: "PIFRA utilization (total)",
+          icon: CheckCircle2,
+          trend: kpiDerived.utilVsSpendingPct,
+        },
+      } as const;
+    }
     return {
-      approvedRupees,
-      pifraRupees,
-      spendingRupees,
-      varianceRupees,
-      remainingRupees,
-      utilVsApprovedPct,
-      utilVsSpendingPct,
-    };
-  }, [activeFinanceRow]);
+      allocation: {
+        valueM: Number(projectSummary?.total_allocation ?? 0),
+        label: "Total allocation",
+        icon: Wallet,
+        trend: kpiDerived.utilVsAllocationPct,
+      },
+      pdRelease: {
+        valueM: Number(projectSummary?.total_pd_release ?? 0),
+        label: "Total P&D release",
+        icon: LucideBanknote,
+        trend: 0,
+      },
+      spendingRelease: {
+        valueM: Number(projectSummary?.total_spending_release ?? 0),
+        label: "Total spending release",
+        icon: AlertCircle,
+        trend: 0,
+      },
+      pifra: {
+        valueM: Number(projectSummary?.total_pifra ?? 0),
+        label: "Total PIFRA utilization",
+        icon: CheckCircle2,
+        trend: kpiDerived.utilVsSpendingPct,
+      },
+    } as const;
+  }, [selectedProject, projectSummary, kpiDerived, aggregatedFinancials, isAllFilters, filteredProjects.length]);
 
-  const kpiDataWithIcons = {
-    totalBudget: {
-      value: kpiDerived.approvedRupees,
-      label: "Approved cost (total)",
-      icon: Wallet,
-      trend: kpiDerived.utilVsApprovedPct,
-    },
-    ytdUtilization: {
-      value: kpiDerived.pifraRupees,
-      label: "PIFRA utilization (total)",
-      icon: LucideBanknote,
-      trend: kpiDerived.utilVsSpendingPct,
-    },
-    variance: {
-      value: kpiDerived.varianceRupees,
-      label: "Spending release − PIFRA",
-      icon: AlertCircle,
-      trend: kpiDerived.utilVsSpendingPct,
-    },
-    remaining: {
-      value: kpiDerived.remainingRupees,
-      label: "Approved − PIFRA (balance)",
-      icon: CheckCircle2,
-      trend:
-        kpiDerived.approvedRupees > 0
-          ? (kpiDerived.remainingRupees / kpiDerived.approvedRupees) * 100
-          : 0,
-    },
-  };
-
-  const utilizationRate = kpiDerived.utilVsApprovedPct;
-  const totalPlanned = kpiDerived.approvedRupees;
-  const totalActual = kpiDerived.pifraRupees;
+  const utilizationRate = kpiDerived.utilVsAllocationPct;
+  const totalPlannedM = kpiDerived.allocationM;
+  const totalActualM = kpiDerived.pifraM;
 
   const handleDivisionChange = (value: string) => {
     setSelectedDivision(value);
@@ -282,28 +383,47 @@ export default function Finance() {
   } as const;
 
   const getKpiVariant = (key: string, value: number) => {
-    if (key === "variance") return value <= 0 ? kpiCardVariants.varianceGood : kpiCardVariants.varianceBad;
-    if (key === "totalBudget") return kpiCardVariants.totalBudget;
-    if (key === "ytdUtilization") return kpiCardVariants.ytdUtilization;
+    if (key === "allocation") return kpiCardVariants.totalBudget;
+    if (key === "pdRelease") return kpiCardVariants.ytdUtilization;
+    if (key === "spendingRelease") return value <= 0 ? kpiCardVariants.varianceGood : kpiCardVariants.varianceBad;
+    if (key === "pifra") return kpiCardVariants.remaining;
+    if (key === "pct") return kpiCardVariants.varianceBad;
     return kpiCardVariants.remaining;
   };
 
   const stageBreakdownItems = useMemo(() => {
-    if (!activeFinanceRow) return [];
-    const r = activeFinanceRow;
-    const approved = r.approved.total || 1;
+    const alloc = {
+      capital: Number(selectedProject?.allocation_capital_cost ?? 0),
+      revenue: Number(selectedProject?.allocation_revenue_cost ?? 0),
+      total: Number(selectedProject?.allocation_total_cost ?? projectSummary?.total_allocation ?? 0),
+    };
+    const pd = {
+      capital: Number(selectedProject?.pd_release_capital_cost ?? 0),
+      revenue: Number(selectedProject?.pd_release_cost ?? 0),
+      total: Number(selectedProject?.pd_release_total_cost ?? projectSummary?.total_pd_release ?? 0),
+    };
+    const spending = {
+      capital: Number(selectedProject?.spending_release_capital_cost ?? 0),
+      revenue: Number(selectedProject?.spending_release_revenue_cost ?? 0),
+      total: Number(selectedProject?.spending_release_total_cost ?? projectSummary?.total_spending_release ?? 0),
+    };
+    const pifra = {
+      capital: Number(selectedProject?.pifra_utilization_capital_cost ?? 0),
+      revenue: Number(selectedProject?.pifra_utilization_revenue_cost ?? 0),
+      total: Number(selectedProject?.pifra_utilization_total_cost ?? projectSummary?.total_pifra ?? 0),
+    };
+    const base = alloc.total || 1;
     return [
-      { label: "Approved cost", triple: r.approved, color: STAGE_COLORS[0] },
-      { label: "Allocation", triple: r.allocation, color: STAGE_COLORS[1] },
-      { label: "P&D release", triple: r.pdRelease, color: STAGE_COLORS[2] },
-      { label: "Spending release", triple: r.spendingRelease, color: STAGE_COLORS[3] },
-      { label: "PIFRA utilization", triple: r.pifraUtilization, color: STAGE_COLORS[4] },
+      { label: "Allocation", triple: alloc, color: STAGE_COLORS[1] },
+      { label: "P&D release", triple: pd, color: STAGE_COLORS[2] },
+      { label: "Spending release", triple: spending, color: STAGE_COLORS[3] },
+      { label: "PIFRA utilization", triple: pifra, color: STAGE_COLORS[4] },
     ].map((item) => ({
       ...item,
       totalM: item.triple.total,
-      pctOfApproved: approved > 0 ? (item.triple.total / approved) * 100 : 0,
+      pctOfApproved: base > 0 ? (item.triple.total / base) * 100 : 0,
     }));
-  }, [activeFinanceRow]);
+  }, [selectedProject, projectSummary]);
 
   return (
     <Layout title="Financial & Budget Analytics">
@@ -414,41 +534,58 @@ export default function Finance() {
           )}
         </div>
 
-        {financeFileLoading && (
-          <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">Loading finance workbook…</CardContent>
-          </Card>
-        )}
+        {(selectedProjectId !== "all" && !selectedProject) || (isAllFilters && !projectSummary) ? (
+          <>
+            {/* Skeleton loader: keep layout stable while loading */}
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i} className="rounded-2xl border border-border/50 shadow-sm overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-10 w-10 rounded-xl" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Skeleton className="h-7 w-40" />
+                    <Skeleton className="h-3 w-48" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <div className="grid gap-6 lg:grid-cols-12">
+              <Card className="lg:col-span-8">
+                <CardHeader>
+                  <Skeleton className="h-5 w-48" />
+                  <Skeleton className="h-3 w-80" />
+                </CardHeader>
+                <CardContent className="h-[320px] sm:h-[380px] lg:h-[400px]">
+                  <Skeleton className="h-full w-full rounded-xl" />
+                </CardContent>
+              </Card>
+              <Card className="lg:col-span-4">
+                <CardHeader>
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-3 w-56" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-5/6" />
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        ) : null}
 
-        {financeFileError && (
-          <Card className="border-destructive/50">
-            <CardHeader>
-              <CardTitle className="text-destructive">Could not load finance data</CardTitle>
-              <CardDescription>
-                {financeFileErr instanceof Error ? financeFileErr.message : "Unknown error"}. Ensure the file exists at{" "}
-                <code className="text-xs">public/Assets/Financial Data/Tehsil Schemes Financial Details.xlsx</code>.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        )}
-
-        {!financeFileLoading && !financeFileError && !activeFinanceRow && (
-          <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">
-              No finance row for this division. Check that the Excel file includes a scheme line for &quot;{effectiveDivision}&quot;.
-            </CardContent>
-          </Card>
-        )}
-
-        {!financeFileLoading && !financeFileError && activeFinanceRow && (
+        {(!isAllFilters || projectSummary) && (
           <>
             {/* KPI Cards */}
             <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
               {Object.entries(kpiDataWithIcons).map(([key, kpi]) => {
                 const Icon = kpi.icon;
                 const isPositive = kpi.trend >= 0;
-                const isVariance = key === "variance";
-                const variant = getKpiVariant(key, kpi.value);
+                const variant = getKpiVariant(key, Number((kpi as any).valueM ?? 0));
 
                 return (
                   <Card
@@ -475,11 +612,13 @@ export default function Finance() {
                       </div>
                     </CardHeader>
                     <CardContent className="relative">
-                      <div className={cn("text-2xl font-bold font-heading", isVariance ? variant.value : "text-foreground")}>
-                        {formatPKR(kpi.value)}
+                      <div className={cn("text-2xl font-bold font-heading", "text-foreground")}>
+                        {key === "pct"
+                          ? `${Number((kpi as any).valueM ?? 0).toFixed(2)}%`
+                          : formatPKRMillions(Number((kpi as any).valueM ?? 0))}
                       </div>
 
-                      {!isVariance && (
+                      {key !== "pdRelease" && key !== "spendingRelease" && key !== "pct" && (
                         <div className="flex items-center gap-1 mt-2">
                           {isPositive ? (
                             <TrendingUp className={cn("h-3 w-3", variant.trend)} />
@@ -487,19 +626,11 @@ export default function Finance() {
                             <TrendingDown className={cn("h-3 w-3", variant.trend)} />
                           )}
                           <p className={cn("text-xs", variant.trend)}>
-                            {key === "ytdUtilization"
-                              ? `${kpi.trend.toFixed(1)}% of spending release (PIFRA)`
-                              : key === "totalBudget"
-                                ? `${kpi.trend.toFixed(1)}% utilized vs approved`
-                                : `${Math.abs(kpi.trend).toFixed(1)}% of approved`}
+                            {key === "pifra"
+                              ? `${kpiDerived.utilVsSpendingPct.toFixed(1)}% of spending release`
+                              : `${kpiDerived.utilVsAllocationPct.toFixed(1)}% utilized vs allocation`}
                           </p>
                         </div>
-                      )}
-
-                      {isVariance && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {kpi.value <= 0 ? "PIFRA ≥ spending release" : "PIFRA below spending release"}
-                        </p>
                       )}
                     </CardContent>
                   </Card>
@@ -513,7 +644,7 @@ export default function Finance() {
                 <CardHeader>
                   <CardTitle>Scheme financial flow</CardTitle>
                   <CardDescription>
-                    Totals (PKR millions) by stage — Approved → Allocation → P&D → Spending release → PIFRA
+                    Totals (PKR millions) by stage — Allocation → P&amp;D → Spending release → PIFRA
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="h-[320px] sm:h-[380px] lg:h-[400px]">
@@ -548,14 +679,16 @@ export default function Finance() {
                       />
                       <Legend />
                       <Bar dataKey="totalM" fill="url(#colorFlowTotal)" radius={[4, 4, 0, 0]} name="Total (M)" />
-                      <Line
-                        type="monotone"
-                        dataKey="revenueM"
-                        stroke="#10b981"
-                        strokeWidth={2}
-                        name="Revenue (M)"
-                        dot={{ fill: "#10b981", r: 3 }}
-                      />
+                      {flowChartData.some((x) => Number((x as any).revenueM) > 0) && (
+                        <Line
+                          type="monotone"
+                          dataKey="revenueM"
+                          stroke="#10b981"
+                          strokeWidth={2}
+                          name="Revenue (M)"
+                          dot={{ fill: "#10b981", r: 3 }}
+                        />
+                      )}
                     </ComposedChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -563,13 +696,13 @@ export default function Finance() {
 
               <Card className="lg:col-span-4">
                 <CardHeader>
-                  <CardTitle>PIFRA vs approved</CardTitle>
-                  <CardDescription>Share of approved cost booked in PIFRA</CardDescription>
+                  <CardTitle>PIFRA vs allocation</CardTitle>
+                  <CardDescription>Share of allocation booked in PIFRA</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Utilized (PIFRA / approved)</span>
+                      <span className="text-muted-foreground">Utilized (PIFRA / allocation)</span>
                       <span className="font-bold">{utilizationRate.toFixed(1)}%</span>
                     </div>
                     <div className="w-full bg-muted h-3 rounded-full overflow-hidden">
@@ -579,30 +712,8 @@ export default function Finance() {
                       />
                     </div>
                     <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>{formatPKR(totalActual)}</span>
-                      <span>{formatPKR(totalPlanned)}</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 pt-4 border-t">
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="font-medium">Approved − PIFRA</span>
-                        <span className="font-bold text-emerald-600">{formatPKR(kpiDerived.remainingRupees)}</span>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="font-medium">Spending release − PIFRA</span>
-                        <span
-                          className={cn(
-                            "font-bold",
-                            kpiDerived.varianceRupees <= 0 ? "text-emerald-600" : "text-red-600"
-                          )}
-                        >
-                          {formatPKR(kpiDerived.varianceRupees)}
-                        </span>
-                      </div>
+                      <span>{formatPKRMillions(totalActualM)}</span>
+                      <span>{formatPKRMillions(totalPlannedM)}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -613,7 +724,7 @@ export default function Finance() {
             <Card className="border-2 transition-colors hover:border-[#101a3c]">
               <CardHeader>
                 <CardTitle>Division comparison</CardTitle>
-                <CardDescription>Approved cost vs PIFRA utilization by division (PKR millions)</CardDescription>
+                <CardDescription>Allocation vs PIFRA utilization by project (PKR millions)</CardDescription>
               </CardHeader>
               <CardContent className="h-[300px] sm:h-[330px] lg:h-[380px]">
                 <ResponsiveContainer width="100%" height="100%">

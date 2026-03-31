@@ -74,6 +74,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "Project Activities",
     href: "/project-activity-management",
   },
+  
   { icon: LayoutDashboard, label: "Citywise Progress", href: "/" },
   { icon: BarChart3, label: "City Comparison", href: "/comparison" },
   { icon: LucideBanknote, label: "Finance & Budget", href: "/finance" },

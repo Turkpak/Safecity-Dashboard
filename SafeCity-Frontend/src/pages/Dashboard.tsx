@@ -417,7 +417,8 @@ function buildPhaseFromProjectGantt(
 
 // Helper function to get progress value (backward compatible)
 const getProgressValue = (progress: number | PhaseProgress): number => {
-  return typeof progress === "number" ? progress : progress.actual;
+  // Backend progress logic not implemented yet — show 0% everywhere.
+  return 0;
 };
 
 // Helper function to check if progress has detailed data
@@ -436,6 +437,8 @@ const generateSubProjects = (
   district?: string,
   tehsil?: string,
 ): SubProject[] => {
+  // Backend progress logic not implemented yet — show 0% everywhere (no synthetic subprojects).
+  return [];
   const subProjectTemplates: Record<
     string,
     { names: string[]; weights: number[] }
@@ -528,17 +531,14 @@ const convertToPhaseProgress = (
   district?: string,
   tehsil?: string,
 ): PhaseProgress => {
-  // Generate planned progress (typically 5-10% higher initially, then converges)
-  const plannedProgress = Math.min(
-    100,
-    currentValue + (100 - currentValue) * 0.15,
-  );
+  // Backend progress logic not implemented yet — keep everything at 0%.
+  const plannedProgress = 0;
 
   // Generate timeline if not provided
   const timeline =
     timelineData?.map((point) => {
-      const actual = (point[phaseKey] as number) || 0;
-      const planned = Math.min(100, actual + (100 - actual) * 0.15);
+      const actual = 0;
+      const planned = 0;
       return {
         month: point.month as string,
         actual,
@@ -547,11 +547,11 @@ const convertToPhaseProgress = (
     }) || [];
 
   return {
-    actual: currentValue,
+    actual: 0,
     planned: plannedProgress,
     subProjects: generateSubProjects(
       phaseKey,
-      currentValue,
+      0,
       plannedProgress,
       division,
       district,
@@ -565,15 +565,8 @@ const convertToPhaseProgress = (
 
 /** Calculate overall financial progress % from a list of projects */
 const calcOverallProgress = (projects: Project[]): number => {
-  if (projects.length === 0) return 0;
-  let totalBudget = 0;
-  let totalUtilized = 0;
-  for (const p of projects) {
-    totalBudget += parseFloat(p.total_budget_allocated ?? "0") || 0;
-    totalUtilized += parseFloat(p.budget_utilized ?? "0") || 0;
-  }
-  if (totalBudget === 0) return 0;
-  return Math.round((totalUtilized / totalBudget) * 100);
+  // Backend progress logic not implemented yet — show 0% everywhere.
+  return 0;
 };
 
 /** Build CityInstallationData from an overall financial progress number (API-only; no synthetic phase or timeline data). */
@@ -1005,20 +998,8 @@ export default function Dashboard() {
 
   // Helper: calculate overall financial progress from a set of projects
   const calcProjectsOverall = (projects: Project[]): number => {
-    const valid = projects.filter(
-      (p) =>
-        p.total_budget_allocated && parseFloat(p.total_budget_allocated) > 0,
-    );
-    if (valid.length === 0) return 0;
-    const totalBudget = valid.reduce(
-      (sum, p) => sum + parseFloat(p.total_budget_allocated!),
-      0,
-    );
-    const totalUtilized = valid.reduce(
-      (sum, p) => sum + parseFloat(p.budget_utilized ?? "0"),
-      0,
-    );
-    return Math.min(100, Math.round((totalUtilized / totalBudget) * 100));
+    // Backend progress logic not implemented yet — show 0% everywhere.
+    return 0;
   };
 
   // Calculate aggregated data from a list of projects
@@ -1340,19 +1321,12 @@ export default function Dashboard() {
 
     // Calculate financial/budget metrics (different from installation progress)
     // Financial metrics are calculated based on overall progress with budget considerations
-    const overallProgress = data.overall || 0;
-    // Budget allocated is typically higher than progress (includes buffer)
-    const financialPlanned = Math.min(
-      100,
-      overallProgress + 8 + Math.abs(overallProgress - 70) * 0.1,
-    );
-    // Budget spent is typically slightly lower than allocated
-    const financialActual = Math.max(
-      0,
-      overallProgress - 3 - Math.abs(overallProgress - 70) * 0.05,
-    );
-    const financialVariance = financialActual - financialPlanned;
-    const absFinancialVariance = Math.abs(financialVariance);
+    // Backend progress logic not implemented yet — keep financial overview at 0%.
+    const overallProgress = 0;
+    const financialPlanned = 0;
+    const financialActual = 0;
+    const financialVariance = 0;
+    const absFinancialVariance = 0;
 
     // Calculate totals for pie chart normalization (installation progress)
     const maxValue = Math.max(avgPlanned, avgActual);
@@ -1445,7 +1419,8 @@ export default function Dashboard() {
                     parseFloat(project.budget_utilized || "0") || 0;
                   const rawPct =
                     total > 0 ? Math.round((utilized / total) * 100) : 0;
-                  const percentage = Math.min(100, Math.max(0, rawPct));
+                  // Backend progress logic not implemented yet — show 0% everywhere.
+                  const percentage = 0;
                   const displayName =
                     project.project_name || `Project ${project.id}`;
                   return (
@@ -1455,8 +1430,9 @@ export default function Dashboard() {
                       percentage={percentage}
                       icon={FolderKanban}
                       color={PROJECT_CARD_COLORS[index % PROJECT_CARD_COLORS.length]}
-                      actualProgress={percentage}
-                      plannedProgress={100}
+                      // Don't show planned/actual until backend exists.
+                      actualProgress={undefined}
+                      plannedProgress={undefined}
                       selected={
                         projectCardsInteractive &&
                         selectedProjectForDetails?.id === project.id
@@ -1477,8 +1453,8 @@ export default function Dashboard() {
                 })
               : installationPhases.map((phase) => {
                   const progress = data[phase.key];
-                  const progressValue = getProgressValue(progress);
-                  const hasDetails = hasDetailedProgress(progress);
+                  const progressValue = 0;
+                  const hasDetails = false;
 
                   return (
                     <InstallationCard
@@ -1487,8 +1463,8 @@ export default function Dashboard() {
                       percentage={progressValue}
                       icon={phase.icon}
                       color={phase.color as unknown as "green"}
-                      actualProgress={hasDetails ? progress.actual : undefined}
-                      plannedProgress={hasDetails ? progress.planned : undefined}
+                      actualProgress={undefined}
+                      plannedProgress={undefined}
                       selected={selectedMilestoneKey === phase.key}
                       onClick={() => {
                         setSelectedMilestoneKey((prev) =>
