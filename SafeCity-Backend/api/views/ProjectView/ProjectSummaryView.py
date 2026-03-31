@@ -6,8 +6,27 @@ class ProjectSummaryView(APIView):
 
     def get(self, request):
         try:
-            data = Project.objects.aggregate(
+            project_id = request.query_params.get("project_id")
 
+            # ----------------------------------------
+            # FILTER (IMPORTANT)
+            # ----------------------------------------
+            queryset = Project.objects.all()
+
+            if project_id:
+                queryset = queryset.filter(id=project_id)
+
+                if not queryset.exists():
+                    return ApiResponse(
+                        status=404,
+                        message="Project not found",
+                        http_status=404
+                    ).create_response()
+
+            # ----------------------------------------
+            # AGGREGATE
+            # ----------------------------------------
+            data = queryset.aggregate(
                 total_allocation=Sum('allocation_total_cost'),
                 total_pd_release=Sum('pd_release_total_cost'),
                 total_spending_release=Sum('spending_release_total_cost'),
@@ -35,16 +54,20 @@ class ProjectSummaryView(APIView):
             percentage_capital = (pifra_capital / allocation_capital * 100) if allocation_capital > 0 else 0
             percentage_revenue = (pifra_revenue / allocation_revenue * 100) if allocation_revenue > 0 else 0
 
+            # ----------------------------------------
+            # RESPONSE
+            # ----------------------------------------
             response = {
+                "project_id": project_id if project_id else "ALL",
+
                 "total_allocation": allocation,
                 "total_pd_release": data['total_pd_release'] or 0,
                 "total_spending_release": data['total_spending_release'] or 0,
                 "total_pifra": pifra,
 
-                # ✅ Include percentages
                 "percentage_total": round(percentage_total, 2),
-                # "percentage_capital": round(percentage_capital, 2),
-                # "percentage_revenue": round(percentage_revenue, 2),
+                "percentage_capital": round(percentage_capital, 2),
+                "percentage_revenue": round(percentage_revenue, 2),
             }
 
             return ApiResponse(
