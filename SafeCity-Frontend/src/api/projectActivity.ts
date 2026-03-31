@@ -148,6 +148,12 @@ export type UpdateTaskActualInput = {
   remarks?: string | null;
 };
 
-export async function updateTaskActual(taskId: number, payload: UpdateTaskActualInput): Promise<{ status: boolean; message: string }> {
-  return post<{ status: boolean; message: string }>(`update-task-actual/${taskId}/`, payload as any);
+export async function updateTaskActual(
+  taskId: number,
+  payload: UpdateTaskActualInput
+): Promise<{ status: boolean; message: string }> {
+  return put<{ status: boolean; message: string }>(
+    `update-project-activity/${taskId}/`,
+    payload as any
+  );
 }

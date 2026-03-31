@@ -4,6 +4,35 @@ from rest_framework.response import Response
 from rest_framework import status
 from api.models import Project, ProjectActivity, TaskDependency
 from django.shortcuts import get_object_or_404
+
+def check_task_delay(task):
+    actual_end = task.get("actual_end")
+    end_date = task.get("end_date")
+
+    actual_start = task.get("actual_start")
+    start_date = task.get("start_date")
+
+    # ---------- END DELAY ----------
+    if actual_end and end_date:
+        return actual_end > end_date
+
+    # ---------- START DELAY ----------
+    if actual_start and start_date:
+        return actual_start > start_date
+
+    return False
+
+
+def has_delay(tasks):
+    for task in tasks:
+        if check_task_delay(task):
+            return True
+
+        if task.get("subtasks"):
+            if has_delay(task["subtasks"]):
+                return True
+
+    return False
 class ProjectGanttNestedView(APIView):
 
     def get(self, request, project_id):
@@ -56,6 +85,8 @@ class ProjectGanttNestedView(APIView):
         # -----------------------------
         root_tasks = build_tree()
 
+        delay_flag = has_delay(root_tasks)
+
         # -----------------------------
         # STEP 4: project summary
         # -----------------------------
@@ -83,5 +114,6 @@ class ProjectGanttNestedView(APIView):
 
         return Response({
             "success": True,
+            "has_delay": delay_flag,
             "schedules": [schedule]
         })

@@ -2052,6 +2052,8 @@ export function MilestoneDetailsPanel({
     end: string | null;
     progress: number;
     parent?: string;
+    actual_start?: string | null;
+    actual_end?: string | null;
   }>;
 }) {
   const [tab, setTab] = useState<"gantt" | "wbs" | "scurves" | "photos" | "logs">("gantt");
