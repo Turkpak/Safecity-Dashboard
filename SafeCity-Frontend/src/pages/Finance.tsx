@@ -1,6 +1,6 @@
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, LucideBanknote, Wallet, AlertCircle, CheckCircle2, Filter, FileSpreadsheet } from "lucide-react";
+import { TrendingUp, TrendingDown, LucideBanknote, Wallet, AlertCircle, CheckCircle2, Filter, Percent } from "lucide-react";
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,15 @@ import { useWindowSize } from "@/hooks/use-window-size";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
-import { getProjectById, getProjectSummary, listProjects } from "@/api";
-import type { Project } from "@/api/types";
 import {
-  getAllDivisions,
-  getDistrictsByDivision,
-  getTehsilsByDivisionAndDistrict,
-} from "@/data/punjabHierarchy";
+  getProjectById,
+  getProjectSummary,
+  listProjects,
+  listDivisions,
+  listDistricts,
+  listTehsils,
+} from "@/api";
+import type { Project } from "@/api/types";
 
 // Backend project financials are PKR millions (M).
 const formatPKRMillions = (m: number) => {
@@ -28,9 +30,9 @@ const STAGE_COLORS = ["#3b82f6", "#6366f1", "#8b5cf6", "#f59e0b", "#10b981"];
 
 export default function Finance() {
   const { width } = useWindowSize();
-  const [selectedDivision, setSelectedDivision] = useState<string>("all");
-  const [selectedDistrict, setSelectedDistrict] = useState<string>("all");
-  const [selectedTehsil, setSelectedTehsil] = useState<string>("all");
+  const [selectedDivisionId, setSelectedDivisionId] = useState<string>("all");
+  const [selectedDistrictId, setSelectedDistrictId] = useState<string>("all");
+  const [selectedTehsilId, setSelectedTehsilId] = useState<string>("all");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
 
   const isMobile = width < 640;
@@ -40,10 +42,34 @@ export default function Finance() {
     queryFn: listProjects,
   });
 
+  const { data: divisions = [], isLoading: divisionsLoading } = useQuery({
+    queryKey: ["finance", "list-division"],
+    queryFn: () => listDivisions(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const divisionNumeric =
+    selectedDivisionId !== "all" ? Number(selectedDivisionId) : null;
+  const { data: districts = [], isFetching: districtsLoading } = useQuery({
+    queryKey: ["finance", "list-district", divisionNumeric],
+    queryFn: () => listDistricts(divisionNumeric!),
+    enabled: divisionNumeric != null && Number.isFinite(divisionNumeric),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const districtNumeric =
+    selectedDistrictId !== "all" ? Number(selectedDistrictId) : null;
+  const { data: tehsils = [], isFetching: tehsilsLoading } = useQuery({
+    queryKey: ["finance", "list-tehsil", districtNumeric],
+    queryFn: () => listTehsils(districtNumeric!),
+    enabled: districtNumeric != null && Number.isFinite(districtNumeric),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const isAllFilters =
-    selectedDivision === "all" &&
-    selectedDistrict === "all" &&
-    selectedTehsil === "all" &&
+    selectedDivisionId === "all" &&
+    selectedDistrictId === "all" &&
+    selectedTehsilId === "all" &&
     selectedProjectId === "all";
 
   const { data: projectSummary } = useQuery({
@@ -54,22 +80,61 @@ export default function Finance() {
   });
 
   const filteredProjects = useMemo((): Project[] => {
-    if (selectedDivision === "all") return projects;
-    let list = projects.filter(
-      (p) => p.division_name && p.division_name.trim().toLowerCase() === selectedDivision.trim().toLowerCase()
-    );
-    if (selectedDistrict !== "all") {
-      list = list.filter(
-        (p) => p.district_name && p.district_name.trim().toLowerCase() === selectedDistrict.trim().toLowerCase()
-      );
+    if (selectedDivisionId === "all") return projects;
+
+    const divName =
+      divisions.find((d) => String(d.id) === selectedDivisionId)?.division_name ?? null;
+    const distName =
+      selectedDistrictId !== "all"
+        ? districts.find((d) => String(d.id) === selectedDistrictId)?.district_name ?? null
+        : null;
+    const tehName =
+      selectedTehsilId !== "all"
+        ? tehsils.find((t) => String(t.id) === selectedTehsilId)?.tehsil_name ?? null
+        : null;
+
+    const divNum = Number(selectedDivisionId);
+    const distNum = selectedDistrictId !== "all" ? Number(selectedDistrictId) : null;
+    const tehNum = selectedTehsilId !== "all" ? Number(selectedTehsilId) : null;
+
+    let list = projects.filter((p) => {
+      const byId = typeof p.division === "number" && p.division === divNum;
+      const byName =
+        divName != null &&
+        p.division_name?.trim().toLowerCase() === divName.trim().toLowerCase();
+      return byId || byName;
+    });
+
+    if (selectedDistrictId !== "all") {
+      list = list.filter((p) => {
+        const byId = distNum != null && typeof p.district === "number" && p.district === distNum;
+        const byName =
+          distName != null &&
+          p.district_name?.trim().toLowerCase() === distName.trim().toLowerCase();
+        return byId || byName;
+      });
     }
-    if (selectedTehsil !== "all") {
-      list = list.filter(
-        (p) => p.tehsil_name && p.tehsil_name.trim().toLowerCase() === selectedTehsil.trim().toLowerCase()
-      );
+
+    if (selectedTehsilId !== "all") {
+      list = list.filter((p) => {
+        const byId = tehNum != null && typeof p.tehsil === "number" && p.tehsil === tehNum;
+        const byName =
+          tehName != null &&
+          p.tehsil_name?.trim().toLowerCase() === tehName.trim().toLowerCase();
+        return byId || byName;
+      });
     }
+
     return list;
-  }, [projects, selectedDivision, selectedDistrict, selectedTehsil]);
+  }, [
+    projects,
+    selectedDivisionId,
+    selectedDistrictId,
+    selectedTehsilId,
+    divisions,
+    districts,
+    tehsils,
+  ]);
 
   const aggregatedFinancials = useMemo(() => {
     const toNum = (v: unknown) => {
@@ -111,12 +176,18 @@ export default function Finance() {
     staleTime: 30 * 1000,
   });
 
-  // When a project is selected, auto-fill Division/District/Tehsil from API response.
+  // When a project is selected first, list-project/?id=… fills division/district/tehsil (ids + names).
   useEffect(() => {
     if (!selectedProject) return;
-    if (selectedProject.division_name) setSelectedDivision(selectedProject.division_name);
-    if (selectedProject.district_name) setSelectedDistrict(selectedProject.district_name);
-    if (selectedProject.tehsil_name) setSelectedTehsil(selectedProject.tehsil_name);
+    if (selectedProject.division != null && Number.isFinite(Number(selectedProject.division))) {
+      setSelectedDivisionId(String(selectedProject.division));
+    }
+    if (selectedProject.district != null && Number.isFinite(Number(selectedProject.district))) {
+      setSelectedDistrictId(String(selectedProject.district));
+    }
+    if (selectedProject.tehsil != null && Number.isFinite(Number(selectedProject.tehsil))) {
+      setSelectedTehsilId(String(selectedProject.tehsil));
+    }
   }, [selectedProject]);
 
   const flowChartData = useMemo(() => {
@@ -189,13 +260,29 @@ export default function Finance() {
   }, [selectedProject, projectSummary, aggregatedFinancials, isAllFilters, selectedProjectId]);
 
   const divisionComparisonData = useMemo(() => {
-    // Compare projects by Allocation vs PIFRA (using current filters).
-    return filteredProjects.map((p, i) => ({
-      division: p.project_name || `#${p.id}`,
-      approvedM: Number(p.allocation_total_cost ?? 0),
-      pifraM: Number(p.pifra_utilization_total_cost ?? 0),
-      color: STAGE_COLORS[i % STAGE_COLORS.length],
-    }));
+    const EPS = 1e-6;
+    const rows = filteredProjects.map((p, i) => {
+      const baseName = (p.project_name?.trim() || `#${p.id}`) as string;
+      return {
+        division: baseName,
+        approvedM: Number(p.allocation_total_cost ?? 0),
+        pifraM: Number(p.pifra_utilization_total_cost ?? 0),
+        id: p.id,
+        color: STAGE_COLORS[i % STAGE_COLORS.length],
+      };
+    });
+    const nameCounts = new Map<string, number>();
+    for (const r of rows) nameCounts.set(r.division, (nameCounts.get(r.division) ?? 0) + 1);
+    const seen = new Map<string, number>();
+    const withUniqueLabels = rows.map((r) => {
+      if ((nameCounts.get(r.division) ?? 0) > 1) {
+        const n = (seen.get(r.division) ?? 0) + 1;
+        seen.set(r.division, n);
+        return { ...r, division: `${r.division} (#${r.id})` };
+      }
+      return r;
+    });
+    return withUniqueLabels.filter((r) => r.approvedM > EPS || r.pifraM > EPS);
   }, [filteredProjects]);
 
   const kpiDerived = useMemo(() => {
@@ -221,18 +308,31 @@ export default function Finance() {
   }, [selectedProject, projectSummary, aggregatedFinancials, isAllFilters]);
 
   const kpiDataWithIcons = useMemo(() => {
+    const pifraVsKpi = {
+      valueM: kpiDerived.utilVsAllocationPct,
+      label: "PIFRA vs allocation",
+      icon: Percent,
+      trend: kpiDerived.utilVsAllocationPct - 100,
+      format: "percent" as const,
+    };
     if (selectedProject) {
       return {
         allocation: {
           valueM: Number(selectedProject.allocation_total_cost ?? 0),
           label: "Allocation (total)",
           icon: Wallet,
-          trend: kpiDerived.utilVsAllocationPct,
+          trend: 0,
         },
         pdRelease: {
           valueM: Number(selectedProject.pd_release_total_cost ?? 0),
           label: "P&D release (total)",
           icon: LucideBanknote,
+          trend: 0,
+        },
+        spendingRelease: {
+          valueM: Number(selectedProject.spending_release_total_cost ?? 0),
+          label: "Spending release (total)",
+          icon: AlertCircle,
           trend: 0,
         },
         pifra: {
@@ -241,21 +341,16 @@ export default function Finance() {
           icon: CheckCircle2,
           trend: kpiDerived.utilVsSpendingPct,
         },
-        pct: {
-          valueM: Number(selectedProject.percentage_utilization_total ?? 0),
-          label: "% utilization (total)",
-          icon: AlertCircle,
-          trend: Number(selectedProject.percentage_utilization_total ?? 0),
-        },
+        pifraVsAllocation: pifraVsKpi,
       } as const;
     }
     if (!isAllFilters) {
       return {
         allocation: {
           valueM: aggregatedFinancials.allocation_total_cost,
-          label: `Allocation (total) • ${filteredProjects.length} project${filteredProjects.length === 1 ? "" : "s"}`,
+          label: `Allocation • ${filteredProjects.length} proj.`,
           icon: Wallet,
-          trend: kpiDerived.utilVsAllocationPct,
+          trend: 0,
         },
         pdRelease: {
           valueM: aggregatedFinancials.pd_release_total_cost,
@@ -275,6 +370,7 @@ export default function Finance() {
           icon: CheckCircle2,
           trend: kpiDerived.utilVsSpendingPct,
         },
+        pifraVsAllocation: pifraVsKpi,
       } as const;
     }
     return {
@@ -282,7 +378,7 @@ export default function Finance() {
         valueM: Number(projectSummary?.total_allocation ?? 0),
         label: "Total allocation",
         icon: Wallet,
-        trend: kpiDerived.utilVsAllocationPct,
+        trend: 0,
       },
       pdRelease: {
         valueM: Number(projectSummary?.total_pd_release ?? 0),
@@ -302,6 +398,7 @@ export default function Finance() {
         icon: CheckCircle2,
         trend: kpiDerived.utilVsSpendingPct,
       },
+      pifraVsAllocation: pifraVsKpi,
     } as const;
   }, [selectedProject, projectSummary, kpiDerived, aggregatedFinancials, isAllFilters, filteredProjects.length]);
 
@@ -310,28 +407,21 @@ export default function Finance() {
   const totalActualM = kpiDerived.pifraM;
 
   const handleDivisionChange = (value: string) => {
-    setSelectedDivision(value);
-    setSelectedDistrict("all");
-    setSelectedTehsil("all");
+    setSelectedDivisionId(value);
+    setSelectedDistrictId("all");
+    setSelectedTehsilId("all");
     setSelectedProjectId("all");
   };
 
   const handleDistrictChange = (value: string) => {
-    setSelectedDistrict(value);
-    setSelectedTehsil("all");
+    setSelectedDistrictId(value);
+    setSelectedTehsilId("all");
     setSelectedProjectId("all");
   };
 
   const handleTehsilChange = (value: string) => {
-    setSelectedTehsil(value);
+    setSelectedTehsilId(value);
     setSelectedProjectId("all");
-  };
-
-  const getLocationName = () => {
-    if (selectedDivision === "all") return "All Punjab (aggregated)";
-    if (selectedDistrict === "all") return selectedDivision;
-    if (selectedTehsil === "all") return `${selectedDistrict}, ${selectedDivision}`;
-    return `${selectedTehsil}, ${selectedDistrict}`;
   };
 
   const kpiCardVariants = {
@@ -380,6 +470,15 @@ export default function Finance() {
       value: "text-rose-600 dark:text-rose-400",
       trend: "text-rose-600 dark:text-rose-400",
     },
+    pifraVsAlloc: {
+      accent: "border-l-sky-600",
+      bg: "bg-gradient-to-br from-card via-card to-sky-50/40 dark:to-sky-950/20",
+      blob: "bg-sky-500/10",
+      iconWrap: "bg-sky-50 dark:bg-sky-950/40",
+      icon: "text-sky-700 dark:text-sky-300",
+      value: "text-sky-900 dark:text-sky-100",
+      trend: "text-sky-700 dark:text-sky-300",
+    },
   } as const;
 
   const getKpiVariant = (key: string, value: number) => {
@@ -387,6 +486,7 @@ export default function Finance() {
     if (key === "pdRelease") return kpiCardVariants.ytdUtilization;
     if (key === "spendingRelease") return value <= 0 ? kpiCardVariants.varianceGood : kpiCardVariants.varianceBad;
     if (key === "pifra") return kpiCardVariants.remaining;
+    if (key === "pifraVsAllocation") return kpiCardVariants.pifraVsAlloc;
     if (key === "pct") return kpiCardVariants.varianceBad;
     return kpiCardVariants.remaining;
   };
@@ -425,6 +525,17 @@ export default function Finance() {
     }));
   }, [selectedProject, projectSummary]);
 
+  const stageBreakdownWithBarScale = useMemo(() => {
+    const maxPct = Math.max(
+      ...stageBreakdownItems.map((i) => i.pctOfApproved),
+      1e-9,
+    );
+    return stageBreakdownItems.map((item) => ({
+      ...item,
+      barWidthPct: maxPct > 0 ? (item.pctOfApproved / maxPct) * 100 : 0,
+    }));
+  }, [stageBreakdownItems]);
+
   return (
     <Layout title="Financial & Budget Analytics">
       <div className="flex flex-col gap-6">
@@ -433,15 +544,15 @@ export default function Finance() {
           <Filter className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
           <div className="flex items-center gap-2 shrink-0">
             <label className="text-sm font-medium text-muted-foreground shrink-0">Division</label>
-            <Select value={selectedDivision} onValueChange={handleDivisionChange}>
+            <Select value={selectedDivisionId} onValueChange={handleDivisionChange} disabled={divisionsLoading}>
               <SelectTrigger className="h-9 w-[140px] border-border/50 bg-background rounded-md">
-                <SelectValue placeholder="All" />
+                <SelectValue placeholder={divisionsLoading ? "Loading…" : "All"} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
-                {getAllDivisions().map((div) => (
-                  <SelectItem key={div} value={div}>
-                    {div}
+                {divisions.map((d) => (
+                  <SelectItem key={d.id} value={String(d.id)}>
+                    {d.division_name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -449,22 +560,25 @@ export default function Finance() {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <label className="text-sm font-medium text-muted-foreground shrink-0">District</label>
-            <Select value={selectedDistrict} onValueChange={handleDistrictChange} disabled={selectedDivision === "all"}>
+            <Select
+              value={selectedDistrictId}
+              onValueChange={handleDistrictChange}
+              disabled={selectedDivisionId === "all" || districtsLoading}
+            >
               <SelectTrigger
                 className={cn(
                   "h-9 w-[140px] border-border/50 bg-background rounded-md",
-                  selectedDivision === "all" && "opacity-50 cursor-not-allowed"
+                  (selectedDivisionId === "all" || districtsLoading) && "opacity-50 cursor-not-allowed"
                 )}
-                disabled={selectedDivision === "all"}
               >
-                <SelectValue placeholder="All" />
+                <SelectValue placeholder={districtsLoading ? "Loading…" : "All"} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
-                {selectedDivision !== "all" &&
-                  getDistrictsByDivision(selectedDivision).map((dist) => (
-                    <SelectItem key={dist} value={dist}>
-                      {dist}
+                {selectedDivisionId !== "all" &&
+                  districts.map((d) => (
+                    <SelectItem key={d.id} value={String(d.id)}>
+                      {d.district_name}
                     </SelectItem>
                   ))}
               </SelectContent>
@@ -473,26 +587,28 @@ export default function Finance() {
           <div className="flex items-center gap-2 shrink-0">
             <label className="text-sm font-medium text-muted-foreground shrink-0">Tehsil</label>
             <Select
-              value={selectedTehsil}
+              value={selectedTehsilId}
               onValueChange={handleTehsilChange}
-              disabled={selectedDivision === "all" || selectedDistrict === "all"}
+              disabled={selectedDivisionId === "all" || selectedDistrictId === "all" || tehsilsLoading}
             >
               <SelectTrigger
                 className={cn(
                   "h-9 w-[140px] border-border/50 bg-background rounded-md",
-                  (selectedDivision === "all" || selectedDistrict === "all") && "opacity-50 cursor-not-allowed"
+                  (selectedDivisionId === "all" ||
+                    selectedDistrictId === "all" ||
+                    tehsilsLoading) &&
+                    "opacity-50 cursor-not-allowed"
                 )}
-                disabled={selectedDivision === "all" || selectedDistrict === "all"}
               >
-                <SelectValue placeholder="All" />
+                <SelectValue placeholder={tehsilsLoading ? "Loading…" : "All"} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
-                {selectedDivision !== "all" &&
-                  selectedDistrict !== "all" &&
-                  getTehsilsByDivisionAndDistrict(selectedDivision, selectedDistrict).map((teh) => (
-                    <SelectItem key={teh} value={teh}>
-                      {teh}
+                {selectedDivisionId !== "all" &&
+                  selectedDistrictId !== "all" &&
+                  tehsils.map((t) => (
+                    <SelectItem key={t.id} value={String(t.id)}>
+                      {t.tehsil_name}
                     </SelectItem>
                   ))}
               </SelectContent>
@@ -514,17 +630,17 @@ export default function Finance() {
               </SelectContent>
             </Select>
           </div>
-          {(selectedDivision !== "all" ||
-            selectedDistrict !== "all" ||
-            selectedTehsil !== "all" ||
+          {(selectedDivisionId !== "all" ||
+            selectedDistrictId !== "all" ||
+            selectedTehsilId !== "all" ||
             selectedProjectId !== "all") && (
             <Button
               variant="destructive"
               size="sm"
               onClick={() => {
-                setSelectedDivision("all");
-                setSelectedDistrict("all");
-                setSelectedTehsil("all");
+                setSelectedDivisionId("all");
+                setSelectedDistrictId("all");
+                setSelectedTehsilId("all");
                 setSelectedProjectId("all");
               }}
               className="h-8 px-3 text-xs font-medium text-white bg-red-600 hover:bg-red-700 border-0 shrink-0"
@@ -537,119 +653,139 @@ export default function Finance() {
         {(selectedProjectId !== "all" && !selectedProject) || (isAllFilters && !projectSummary) ? (
           <>
             {/* Skeleton loader: keep layout stable while loading */}
-            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Card key={i} className="rounded-2xl border border-border/50 shadow-sm overflow-hidden">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-10 w-10 rounded-xl" />
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-3 xl:grid-cols-5">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Card key={i} className="rounded-xl border border-border/50 shadow-sm overflow-hidden">
+                  <CardHeader className="space-y-0 px-3 pb-1 pt-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <Skeleton className="h-3 w-24" />
+                      <Skeleton className="h-8 w-8 rounded-lg" />
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Skeleton className="h-7 w-40" />
-                    <Skeleton className="h-3 w-48" />
+                  <CardContent className="space-y-2 px-3 pb-3 pt-0">
+                    <Skeleton className="h-6 w-28" />
+                    <Skeleton className="h-2.5 w-full" />
                   </CardContent>
                 </Card>
               ))}
             </div>
-            <div className="grid gap-6 lg:grid-cols-12">
-              <Card className="lg:col-span-8">
-                <CardHeader>
-                  <Skeleton className="h-5 w-48" />
-                  <Skeleton className="h-3 w-80" />
-                </CardHeader>
-                <CardContent className="h-[320px] sm:h-[380px] lg:h-[400px]">
-                  <Skeleton className="h-full w-full rounded-xl" />
-                </CardContent>
-              </Card>
-              <Card className="lg:col-span-4">
-                <CardHeader>
-                  <Skeleton className="h-5 w-40" />
-                  <Skeleton className="h-3 w-56" />
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-3 w-full" />
-                  <Skeleton className="h-3 w-5/6" />
-                </CardContent>
-              </Card>
-            </div>
+            <Card className="border-2">
+              <CardHeader>
+                <Skeleton className="h-5 w-48" />
+                <Skeleton className="h-3 w-80 max-w-full" />
+              </CardHeader>
+              <CardContent className="h-[360px] sm:h-[420px] lg:h-[480px]">
+                <Skeleton className="h-full w-full rounded-xl" />
+              </CardContent>
+            </Card>
           </>
         ) : null}
 
         {(!isAllFilters || projectSummary) && (
           <>
-            {/* KPI Cards */}
-            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+            {/* KPI row: five compact cards incl. PIFRA vs allocation */}
+            <div className="grid grid-cols-2 items-stretch gap-3 sm:grid-cols-3 sm:gap-3 xl:grid-cols-5">
               {Object.entries(kpiDataWithIcons).map(([key, kpi]) => {
                 const Icon = kpi.icon;
+                const isPercentKpi = (kpi as { format?: string }).format === "percent";
                 const isPositive = kpi.trend >= 0;
                 const variant = getKpiVariant(key, Number((kpi as any).valueM ?? 0));
+
+                const footerTrend =
+                  key === "pifraVsAllocation" ? (
+                    <div className="w-full space-y-1">
+                      <p className="text-[10px] leading-tight text-muted-foreground">Share of allocation in PIFRA</p>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{ width: `${Math.min(100, utilizationRate)}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between gap-1 text-[10px] leading-tight text-muted-foreground">
+                        <span className="min-w-0 truncate" title={formatPKRMillions(totalActualM)}>
+                          {formatPKRMillions(totalActualM)}
+                        </span>
+                        <span className="min-w-0 truncate text-right" title={formatPKRMillions(totalPlannedM)}>
+                          {formatPKRMillions(totalPlannedM)}
+                        </span>
+                      </div>
+                    </div>
+                  ) : key === "pifra" ? (
+                    <div className="flex items-center gap-1">
+                      {isPositive ? (
+                        <TrendingUp className={cn("h-3 w-3 shrink-0", variant.trend)} />
+                      ) : (
+                        <TrendingDown className={cn("h-3 w-3 shrink-0", variant.trend)} />
+                      )}
+                      <p className={cn("text-[11px] leading-snug", variant.trend)}>
+                        {`${kpiDerived.utilVsSpendingPct.toFixed(1)}% of spending release`}
+                      </p>
+                    </div>
+                  ) : key === "pct" ? (
+                    <p className="text-[11px] leading-snug text-muted-foreground">Share of approved allocation</p>
+                  ) : key === "pdRelease" ? (
+                    <p className="text-[11px] leading-snug text-muted-foreground">Planning &amp; development</p>
+                  ) : key === "allocation" ? (
+                    <p className="text-[11px] leading-snug text-muted-foreground">Approved / planned baseline</p>
+                  ) : (
+                    <p className="text-[11px] leading-snug text-muted-foreground">Released for expenditure</p>
+                  );
 
                 return (
                   <Card
                     key={key}
                     className={cn(
-                      "relative overflow-hidden rounded-2xl border border-border/50 shadow-sm transition-all hover:shadow-lg",
+                      "relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-border/50 shadow-sm transition-all hover:shadow-md",
                       "border-l-4",
                       variant.accent,
                       variant.bg
                     )}
                   >
-                    <div className={cn("absolute top-0 right-0 h-28 w-28 rounded-full blur-2xl -mr-12 -mt-12", variant.blob)} />
-                    <CardHeader className="pb-2 relative">
-                      <div className="flex items-start justify-between gap-3">
-                        <CardTitle className="text-sm font-medium text-muted-foreground leading-tight">{kpi.label}</CardTitle>
+                    <div className={cn("pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full blur-2xl", variant.blob)} />
+                    <CardHeader className="relative flex-shrink-0 space-y-0 px-3 pb-1 pt-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <CardTitle className="min-h-[2.25rem] max-w-[calc(100%-2.25rem)] text-xs font-medium leading-snug text-muted-foreground line-clamp-2">
+                          {kpi.label}
+                        </CardTitle>
                         <div
                           className={cn(
-                            "h-10 w-10 rounded-xl flex items-center justify-center border border-border/40 shadow-sm",
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/40 shadow-sm",
                             variant.iconWrap
                           )}
                         >
-                          <Icon className={cn("h-5 w-5", variant.icon)} />
+                          <Icon className={cn("h-4 w-4", variant.icon)} />
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent className="relative">
-                      <div className={cn("text-2xl font-bold font-heading", "text-foreground")}>
-                        {key === "pct"
-                          ? `${Number((kpi as any).valueM ?? 0).toFixed(2)}%`
-                          : formatPKRMillions(Number((kpi as any).valueM ?? 0))}
+                    <CardContent className="relative flex flex-col px-3 pb-3 pt-0">
+                      <div className="text-lg font-bold font-heading text-foreground xl:text-xl">
+                        {isPercentKpi
+                          ? `${Number((kpi as any).valueM ?? 0).toFixed(1)}%`
+                          : key === "pct"
+                            ? `${Number((kpi as any).valueM ?? 0).toFixed(2)}%`
+                            : formatPKRMillions(Number((kpi as any).valueM ?? 0))}
                       </div>
-
-                      {key !== "pdRelease" && key !== "spendingRelease" && key !== "pct" && (
-                        <div className="flex items-center gap-1 mt-2">
-                          {isPositive ? (
-                            <TrendingUp className={cn("h-3 w-3", variant.trend)} />
-                          ) : (
-                            <TrendingDown className={cn("h-3 w-3", variant.trend)} />
-                          )}
-                          <p className={cn("text-xs", variant.trend)}>
-                            {key === "pifra"
-                              ? `${kpiDerived.utilVsSpendingPct.toFixed(1)}% of spending release`
-                              : `${kpiDerived.utilVsAllocationPct.toFixed(1)}% utilized vs allocation`}
-                          </p>
-                        </div>
-                      )}
+                      <div className="mt-2 min-h-[2.5rem]">{footerTrend}</div>
                     </CardContent>
                   </Card>
                 );
               })}
             </div>
 
-            {/* Financial flow + utilization */}
-            <div className="grid gap-6 lg:grid-cols-12">
-              <Card className="lg:col-span-8 border-2 transition-colors hover:border-[#101a3c]">
-                <CardHeader>
-                  <CardTitle>Scheme financial flow</CardTitle>
-                  <CardDescription>
-                    Totals (PKR millions) by stage — Allocation → P&amp;D → Spending release → PIFRA
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="h-[320px] sm:h-[380px] lg:h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={flowChartData} margin={{ top: 10, right: 30, left: 0, bottom: isMobile ? 48 : 24 }}>
+            {/* Scheme financial flow — full width */}
+            <Card className="flex min-h-0 w-full flex-col border-2 transition-colors hover:border-[#101a3c]">
+              <CardHeader className="flex-shrink-0">
+                <CardTitle>Scheme financial flow</CardTitle>
+                <CardDescription>
+                  Totals (PKR millions) by stage — Allocation → P&amp;D → Spending release → PIFRA
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="h-[360px] w-full sm:h-[420px] lg:h-[480px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart
+                    data={flowChartData}
+                    margin={{ top: 16, right: 32, left: 16, bottom: isMobile ? 52 : 36 }}
+                  >
                       <defs>
                         <linearGradient id="colorFlowTotal" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
@@ -677,8 +813,14 @@ export default function Finance() {
                           return [`PKR ${Number(value).toFixed(2)} M`, name];
                         }}
                       />
-                      <Legend />
-                      <Bar dataKey="totalM" fill="url(#colorFlowTotal)" radius={[4, 4, 0, 0]} name="Total (M)" />
+                      <Legend wrapperStyle={{ paddingTop: 8 }} />
+                      <Bar
+                        dataKey="totalM"
+                        fill="url(#colorFlowTotal)"
+                        radius={[4, 4, 0, 0]}
+                        name="Total (M)"
+                        barCategoryGap="18%"
+                      />
                       {flowChartData.some((x) => Number((x as any).revenueM) > 0) && (
                         <Line
                           type="monotone"
@@ -694,63 +836,53 @@ export default function Finance() {
                 </CardContent>
               </Card>
 
-              <Card className="lg:col-span-4">
-                <CardHeader>
-                  <CardTitle>PIFRA vs allocation</CardTitle>
-                  <CardDescription>Share of allocation booked in PIFRA</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Utilized (PIFRA / allocation)</span>
-                      <span className="font-bold">{utilizationRate.toFixed(1)}%</span>
-                    </div>
-                    <div className="w-full bg-muted h-3 rounded-full overflow-hidden">
-                      <div
-                        className="bg-primary h-full rounded-full transition-all"
-                        style={{ width: `${Math.min(100, utilizationRate)}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>{formatPKRMillions(totalActualM)}</span>
-                      <span>{formatPKRMillions(totalPlannedM)}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Division comparison */}
+            {/* Project comparison — only projects with financial data; duplicate names disambiguated */}
             <Card className="border-2 transition-colors hover:border-[#101a3c]">
               <CardHeader>
-                <CardTitle>Division comparison</CardTitle>
-                <CardDescription>Allocation vs PIFRA utilization by project (PKR millions)</CardDescription>
+                <CardTitle>Project comparison</CardTitle>
+                <CardDescription>Allocation vs PIFRA utilization (PKR millions), projects with data only</CardDescription>
               </CardHeader>
               <CardContent className="h-[300px] sm:h-[330px] lg:h-[380px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={divisionComparisonData} margin={{ top: 10, right: 30, left: 0, bottom: 60 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                    <XAxis
-                      dataKey="division"
-                      angle={-40}
-                      textAnchor="end"
-                      height={90}
-                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                    />
-                    <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${v}M`} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        borderColor: "hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                      formatter={(value: number, name: string) => [`PKR ${Number(value).toFixed(2)} M`, name]}
-                    />
-                    <Legend />
-                    <Bar dataKey="approvedM" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Approved (M)" />
-                    <Bar dataKey="pifraM" fill="#10b981" radius={[4, 4, 0, 0]} name="PIFRA (M)" />
-                  </ComposedChart>
-                </ResponsiveContainer>
+                {divisionComparisonData.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                    No projects with allocation or PIFRA totals in the current filter.
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart
+                      data={divisionComparisonData}
+                      margin={{ top: 10, right: 24, left: 8, bottom: divisionComparisonData.length > 6 ? 72 : 56 }}
+                      barCategoryGap="12%"
+                      barGap={4}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                      <XAxis
+                        dataKey="division"
+                        angle={-35}
+                        textAnchor="end"
+                        height={divisionComparisonData.length > 6 ? 88 : 72}
+                        interval={0}
+                        tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                        tickFormatter={(v) => `${v}M`}
+                        width={48}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          borderColor: "hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                        formatter={(value: number, name: string) => [`PKR ${Number(value).toFixed(2)} M`, name]}
+                      />
+                      <Legend wrapperStyle={{ paddingTop: 8 }} />
+                      <Bar dataKey="approvedM" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Approved (M)" maxBarSize={56} />
+                      <Bar dataKey="pifraM" fill="#10b981" radius={[4, 4, 0, 0]} name="PIFRA (M)" maxBarSize={56} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
 
@@ -758,33 +890,34 @@ export default function Finance() {
             <Card>
               <CardHeader>
                 <CardTitle>Stage breakdown (totals)</CardTitle>
-                <CardDescription>Capital / revenue / total in PKR millions; bar length vs approved cost total</CardDescription>
+                <CardDescription>
+                  Capital / revenue / total (PKR M). Bar length is relative across stages (longest = highest % vs
+                  approved); the percentage is vs approved allocation.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {stageBreakdownItems.map((item) => (
+                  {stageBreakdownWithBarScale.map((item) => (
                     <div key={item.label} className="space-y-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <span className="font-bold text-primary">{item.label}</span>
-                        <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-6 bg-muted/30 sm:bg-transparent p-2 sm:p-0 rounded-lg">
-                          <div className="text-left sm:text-right text-xs font-mono text-muted-foreground space-y-0.5">
-                            <div>C: {item.triple.capital.toFixed(2)} M</div>
-                            <div>R: {item.triple.revenue.toFixed(2)} M</div>
-                            <div className="font-bold text-foreground">T: {item.triple.total.toFixed(2)} M</div>
-                          </div>
+                        <div className="text-xs font-mono text-muted-foreground space-y-0.5 sm:text-right">
+                          <div>C: {item.triple.capital.toFixed(2)} M</div>
+                          <div>R: {item.triple.revenue.toFixed(2)} M</div>
+                          <div className="font-bold text-foreground">T: {item.triple.total.toFixed(2)} M</div>
                         </div>
                       </div>
                       <div className="w-full bg-muted h-3 rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all"
                           style={{
-                            width: `${Math.min(100, item.pctOfApproved)}%`,
+                            width: `${Math.min(100, item.barWidthPct)}%`,
                             backgroundColor: item.color,
                           }}
                         />
                       </div>
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{item.pctOfApproved.toFixed(1)}% of approved total</span>
+                      <div className="text-xs text-muted-foreground">
+                        {item.pctOfApproved.toFixed(1)}% of approved total
                       </div>
                     </div>
                   ))}

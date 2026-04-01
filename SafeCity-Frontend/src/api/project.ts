@@ -36,12 +36,24 @@ export async function listProjects(): Promise<Project[]> {
 }
 
 export async function getProjectById(id: number): Promise<Project | null> {
-  const data = await get<Project | { id?: number; properties?: Record<string, unknown> }>(LIST, { id: String(id) });
-  if (!data) return null;
-  if (typeof data === "object" && "properties" in data) {
-    return normalizeProjectFeature(data as { id?: number; properties?: Record<string, unknown> });
+  const data = await get<unknown>(LIST, { id: String(id) });
+  if (data == null) return null;
+  let raw: unknown = data;
+  // Some endpoints nest again: { data: GeoJSON Feature }
+  if (
+    typeof raw === "object" &&
+    raw !== null &&
+    "data" in raw &&
+    typeof (raw as { data: unknown }).data === "object" &&
+    (raw as { data: unknown }).data !== null &&
+    "properties" in ((raw as { data: { properties?: unknown } }).data as object)
+  ) {
+    raw = (raw as { data: unknown }).data;
   }
-  return data as Project;
+  if (typeof raw === "object" && raw !== null && "properties" in raw) {
+    return normalizeProjectFeature(raw as { id?: number; properties?: Record<string, unknown> });
+  }
+  return raw as Project;
 }
 
 function appendFormValue(form: FormData, key: string, value: unknown): void {
