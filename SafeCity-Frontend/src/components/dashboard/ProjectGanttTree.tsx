@@ -576,7 +576,15 @@ export function ProjectGanttTree({
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-1.5">
+                <Label>Start date</Label>
+                <Input type="date" value={activeRow?.start ?? ""} readOnly />
+              </div>
+              <div className="space-y-1.5">
+                <Label>End date</Label>
+                <Input type="date" value={activeRow?.end ?? ""} readOnly />
+              </div>
               <div className="space-y-1.5">
                 <Label>Progress date</Label>
                 <Input type="date" value={progressDate} onChange={(e) => setProgressDate(e.target.value)} />

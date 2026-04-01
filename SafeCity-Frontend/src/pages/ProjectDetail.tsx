@@ -604,8 +604,8 @@ export default function ProjectDetail() {
               <h2 className="text-xl font-bold font-heading mb-1">Project Charts</h2>
               <p className="text-sm text-muted-foreground">
                 {selectedMilestoneKey 
-                  ? `Gantt chart, WBS breakdown, and S-curves for ${installationPhases.find(p => p.key === selectedMilestoneKey)?.title || 'selected milestone'}`
-                  : `Gantt chart, WBS breakdown, and S-curves for ${selectedProject.title}`
+                  ? `Gantt chart and WBS breakdown for ${installationPhases.find(p => p.key === selectedMilestoneKey)?.title || 'selected milestone'}`
+                  : `Gantt chart and WBS breakdown for ${selectedProject.title}`
                 }
               </p>
             </div>
@@ -712,7 +712,7 @@ export default function ProjectDetail() {
                   <CardHeader>
                     <CardTitle>{currentPhaseTitle} — Charts</CardTitle>
                     <CardDescription>
-                      No timeline data found for this project yet. Timeline data is required to enable Gantt, WBS breakdown and S-curves.
+                      No timeline data found for this project yet. Timeline data is required to enable Gantt and WBS breakdown.
                     </CardDescription>
                   </CardHeader>
                 </Card>

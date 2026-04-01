@@ -198,7 +198,7 @@ function buildPhaseFromProjectGantt(
   }
 
   // Optional: limit the whole phase to a single tehsil subtree based on tehsil name.
-  // This prevents the WBS pie + S-curves from including other geographies inside the same XER.
+  // This prevents the WBS pie from including other geographies inside the same XER.
   const applySubtreeFilter = (subtreeRootName?: string | null): string | null => {
     if (!subtreeRootName) return null;
     const needle = subtreeRootName.trim().toLowerCase();
@@ -1476,7 +1476,7 @@ export default function Dashboard() {
                 })}
           </div>
 
-          {/* Selected project details (Gantt / WBS / S-curves) for Division/District views */}
+          {/* Selected project details (Gantt / WBS) for Division/District views */}
           {isSelectedProjectInThisScope && (
             <div className="mt-6">
               <MilestoneDetailsPanel
@@ -1757,7 +1757,7 @@ export default function Dashboard() {
                   <p className="text-sm text-muted-foreground">
                     {progressType === "financial"
                       ? "Financial progress charts and analysis"
-                      : "Gantt chart, WBS breakdown, and S-curves"}
+                      : "Gantt chart and WBS breakdown"}
                   </p>
                 </div>
                 {/* Progress Type Toggle - Right side */}

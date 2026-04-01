@@ -2054,7 +2054,7 @@ export function MilestoneDetailsPanel({
     parent?: string;
   }>;
 }) {
-  const [tab, setTab] = useState<"gantt" | "wbs" | "scurves" | "photos" | "logs">("gantt");
+  const [tab, setTab] = useState<"gantt" | "wbs" | "photos" | "logs">("gantt");
 
   // Frontend-only: progress photos (with timeline date) and documents
   const [progressPhotos, setProgressPhotos] = useState<ProgressPhotoItem[]>([]);
@@ -2179,14 +2179,6 @@ export function MilestoneDetailsPanel({
     [subProjects]
   );
 
-  const subProjectTimelines = useMemo(() => {
-    if (timeline.length === 0) return [];
-    return adjustedSubProjects.map((s) => ({
-      sub: s,
-      timeline: buildDeterministicSubprojectTimeline(s, timeline),
-    }));
-  }, [adjustedSubProjects, timeline]);
-
   // If there is no WBS/timeline, render nothing (avoid showing an empty banner on pages).
   if (subProjects.length === 0 || timeline.length === 0) return null;
 
@@ -2202,7 +2194,7 @@ export function MilestoneDetailsPanel({
         {showAllTabs ? (
           <>
             {/* Show all charts side by side */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Gantt Chart */}
               <div className="lg:col-span-1">
                 <h3 className={`${isMobile ? 'text-sm' : 'text-base'} font-bold mb-3`}>Gantt Chart</h3>
@@ -2325,21 +2317,6 @@ export function MilestoneDetailsPanel({
                   </div>
                 </div>
               </div>
-
-              {/* S-Curves */}
-              <div className="lg:col-span-1">
-                <h3 className={`${isMobile ? 'text-sm' : 'text-base'} font-bold mb-3`}>S-Curves</h3>
-                <div className="space-y-4">
-                  {subProjectTimelines.map(({ sub, timeline }) => (
-                    <PlannedVsActualChart
-                      key={sub.id}
-                      phaseName={sub.name}
-                      timelineData={timeline}
-                      color={phaseColor}
-                    />
-                  ))}
-                </div>
-              </div>
             </div>
           </>
         ) : (
@@ -2347,7 +2324,6 @@ export function MilestoneDetailsPanel({
             <TabsList className={`w-full ${isMobile ? 'flex items-center gap-1 overflow-x-auto whitespace-nowrap p-1' : 'flex flex-wrap justify-start gap-1'}`}>
               <TabsTrigger value="gantt" className={isMobile ? 'text-xs shrink-0 px-3' : ''}>Gantt</TabsTrigger>
               <TabsTrigger value="wbs" className={isMobile ? 'text-xs shrink-0 px-3' : ''}>WBS Breakdown</TabsTrigger>
-              <TabsTrigger value="scurves" className={isMobile ? 'text-xs shrink-0 px-3' : ''}>S-Curves</TabsTrigger>
               <TabsTrigger value="photos" className={isMobile ? 'text-xs shrink-0 px-3' : ''}>Photos & Docs</TabsTrigger>
             </TabsList>
 
@@ -2476,19 +2452,6 @@ export function MilestoneDetailsPanel({
                     })}
                   </div>
                 </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="scurves" className="mt-4">
-              <div className="grid gap-4 grid-cols-1">
-                {subProjectTimelines.map(({ sub, timeline }) => (
-                  <PlannedVsActualChart
-                    key={sub.id}
-                    phaseName={sub.name}
-                    timelineData={timeline}
-                    color={phaseColor}
-                  />
-                ))}
               </div>
             </TabsContent>
 
