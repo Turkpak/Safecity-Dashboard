@@ -392,38 +392,75 @@ export default function Finance() {
   };
 
   const stageBreakdownItems = useMemo(() => {
-    const alloc = {
-      capital: Number(selectedProject?.allocation_capital_cost ?? 0),
-      revenue: Number(selectedProject?.allocation_revenue_cost ?? 0),
-      total: Number(selectedProject?.allocation_total_cost ?? projectSummary?.total_allocation ?? 0),
-    };
-    const pd = {
-      capital: Number(selectedProject?.pd_release_capital_cost ?? 0),
-      revenue: Number(selectedProject?.pd_release_cost ?? 0),
-      total: Number(selectedProject?.pd_release_total_cost ?? projectSummary?.total_pd_release ?? 0),
-    };
-    const spending = {
-      capital: Number(selectedProject?.spending_release_capital_cost ?? 0),
-      revenue: Number(selectedProject?.spending_release_revenue_cost ?? 0),
-      total: Number(selectedProject?.spending_release_total_cost ?? projectSummary?.total_spending_release ?? 0),
-    };
-    const pifra = {
-      capital: Number(selectedProject?.pifra_utilization_capital_cost ?? 0),
-      revenue: Number(selectedProject?.pifra_utilization_revenue_cost ?? 0),
-      total: Number(selectedProject?.pifra_utilization_total_cost ?? projectSummary?.total_pifra ?? 0),
-    };
-    const base = alloc.total || 1;
-    return [
-      { label: "Allocation", triple: alloc, color: STAGE_COLORS[1] },
-      { label: "P&D release", triple: pd, color: STAGE_COLORS[2] },
-      { label: "Spending release", triple: spending, color: STAGE_COLORS[3] },
-      { label: "PIFRA utilization", triple: pifra, color: STAGE_COLORS[4] },
-    ].map((item) => ({
-      ...item,
-      totalM: item.triple.total,
-      pctOfApproved: base > 0 ? (item.triple.total / base) * 100 : 0,
-    }));
-  }, [selectedProject, projectSummary]);
+  const alloc = {
+    capital: selectedProject
+      ? Number(selectedProject.allocation_capital_cost ?? 0)
+      : Number(projectSummary?.total_allocation_capital ?? 0),
+
+    revenue: selectedProject
+      ? Number(selectedProject.allocation_revenue_cost ?? 0)
+      : Number(projectSummary?.total_allocation_revenue ?? 0),
+
+    total: selectedProject
+      ? Number(selectedProject.allocation_total_cost ?? 0)
+      : Number(projectSummary?.total_allocation ?? 0),
+  };
+
+  const pd = {
+    capital: selectedProject
+      ? Number(selectedProject.pd_release_capital_cost ?? 0)
+      : Number(projectSummary?.total_pd_release_capital ?? 0),
+
+    revenue: selectedProject
+      ? Number(selectedProject.pd_release_cost ?? 0)
+      : Number(projectSummary?.total_pd_release_revenue ?? 0),
+
+    total: selectedProject
+      ? Number(selectedProject.pd_release_total_cost ?? 0)
+      : Number(projectSummary?.total_pd_release ?? 0),
+  };
+
+  const spending = {
+    capital: selectedProject
+      ? Number(selectedProject.spending_release_capital_cost ?? 0)
+      : Number(projectSummary?.total_spending_release_capital ?? 0),
+
+    revenue: selectedProject
+      ? Number(selectedProject.spending_release_revenue_cost ?? 0)
+      : Number(projectSummary?.total_spending_release_revenue ?? 0),
+
+    total: selectedProject
+      ? Number(selectedProject.spending_release_total_cost ?? 0)
+      : Number(projectSummary?.total_spending_release ?? 0),
+  };
+
+  const pifra = {
+    capital: selectedProject
+      ? Number(selectedProject.pifra_utilization_capital_cost ?? 0)
+      : Number(projectSummary?.total_pifra_capital ?? 0),
+
+    revenue: selectedProject
+      ? Number(selectedProject.pifra_utilization_revenue_cost ?? 0)
+      : Number(projectSummary?.total_pifra_revenue ?? 0),
+
+    total: selectedProject
+      ? Number(selectedProject.pifra_utilization_total_cost ?? 0)
+      : Number(projectSummary?.total_pifra ?? 0),
+  };
+
+  const base = alloc.total || 1;
+
+  return [
+    { label: "Allocation", triple: alloc, color: STAGE_COLORS[1] },
+    { label: "P&D release", triple: pd, color: STAGE_COLORS[2] },
+    { label: "Spending release", triple: spending, color: STAGE_COLORS[3] },
+    { label: "PIFRA utilization", triple: pifra, color: STAGE_COLORS[4] },
+  ].map((item) => ({
+    ...item,
+    totalM: item.triple.total,
+    pctOfApproved: base > 0 ? (item.triple.total / base) * 100 : 0,
+  }));
+}, [selectedProject, projectSummary]);
 
   return (
     <Layout title="Financial & Budget Analytics">
