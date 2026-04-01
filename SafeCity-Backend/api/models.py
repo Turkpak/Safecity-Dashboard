@@ -333,6 +333,7 @@ class ProjectActivity(models.Model):
     remarks = models.TextField(null=True, blank=True)
 
     progress = models.FloatField(default=0)
+    progress_date = models.DateField(null=True, blank=True)
     duration = models.FloatField(null=True, blank=True)
 
     task_type = models.CharField(max_length=20, default="task")

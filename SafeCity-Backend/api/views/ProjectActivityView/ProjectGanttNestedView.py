@@ -90,6 +90,7 @@ class ProjectGanttNestedView(APIView):
                     "progress": act.progress or 0,
                     "actual_start": act.actual_start.isoformat() if act.actual_start else None,
                     "actual_end": act.actual_end.isoformat() if act.actual_end else None,
+                    "progress_date": act.progress_date.isoformat() if act.progress_date else None,
                     "has_delay": has_delay_flag,
                     "delay_info": delay_info,
                     "subtasks": build_tree(act.id, new_id)
