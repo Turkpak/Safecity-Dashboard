@@ -74,7 +74,7 @@ export function ProjectGanttTree({
   const [activeRow, setActiveRow] = useState<FlatGanttRow | null>(null);
   const [progressValue, setProgressValue] = useState<number>(0);
   const [progressDate, setProgressDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
-  const [progressImage, setProgressImage] = useState<File | null>(null);
+  const [progressImages, setProgressImages] = useState<File[]>([]);
   const [savingProgress, setSavingProgress] = useState(false);
 
   const [delayOpen, setDelayOpen] = useState(false);
@@ -378,7 +378,7 @@ export function ProjectGanttTree({
                               typeof t.progress === "number" && Number.isFinite(t.progress) ? t.progress : 0,
                             );
                             setProgressDate(new Date().toISOString().slice(0, 10));
-                            setProgressImage(null);
+                            setProgressImages([]);
                             setProgressOpen(true);
                           }}
                         >
@@ -628,7 +628,7 @@ export function ProjectGanttTree({
           setProgressOpen(open);
           if (!open) {
             setActiveRow(null);
-            setProgressImage(null);
+            setProgressImages([]);
             setSavingProgress(false);
           }
         }}
@@ -688,7 +688,7 @@ export function ProjectGanttTree({
               <Label>Picture (optional)</Label>
               <div
                 className={`relative border-2 border-dashed rounded-lg p-5 flex items-center justify-between gap-4 transition-all ${
-                  progressImage
+                  progressImages.length > 0
                     ? "border-primary bg-primary/5"
                     : "border-muted-foreground/20 hover:border-primary/50 cursor-pointer"
                 }`}
@@ -704,23 +704,25 @@ export function ProjectGanttTree({
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium">
-                    {progressImage ? progressImage.name : "Click to upload a progress picture"}
+                    {progressImages.length > 0
+                      ? `${progressImages.length} file(s) selected`
+                      : "Click to upload progress picture(s)"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {progressImage
-                      ? `${(progressImage.size / 1024).toFixed(1)} KB`
+                    {progressImages.length > 0
+                      ? progressImages.map((f) => f.name).join(", ")
                       : "PNG, JPG, JPEG"}
                   </p>
                 </div>
 
-                {progressImage ? (
+                {progressImages.length > 0 ? (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setProgressImage(null);
+                      setProgressImages([]);
                     }}
                   >
                     Remove
@@ -735,8 +737,12 @@ export function ProjectGanttTree({
                   id="gantt-progress-image-input"
                   type="file"
                   accept="image/*"
+                  multiple
                   className="hidden"
-                  onChange={(e) => setProgressImage(e.target.files?.[0] ?? null)}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    setProgressImages(files);
+                  }}
                 />
               </div>
             </div>
@@ -777,20 +783,22 @@ export function ProjectGanttTree({
                         : undefined,
                   });
 
-                  if (progressImage && projectId != null) {
-                    await createPictorialArchive({
-                      project: projectId,
-                      image: progressImage,
-                      image_date: progressDate || new Date().toISOString().slice(0, 10),
-                      description: `Progress update • Activity: ${activeRow.label} • ${Math.round(progressValue)}%`,
-                    });
+                  if (progressImages.length > 0 && projectId != null) {
+                    for (const img of progressImages) {
+                      await createPictorialArchive({
+                        project: projectId,
+                        image: img,
+                        image_date: progressDate || new Date().toISOString().slice(0, 10),
+                        description: `Progress update • Activity: ${activeRow.label} • ${Math.round(progressValue)}%`,
+                      });
+                    }
                   }
 
                   toast({
                     title: "Progress saved",
-                    description: progressImage
+                    description: progressImages.length > 0
                       ? projectId != null
-                        ? "Progress updated and picture attached."
+                        ? "Progress updated and picture(s) attached."
                         : "Progress updated (picture not saved: missing project context)."
                       : "Progress updated successfully.",
                   });
