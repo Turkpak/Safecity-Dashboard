@@ -455,23 +455,12 @@ class TaskSerializer(serializers.ModelSerializer):
             "duration",
             "task_type"
         ]
-            
-class SubActivitySerializer(serializers.ModelSerializer):
+
+class ActivityDelayLogSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ProjectActivity
-        fields = ['id', 'title', 'planned_progress', 'actual_progress', 'start_date', 'end_date', 'owner']
-
-class ActivitySerializer(serializers.ModelSerializer):
-    children = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ProjectActivity
-        fields = ['id', 'title', 'weight', 'status', 'children']
-
-    def get_children(self, obj):
-        # Fetch sub-activities where parent == this activity
-        sub_activities = ProjectActivity.objects.filter(parent=obj)
-        return SubActivitySerializer(sub_activities, many=True).data
+        model = ActivityDelayLog
+        fields = "__all__"
+        read_only_fields = ["originator", "created_by"]
 # --------------------------------------------------------
 # Pictorial Archive
 # --------------------------------------------------------

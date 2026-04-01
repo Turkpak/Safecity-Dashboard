@@ -22,15 +22,14 @@ type FlatGanttRow = {
   label: string;
   start: string | null;
   end: string | null;
-  /** Actual dates from API (YYYY-MM-DD). */
+  progress: number;
+  parent?: string;
+  order?: number;
+  db_id?: number;
+
+  // ✅ ADD THESE
   actual_start?: string | null;
   actual_end?: string | null;
-  progress: number; // 0..100
-  parent?: string;
-  /** Optional stable ordering index (insertion order from API flattening). */
-  order?: number;
-  /** Database id of ProjectActivity (required for update-task-actual). */
-  db_id?: number;
 };
 
 function clamp(n: number, min: number, max: number) {
@@ -334,8 +333,8 @@ export function ProjectGanttTree({
                           onSelect={(e) => {
                             e.preventDefault();
                             setDelayRow(t);
-                            setDelayStartDate(t.actual_start ?? "");
-                            setDelayEndDate(t.actual_end ?? "");
+                            setDelayStartDate("");
+                            setDelayEndDate("");
                             const role = user?.role ?? user?.stakeholder_type ?? "";
                             setDelayOriginator(role ? String(role) : "—");
                             setDelayActionBy(role ? String(role) : "");
@@ -425,11 +424,11 @@ export function ProjectGanttTree({
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-1.5">
-                <Label>Actual start date</Label>
+                <Label>Start date</Label>
                 <Input type="date" value={delayStartDate} onChange={(e) => setDelayStartDate(e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label>Actual end date</Label>
+                <Label>End date</Label>
                 <Input type="date" value={delayEndDate} onChange={(e) => setDelayEndDate(e.target.value)} />
               </div>
               <div className="space-y-1.5">
@@ -579,15 +578,7 @@ export function ProjectGanttTree({
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-1.5">
-                <Label>Start date</Label>
-                <Input type="date" value={activeRow?.start ?? ""} readOnly />
-              </div>
-              <div className="space-y-1.5">
-                <Label>End date</Label>
-                <Input type="date" value={activeRow?.end ?? ""} readOnly />
-              </div>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Progress date</Label>
                 <Input type="date" value={progressDate} onChange={(e) => setProgressDate(e.target.value)} />
@@ -673,7 +664,18 @@ export function ProjectGanttTree({
                   setSavingProgress(true);
                   await updateTaskActual(activeRow.db_id, {
                     progress: Math.max(0, Math.min(100, Number(progressValue))),
-                    actual_end: progressDate || null,
+
+                    // ✅ only send if not already set
+                    actual_start:
+                      progressValue > 0 && !activeRow.actual_start
+                        ? progressDate
+                        : undefined,
+
+                    // ✅ only when completed
+                    actual_end:
+                      progressValue === 100
+                        ? progressDate
+                        : undefined,
                   });
 
                   if (progressImage && projectId != null) {
