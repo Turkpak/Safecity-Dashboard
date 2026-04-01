@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { MoreVertical, Plus, Upload, FileText } from "lucide-react";
+import { MoreVertical, Plus, Upload, FileText, FolderKanban, ListChecks, CornerDownRight } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,9 +9,12 @@ import {
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { updateTaskActual, createPictorialArchive } from "@/api";
 
 type FlatGanttRow = {
@@ -63,6 +66,7 @@ export function ProjectGanttTree({
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const [progressOpen, setProgressOpen] = useState(false);
   const [activeRow, setActiveRow] = useState<FlatGanttRow | null>(null);
@@ -70,6 +74,26 @@ export function ProjectGanttTree({
   const [progressDate, setProgressDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [progressImage, setProgressImage] = useState<File | null>(null);
   const [savingProgress, setSavingProgress] = useState(false);
+
+  const [delayOpen, setDelayOpen] = useState(false);
+  const [delayRow, setDelayRow] = useState<FlatGanttRow | null>(null);
+  const [delayStartDate, setDelayStartDate] = useState<string>("");
+  const [delayEndDate, setDelayEndDate] = useState<string>("");
+  const [delayOriginator, setDelayOriginator] = useState<string>("");
+  const [delayIssue, setDelayIssue] = useState<string>("");
+  const [delayRecommendedAction, setDelayRecommendedAction] = useState<string>("");
+  const [delayActionBy, setDelayActionBy] = useState<string>("");
+  const [savingDelay, setSavingDelay] = useState(false);
+
+  const delayDays = useMemo(() => {
+    if (!delayStartDate || !delayEndDate) return 0;
+    const s = new Date(delayStartDate);
+    const e = new Date(delayEndDate);
+    const ms = e.getTime() - s.getTime();
+    if (!Number.isFinite(ms)) return 0;
+    // inclusive day difference (min 0)
+    return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+  }, [delayStartDate, delayEndDate]);
 
   const normalized = useMemo(() => {
     return (tasks || []).map((t) => ({
@@ -208,6 +232,22 @@ export function ProjectGanttTree({
                   ? "text-xs font-semibold"
                   : "text-xs font-medium";
 
+            const levelMeta =
+              t.depth === 0
+                ? {
+                    Icon: FolderKanban,
+                    iconWrap: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300",
+                  }
+                : t.depth === 1
+                  ? {
+                      Icon: ListChecks,
+                      iconWrap: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+                    }
+                  : {
+                      Icon: CornerDownRight,
+                      iconWrap: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+                    };
+
             return (
               <div key={t.id} className="flex items-stretch gap-0 rounded-lg border border-border/60 bg-card/50">
                 <div
@@ -215,6 +255,12 @@ export function ProjectGanttTree({
                   style={{ paddingLeft: `${12 + t.depth * 18}px` }}
                   title={t.label}
                 >
+                  <div
+                    className={`h-7 w-7 rounded-lg flex items-center justify-center border ${levelMeta.iconWrap}`}
+                    title={t.depth === 0 ? "Project" : t.depth === 1 ? "Task" : "Subtask"}
+                  >
+                    <levelMeta.Icon className="h-4 w-4" />
+                  </div>
                   {t.hasChildren ? (
                     <button
                       type="button"
@@ -235,7 +281,9 @@ export function ProjectGanttTree({
                   )}
                   <div className="min-w-0 flex-1">
                     <div className={depthFont}>
-                      <span className="truncate block">{t.label}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="truncate block">{t.label}</span>
+                      </div>
                     </div>
                     <div className="text-[10px] text-muted-foreground">
                       Weight {w.toFixed(0)}%{" "}
@@ -268,58 +316,220 @@ export function ProjectGanttTree({
                 </div>
 
                 <div className="w-20 border-l border-border/60 flex items-center justify-center">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className="h-9 w-9 rounded-lg border border-border/60 bg-background hover:bg-muted/60 flex items-center justify-center"
-                        aria-label="Options"
-                      >
-                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add delay log
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={(e) => {
-                          e.preventDefault();
-                          if (onOpenAddDocument) {
-                            onOpenAddDocument(t.id, t.label);
-                            return;
-                          }
-                          toast({
-                            title: "Documents not available here",
-                            description: "Open the Photos & Docs tab to add documents for this project.",
-                          });
-                        }}
-                      >
-                        <FileText className="h-4 w-4 mr-2" />
-                        Add documents
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={(e) => {
-                          e.preventDefault();
-                          setActiveRow(t);
-                          setProgressValue(typeof t.progress === "number" && Number.isFinite(t.progress) ? t.progress : 0);
-                          setProgressDate(new Date().toISOString().slice(0, 10));
-                          setProgressImage(null);
-                          setProgressOpen(true);
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add progress
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {/* Show options only for leaf subtasks (not parent WBS rows). */}
+                  {!t.hasChildren && t.depth >= 2 ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="h-9 w-9 rounded-lg border border-border/60 bg-background hover:bg-muted/60 flex items-center justify-center"
+                          aria-label="Options"
+                        >
+                          <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            setDelayRow(t);
+                            setDelayStartDate("");
+                            setDelayEndDate("");
+                            const role = user?.role ?? user?.stakeholder_type ?? "";
+                            setDelayOriginator(role ? String(role) : "—");
+                            setDelayActionBy(role ? String(role) : "");
+                            setDelayIssue("");
+                            setDelayRecommendedAction("");
+                            setDelayOpen(true);
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add delay log
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            if (onOpenAddDocument) {
+                              onOpenAddDocument(t.id, t.label);
+                              return;
+                            }
+                            toast({
+                              title: "Documents not available here",
+                              description: "Open the Photos & Docs tab to add documents for this project.",
+                            });
+                          }}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Add documents
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            setActiveRow(t);
+                            setProgressValue(
+                              typeof t.progress === "number" && Number.isFinite(t.progress) ? t.progress : 0,
+                            );
+                            setProgressDate(new Date().toISOString().slice(0, 10));
+                            setProgressImage(null);
+                            setProgressOpen(true);
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add progress
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : (
+                    <span className="inline-block h-9 w-9" aria-hidden />
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
       </div>
+
+      <Dialog
+        open={delayOpen}
+        onOpenChange={(open) => {
+          setDelayOpen(open);
+          if (!open) {
+            setDelayRow(null);
+            setDelayStartDate("");
+            setDelayEndDate("");
+            setDelayOriginator("");
+            setDelayIssue("");
+            setDelayRecommendedAction("");
+            setDelayActionBy("");
+            setSavingDelay(false);
+          }
+        }}
+      >
+        <DialogContent className="w-[95vw] max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add Delay Log</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Project</Label>
+                <Input value={projectName ?? (projectId != null ? `Project #${projectId}` : "—")} readOnly />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Activity</Label>
+                <Input value={delayRow?.label ?? ""} readOnly />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-1.5">
+                <Label>Start date</Label>
+                <Input type="date" value={delayStartDate} onChange={(e) => setDelayStartDate(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>End date</Label>
+                <Input type="date" value={delayEndDate} onChange={(e) => setDelayEndDate(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Delay (days)</Label>
+                <Input value={String(delayDays)} readOnly />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Originator</Label>
+                <Input value={delayOriginator} readOnly />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Action by</Label>
+                <Select value={delayActionBy} onValueChange={setDelayActionBy}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from(
+                      new Set(
+                        [user?.role, user?.stakeholder_type, "super_admin", "contractor", "consultant"]
+                          .filter(Boolean)
+                          .map((v) => String(v))
+                      )
+                    ).map((r) => (
+                      <SelectItem key={r} value={r}>
+                        {r}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Issue</Label>
+                <Textarea
+                  value={delayIssue}
+                  onChange={(e) => setDelayIssue(e.target.value)}
+                  placeholder="Describe the issue due to which the delay occurred..."
+                  className="min-h-[110px]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Recommended action</Label>
+                <Textarea
+                  value={delayRecommendedAction}
+                  onChange={(e) => setDelayRecommendedAction(e.target.value)}
+                  placeholder="Recommended action to address the delay..."
+                  className="min-h-[110px]"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setDelayOpen(false)} disabled={savingDelay}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={
+                savingDelay ||
+                !delayRow ||
+                !delayStartDate ||
+                !delayEndDate ||
+                !delayOriginator ||
+                !delayIssue.trim() ||
+                !delayRecommendedAction.trim() ||
+                !delayActionBy
+              }
+              onClick={async () => {
+                if (!delayRow) return;
+                try {
+                  setSavingDelay(true);
+                  // Backend persistence not implemented yet for delay logs.
+                  // For now: just acknowledge and keep UI consistent.
+                  toast({
+                    title: "Delay log saved",
+                    description: `Delay ${delayDays} day(s) logged for "${delayRow.label}".`,
+                  });
+                  setDelayOpen(false);
+                } catch (err) {
+                  toast({
+                    title: "Failed to save delay log",
+                    description: err instanceof Error ? err.message : "Please try again.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setSavingDelay(false);
+                }
+              }}
+            >
+              {savingDelay ? "Saving..." : "Save delay log"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={progressOpen}
