@@ -49,6 +49,10 @@ export interface GanttTask {
   label: string;
   start: string | null;
   end: string | null;
+  /** Actual start date from backend (YYYY-MM-DD). */
+  actual_start?: string | null;
+  /** Actual end date from backend (YYYY-MM-DD). */
+  actual_end?: string | null;
   progress: number;
   parent?: string;
   /** Stable ordering index to preserve API/XER sibling order. */
@@ -109,6 +113,8 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
       label: String(node?.name ?? node?.activity_name ?? `#${id}`),
       start: range.start,
       end: range.end,
+      actual_start: asDate(node?.actual_start),
+      actual_end: asDate(node?.actual_end),
       progress: typeof node?.progress === "number" && Number.isFinite(node.progress) ? node.progress : 0,
       parent,
       order: orderCounter++,
@@ -133,6 +139,8 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
     label: act.activity_name || `#${act.activity_id}`,
     start: act.start_date || null,
     end: act.end_date || act.start_date || null,
+    actual_start: act.actual_start ?? null,
+    actual_end: act.actual_end ?? null,
     progress: act.progress ?? 0,
     parent: act.parent_id ? String(act.parent_id) : undefined,
     order: idx,

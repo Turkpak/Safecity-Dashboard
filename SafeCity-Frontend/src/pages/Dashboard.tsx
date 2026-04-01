@@ -68,6 +68,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { listProjects, getProjectById } from "@/api/project";
+import { useSidebar } from "@/contexts/SidebarContext";
 
 // Enhanced installation progress data with sub-projects and planned vs actual
 interface PhaseProgress {
@@ -628,6 +629,8 @@ const getProgressRangeMeta = (overall: number): ProgressRangeMeta => {
 };
 
 export default function Dashboard() {
+  const { isCollapsed, setCollapsed } = useSidebar();
+  const sidebarPrevCollapsedRef = useRef<boolean | null>(null);
   const [location, setLocation] = useLocation();
   const [viewType, setViewType] = useState<
     "divisions" | "districts" | "tehsils" | "projects" | ""
@@ -890,6 +893,22 @@ export default function Dashboard() {
       ignore = true;
     };
   }, [selectedProjectForDetails?.id]);
+
+  // Auto-collapse sidebar while project details (Gantt) are open, and restore prior state on close.
+  useEffect(() => {
+    const detailsOpen = !!selectedProjectForDetails?.id;
+    if (detailsOpen) {
+      if (sidebarPrevCollapsedRef.current == null) {
+        sidebarPrevCollapsedRef.current = isCollapsed;
+      }
+      setCollapsed(true);
+      return;
+    }
+    if (sidebarPrevCollapsedRef.current != null) {
+      setCollapsed(sidebarPrevCollapsedRef.current);
+      sidebarPrevCollapsedRef.current = null;
+    }
+  }, [selectedProjectForDetails?.id, isCollapsed, setCollapsed]);
 
   // Filter options from API data
   const divisions = useMemo(
@@ -2753,7 +2772,9 @@ export default function Dashboard() {
                               overallProgress={progress}
                               onClick={() => {
                                 // instead of navigating off-dashboard, show details inline
-                                setSelectedProjectForDetails(project);
+                                setSelectedProjectForDetails((prev) =>
+                                  prev?.id === project.id ? null : project,
+                                );
                               }}
                               color={CARD_COLORS[index % CARD_COLORS.length]}
                             />
@@ -3274,7 +3295,11 @@ export default function Dashboard() {
                       key={project.id}
                       title={project.project_name || `Project ${project.id}`}
                       overallProgress={progress}
-                      onClick={() => setSelectedProjectForDetails(project)}
+                      onClick={() =>
+                        setSelectedProjectForDetails((prev) =>
+                          prev?.id === project.id ? null : project,
+                        )
+                      }
                       color={CARD_COLORS[index % CARD_COLORS.length]}
                     />
                   );

@@ -22,6 +22,9 @@ type FlatGanttRow = {
   label: string;
   start: string | null;
   end: string | null;
+  /** Actual dates from API (YYYY-MM-DD). */
+  actual_start?: string | null;
+  actual_end?: string | null;
   progress: number; // 0..100
   parent?: string;
   /** Optional stable ordering index (insertion order from API flattening). */
@@ -331,8 +334,8 @@ export function ProjectGanttTree({
                           onSelect={(e) => {
                             e.preventDefault();
                             setDelayRow(t);
-                            setDelayStartDate("");
-                            setDelayEndDate("");
+                            setDelayStartDate(t.actual_start ?? "");
+                            setDelayEndDate(t.actual_end ?? "");
                             const role = user?.role ?? user?.stakeholder_type ?? "";
                             setDelayOriginator(role ? String(role) : "—");
                             setDelayActionBy(role ? String(role) : "");
@@ -422,11 +425,11 @@ export function ProjectGanttTree({
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-1.5">
-                <Label>Start date</Label>
+                <Label>Actual start date</Label>
                 <Input type="date" value={delayStartDate} onChange={(e) => setDelayStartDate(e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label>End date</Label>
+                <Label>Actual end date</Label>
                 <Input type="date" value={delayEndDate} onChange={(e) => setDelayEndDate(e.target.value)} />
               </div>
               <div className="space-y-1.5">
