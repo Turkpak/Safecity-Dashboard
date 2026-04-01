@@ -348,6 +348,38 @@ class TaskDependency(models.Model):
     predecessor = models.ForeignKey(ProjectActivity, related_name="predecessors", on_delete=models.CASCADE)
     type = models.CharField(max_length=10)  # FS, SS, FF
 
+
+class ActivityDelayLog(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="delay_logs")
+    activity = models.ForeignKey(ProjectActivity, on_delete=models.CASCADE, related_name="delay_logs")
+
+    # dates
+    delay_start_date = models.DateField()
+    delay_end_date = models.DateField()
+    delay_days = models.IntegerField(default=0)
+
+    # details
+    originator = models.CharField(max_length=100, null=True, blank=True)
+    action_by = models.CharField(max_length=100)
+
+    issue = models.TextField()
+    recommended_action = models.TextField()
+
+    # tracking
+    created_by = models.ForeignKey(MyUser, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        # auto calculate delay days
+        if self.delay_start_date and self.delay_end_date:
+            self.delay_days = max(
+                0,
+                (self.delay_end_date - self.delay_start_date).days
+            )
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.activity.activity_name} - {self.delay_days} days delay"
 # --------------------------------------------------------
 # Pictorial Archive
 # --------------------------------------------------------

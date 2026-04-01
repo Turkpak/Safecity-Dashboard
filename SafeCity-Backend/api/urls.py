@@ -80,6 +80,8 @@ urlpatterns = [
     path('project-gantt-nested/<int:project_id>/', ProjectGanttNestedView.as_view(), name='project-gantt-nested'),
 
     path('project-summary/', ProjectSummaryView.as_view(), name='project-summary'),
+
+    path("add-delay-log/", ActivityDelayLogView.as_view()),
 ]
 
 if settings.DEBUG:
