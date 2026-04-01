@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { MoreVertical, Plus, Upload, FileText, FolderKanban, ListChecks, CornerDownRight } from "lucide-react";
+import { MoreVertical, Plus, Upload, FileText, FolderKanban, ListChecks, CornerDownRight, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,9 +13,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { updateTaskActual, createPictorialArchive } from "@/api";
+import { updateTaskActual, createPictorialArchive, addDelayLog } from "@/api";
 
 type FlatGanttRow = {
   id: string;
@@ -79,6 +81,9 @@ export function ProjectGanttTree({
   const [delayRow, setDelayRow] = useState<FlatGanttRow | null>(null);
   const [delayStartDate, setDelayStartDate] = useState<string>("");
   const [delayEndDate, setDelayEndDate] = useState<string>("");
+  const [delayCategory, setDelayCategory] = useState<string>("");
+  const [delayCategoryOpen, setDelayCategoryOpen] = useState(false);
+  const [delayCategoryQuery, setDelayCategoryQuery] = useState("");
   const [delayOriginator, setDelayOriginator] = useState<string>("");
   const [delayIssue, setDelayIssue] = useState<string>("");
   const [delayRecommendedAction, setDelayRecommendedAction] = useState<string>("");
@@ -333,8 +338,11 @@ export function ProjectGanttTree({
                           onSelect={(e) => {
                             e.preventDefault();
                             setDelayRow(t);
-                            setDelayStartDate("");
-                            setDelayEndDate("");
+                            setDelayStartDate(t.start ?? "");
+                            setDelayEndDate(t.end ?? t.start ?? "");
+                            setDelayCategory("");
+                            setDelayCategoryOpen(false);
+                            setDelayCategoryQuery("");
                             const role = user?.role ?? user?.stakeholder_type ?? "";
                             setDelayOriginator(role ? String(role) : "—");
                             setDelayActionBy(role ? String(role) : "");
@@ -344,7 +352,7 @@ export function ProjectGanttTree({
                           }}
                         >
                           <Plus className="h-4 w-4 mr-2" />
-                          Add delay log
+                          Add Delay
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onSelect={(e) => {
@@ -397,6 +405,9 @@ export function ProjectGanttTree({
             setDelayRow(null);
             setDelayStartDate("");
             setDelayEndDate("");
+            setDelayCategory("");
+            setDelayCategoryOpen(false);
+            setDelayCategoryQuery("");
             setDelayOriginator("");
             setDelayIssue("");
             setDelayRecommendedAction("");
@@ -407,7 +418,7 @@ export function ProjectGanttTree({
       >
         <DialogContent className="w-[95vw] max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Add Delay Log</DialogTitle>
+            <DialogTitle>Add Delay</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-5">
@@ -424,11 +435,11 @@ export function ProjectGanttTree({
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-1.5">
-                <Label>Start date</Label>
+                <Label>Delay Start date</Label>
                 <Input type="date" value={delayStartDate} onChange={(e) => setDelayStartDate(e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label>End date</Label>
+                <Label>Delay End date</Label>
                 <Input type="date" value={delayEndDate} onChange={(e) => setDelayEndDate(e.target.value)} />
               </div>
               <div className="space-y-1.5">
@@ -437,10 +448,64 @@ export function ProjectGanttTree({
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-1.5">
                 <Label>Originator</Label>
                 <Input value={delayOriginator} readOnly />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Category</Label>
+                <Popover open={delayCategoryOpen} onOpenChange={setDelayCategoryOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={delayCategoryOpen}
+                      className="w-full justify-between font-normal h-10 px-3 text-sm"
+                    >
+                      <span className="truncate">{delayCategory ? delayCategory : "Select category"}</span>
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                    <Command
+                      filter={(value, search) => {
+                        const q = (search || "").toLowerCase();
+                        if (!q) return 1;
+                        return (value || "").toLowerCase().includes(q) ? 1 : 0;
+                      }}
+                    >
+                      <CommandInput
+                        placeholder="Type category…"
+                        value={delayCategoryQuery}
+                        onValueChange={setDelayCategoryQuery}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          <div className="p-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="w-full justify-center"
+                              disabled={!delayCategoryQuery.trim()}
+                              onClick={() => {
+                                const v = delayCategoryQuery.trim();
+                                if (!v) return;
+                                setDelayCategory(v);
+                                setDelayCategoryOpen(false);
+                              }}
+                            >
+                              Use “{delayCategoryQuery.trim() || "…"}”
+                            </Button>
+                          </div>
+                        </CommandEmpty>
+                        <CommandGroup />
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-1.5">
                 <Label>Action by</Label>
@@ -496,22 +561,48 @@ export function ProjectGanttTree({
               disabled={
                 savingDelay ||
                 !delayRow ||
+                projectId == null ||
+                !delayRow.db_id ||
                 !delayStartDate ||
                 !delayEndDate ||
                 !delayOriginator ||
+                !delayCategory ||
                 !delayIssue.trim() ||
                 !delayRecommendedAction.trim() ||
                 !delayActionBy
               }
               onClick={async () => {
                 if (!delayRow) return;
+                if (projectId == null) {
+                  toast({
+                    title: "Cannot save delay log",
+                    description: "Missing project id. Please refresh and try again.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                if (!delayRow.db_id || !Number.isFinite(delayRow.db_id)) {
+                  toast({
+                    title: "Cannot save delay log",
+                    description: "Missing activity id from API. Please refresh and try again.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
                 try {
                   setSavingDelay(true);
-                  // Backend persistence not implemented yet for delay logs.
-                  // For now: just acknowledge and keep UI consistent.
+                  await addDelayLog({
+                    project: projectId,
+                    activity: delayRow.db_id,
+                    delay_start_date: delayStartDate,
+                    delay_end_date: delayEndDate,
+                    action_by: delayActionBy,
+                    issue: delayIssue.trim(),
+                    recommended_action: delayRecommendedAction.trim(),
+                  });
                   toast({
                     title: "Delay log saved",
-                    description: `Delay ${delayDays} day(s) logged for "${delayRow.label}".`,
+                    description: `Delay ${delayDays} day(s) • ${delayCategory} • "${delayRow.label}".`,
                   });
                   setDelayOpen(false);
                 } catch (err) {
@@ -580,11 +671,11 @@ export function ProjectGanttTree({
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-1.5">
-                <Label>Start date</Label>
+                <Label> Start date</Label>
                 <Input type="date" value={activeRow?.start ?? ""} readOnly />
               </div>
               <div className="space-y-1.5">
-                <Label>End date</Label>
+                <Label> End date</Label>
                 <Input type="date" value={activeRow?.end ?? ""} readOnly />
               </div>
               <div className="space-y-1.5">
