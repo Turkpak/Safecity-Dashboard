@@ -371,69 +371,86 @@ export default function StakeholderManagement() {
               ) : paginated.length === 0 ? (
                 emptyListMessage
               ) : (
-                <ul className="divide-y divide-border/60 list-none m-0 p-0">
-                  {paginated.map((stakeholder, index) => (
-                    <li key={stakeholder.id} className="p-2 space-y-1.5">
-                      <div className="flex items-start justify-between gap-2 min-w-0">
-                        <span className="text-xs font-medium text-muted-foreground tabular-nums shrink-0 pt-0.5">
-                          #{index + 1}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => toggleStatus(stakeholder)}
-                          disabled={updateMutation.isPending}
-                          className={cn(
-                            "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 min-h-8 text-xs font-semibold transition-all hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 shrink-0",
-                            stakeholder.status === "active"
-                              ? "border-transparent bg-primary text-primary-foreground"
-                              : "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "h-1.5 w-1.5 rounded-full shrink-0",
-                              stakeholder.status === "active" ? "bg-primary-foreground/80" : "bg-slate-500"
-                            )}
-                            aria-hidden
-                          />
-                          {statusDisplay(stakeholder.status)}
-                        </button>
-                      </div>
-                      <div className="min-w-0 space-y-1">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Type</p>
-                        <p className="text-sm font-medium text-foreground break-words">{stakeholder.stakeholder_type}</p>
-                      </div>
-                      <div className="min-w-0 space-y-1">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Title</p>
-                        <p className="text-sm text-foreground break-words">{stakeholder.stakeholder_title}</p>
-                      </div>
-                      <div className="flex justify-end gap-2 pt-1 border-t border-border/40">
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="outline"
-                          className="h-9 w-9 shrink-0 text-primary border-primary/20 hover:bg-primary/10"
-                          onClick={() => openEditDialog(stakeholder)}
-                          disabled={updateMutation.isPending}
-                          aria-label="Edit stakeholder"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="outline"
-                          className="h-9 w-9 shrink-0 text-destructive border-destructive/20 hover:bg-destructive/10"
-                          onClick={() => handleDelete(stakeholder.id)}
-                          disabled={deleteMutation.isPending}
-                          aria-label="Delete stakeholder"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                <div className="p-3 space-y-3">
+                  {paginated.map((stakeholder, index) => {
+                    const isActive = stakeholder.status === "active";
+                    const accentBorder = isActive ? "border-l-emerald-500" : "border-l-slate-400";
+                    const statusClasses = isActive
+                      ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200"
+                      : "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-200";
+
+                    return (
+                      <Card
+                        key={stakeholder.id}
+                        className={cn(
+                          "rounded-xl border border-border/80 bg-gradient-to-b from-card to-muted/15 shadow-sm overflow-hidden border-l-4",
+                          accentBorder,
+                        )}
+                      >
+                        <CardHeader className="pb-2 pt-3 px-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <CardTitle className="text-sm font-semibold leading-tight break-words">
+                                {stakeholder.stakeholder_title}
+                              </CardTitle>
+                              <CardDescription className="text-xs mt-1 text-muted-foreground">
+                                Type: <span className="font-medium text-foreground">{stakeholder.stakeholder_type}</span>
+                              </CardDescription>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleStatus(stakeholder)}
+                              disabled={updateMutation.isPending}
+                              className={cn(
+                                "shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold border-0",
+                                statusClasses,
+                              )}
+                              aria-label="Toggle stakeholder status"
+                            >
+                              <span
+                                className={cn(
+                                  "h-1.5 w-1.5 rounded-full",
+                                  isActive ? "bg-emerald-600" : "bg-slate-500",
+                                )}
+                                aria-hidden
+                              />
+                              {statusDisplay(stakeholder.status)}
+                            </button>
+                          </div>
+                        </CardHeader>
+
+                        <CardContent className="px-4 pb-4 pt-0 space-y-3">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span className="tabular-nums">#{index + 1}</span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              type="button"
+                              variant="default"
+                              className="w-full"
+                              onClick={() => openEditDialog(stakeholder)}
+                              disabled={updateMutation.isPending}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                              Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full text-destructive border-destructive/20 hover:bg-destructive/10"
+                              onClick={() => handleDelete(stakeholder.id)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Delete
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
               )}
             </div>
 
