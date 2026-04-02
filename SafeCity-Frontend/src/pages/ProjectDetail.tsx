@@ -478,7 +478,7 @@ export default function ProjectDetail() {
     <Layout title={`${selectedProject.title} - ${tehsilName} Tehsil`}>
       <div className="space-y-6">
         {/* Back Button */}
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 min-w-0">
           <Button
             variant="outline"
             onClick={() => {
@@ -490,25 +490,25 @@ export default function ProjectDetail() {
                 setLocation('/');
               }
             }}
-            className="rounded-xl cursor-pointer"
+            className="rounded-xl cursor-pointer w-full sm:w-auto shrink-0"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to {actualTehsilName || 'Tehsil'} Projects
           </Button>
-          <div>
-            <h2 className="text-2xl font-bold font-heading">{selectedProject.title}</h2>
+          <div className="min-w-0">
+            <h2 className="text-xl sm:text-2xl font-bold font-heading break-words">{selectedProject.title}</h2>
             <p className="text-sm text-muted-foreground">{tehsilName} Tehsil - Project Details</p>
           </div>
         </div>
 
         {/* Project KPIs - Sub-projects of the selected project */}
         <div className="w-full">
-          <div className="mb-3 flex items-start justify-between gap-4">
-            <div>
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 min-w-0">
+            <div className="min-w-0">
               <h2 className="text-xl font-bold font-heading mb-1">Project KPIs</h2>
-              <p className="text-sm text-muted-foreground">Sub-projects breakdown for {selectedProject.title}</p>
+              <p className="text-sm text-muted-foreground break-words">Sub-projects breakdown for {selectedProject.title}</p>
             </div>
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap shrink-0">
               {selectedMilestoneKey && (
                 <button
                   type="button"

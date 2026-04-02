@@ -574,15 +574,15 @@ export default function Finance() {
   }, [stageBreakdownItems]);
 
   return (
-    <Layout title="Financial & Budget Analytics">
-      <div className="flex flex-col gap-6">
+    <Layout title={isMobile ? "FINANCIAL ANALYTICS" : "Financial & Budget Analytics"}>
+      <div className="flex flex-col gap-4 sm:gap-6 w-full min-w-0">
         {/* Filters */}
-        <div className="flex flex-nowrap items-center gap-3 overflow-x-auto pb-1">
+        <div className="flex flex-wrap items-center gap-3 min-w-0">
           <Filter className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
             <label className="text-sm font-medium text-muted-foreground shrink-0">Division</label>
             <Select value={selectedDivisionId} onValueChange={handleDivisionChange} disabled={divisionsLoading}>
-              <SelectTrigger className="h-9 w-[140px] border-border/50 bg-background rounded-md">
+              <SelectTrigger className="h-9 w-full min-w-[120px] sm:w-[140px] border-border/50 bg-background rounded-md">
                 <SelectValue placeholder={divisionsLoading ? "Loading…" : "All"} />
               </SelectTrigger>
               <SelectContent>
@@ -595,7 +595,7 @@ export default function Finance() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
             <label className="text-sm font-medium text-muted-foreground shrink-0">District</label>
             <Select
               value={selectedDistrictId}
@@ -604,7 +604,7 @@ export default function Finance() {
             >
               <SelectTrigger
                 className={cn(
-                  "h-9 w-[140px] border-border/50 bg-background rounded-md",
+                  "h-9 w-full min-w-[120px] sm:w-[140px] border-border/50 bg-background rounded-md",
                   (selectedDivisionId === "all" || districtsLoading) && "opacity-50 cursor-not-allowed"
                 )}
               >
@@ -621,7 +621,7 @@ export default function Finance() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
             <label className="text-sm font-medium text-muted-foreground shrink-0">Tehsil</label>
             <Select
               value={selectedTehsilId}
@@ -630,7 +630,7 @@ export default function Finance() {
             >
               <SelectTrigger
                 className={cn(
-                  "h-9 w-[140px] border-border/50 bg-background rounded-md",
+                  "h-9 w-full min-w-[120px] sm:w-[140px] border-border/50 bg-background rounded-md",
                   (selectedDivisionId === "all" ||
                     selectedDistrictId === "all" ||
                     tehsilsLoading) &&
@@ -651,10 +651,10 @@ export default function Finance() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1 sm:flex-initial basis-full sm:basis-auto">
             <label className="text-sm font-medium text-muted-foreground shrink-0">Project</label>
             <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-              <SelectTrigger className="h-9 w-[160px] border-border/50 bg-background rounded-md">
+              <SelectTrigger className="h-9 w-full min-w-[140px] sm:w-[160px] max-w-full border-border/50 bg-background rounded-md">
                 <SelectValue placeholder="All" />
               </SelectTrigger>
               <SelectContent>

@@ -867,7 +867,7 @@ export default function ProjectManagement() {
 
   return (
     <Layout title="Project Management">
-      <div className="flex flex-col min-h-[calc(100vh-8rem)]">
+      <div className="flex flex-col min-h-[calc(100vh-8rem)] w-full min-w-0">
         {/* Header with search and Add Project button */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0 mb-4">
           <div className="min-w-0">

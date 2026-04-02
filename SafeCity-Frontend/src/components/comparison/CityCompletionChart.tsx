@@ -28,7 +28,7 @@ export function CityCompletionChart({ cityData, description = "District Wise Pro
   return (
     <Card className="shadow-lg border-border/50 border-2 transition-colors hover:border-[#101a3c]">
       <CardHeader className="pb-4">
-        <CardTitle className="font-heading text-xl font-bold">Smart Safe Cities Phase I (Completion %)</CardTitle>
+        <CardTitle className="font-heading text-lg sm:text-xl font-bold leading-tight">Smart Safe Cities Phase I (Completion %)</CardTitle>
         <CardDescription className="text-sm">{description}</CardDescription>
       </CardHeader>
       <CardContent>

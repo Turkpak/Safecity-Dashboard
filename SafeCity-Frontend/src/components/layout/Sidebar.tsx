@@ -7,7 +7,6 @@ import {
   LucideBanknote,
   LayoutDashboard,
   Map as MapIcon,
-  Menu,
   LogOut,
   MapPin,
   ChevronDown,
@@ -25,7 +24,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useEffect, useMemo, useState } from "react";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -88,13 +87,21 @@ export function Sidebar() {
   const userRole =
     (user?.role ?? localStorage.getItem("userRole"))?.trim().toLowerCase() ??
     null;
-  const { isCollapsed, toggleSidebar } = useSidebar();
+  const {
+    isCollapsed,
+    toggleSidebar,
+    mobileSidebarOpen,
+    setMobileSidebarOpen,
+  } = useSidebar();
   const [accordionValue, setAccordionValue] = useState<string | undefined>(
     undefined,
   );
 
   // Auto-open accordion if a sub-item is selected
   useEffect(() => {
+    // Close the mobile drawer when navigating to a new route.
+    setMobileSidebarOpen(false);
+
     const itemWithSelectedSub = NAV_ITEMS.find((item) =>
       item.subItems?.some((sub) => location === sub.href),
     );
@@ -441,16 +448,7 @@ export function Sidebar() {
         <NavContent />
       </div>
 
-      <Sheet>
-        <SheetTrigger asChild>
-          <Button
-            variant="outline"
-            size="icon"
-            className="md:hidden fixed top-4 left-4 z-50 bg-card"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-        </SheetTrigger>
+      <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
         <SheetContent side="left" className="w-64 p-0 bg-sidebar border-none">
           <NavContent />
         </SheetContent>

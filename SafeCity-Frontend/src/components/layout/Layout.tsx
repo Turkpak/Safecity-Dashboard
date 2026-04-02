@@ -20,7 +20,7 @@ export function Layout({ children, title = "Dashboard" }: LayoutProps) {
         isCollapsed ? "md:ml-16" : "md:ml-64"
       )}>
         <Header title={title} />
-        <main className="flex-1 p-4 sm:p-6 space-y-6 w-full max-w-[1600px] mx-auto min-w-0">
+        <main className="flex-1 min-h-0 p-3 sm:p-6 space-y-4 sm:space-y-6 w-full max-w-[1600px] mx-auto min-w-0 box-border">
           {children}
         </main>
         <Footer />

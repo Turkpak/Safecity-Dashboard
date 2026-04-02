@@ -370,8 +370,7 @@ export default function UserManagement() {
       <div className="space-y-6">
         {/* Header with Add New User button on the right — Super Admin only */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          
-          <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0">
+          <Button onClick={() => setDialogOpen(true)} className="gap-2 w-full sm:w-auto shrink-0">
             <UserPlus className="h-4 w-4" />
             Add New User
           </Button>

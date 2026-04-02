@@ -169,7 +169,7 @@ export default function TehsilManagement() {
 
   return (
     <Layout title="Area Hierarchy Management">
-      <div className="flex flex-col gap-8 max-w-[1400px] mx-auto pb-20">
+      <div className="flex flex-col gap-8 w-full max-w-[1400px] mx-auto min-w-0 pb-20">
         <div>
           <h1 className="text-2xl font-bold text-primary">Tehsil — Add / Edit</h1>
           <p className="text-muted-foreground text-sm">Select Province → Division → District, then enter tehsil name and click Create Tehsil.</p>

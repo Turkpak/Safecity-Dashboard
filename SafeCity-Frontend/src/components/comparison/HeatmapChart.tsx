@@ -42,11 +42,11 @@ export function HeatmapChart({ data }: HeatmapChartProps) {
   return (
     <Card className="shadow-lg border-border/50 border-2 transition-colors hover:border-[#101a3c]">
       <CardHeader className="pb-4">
-        <CardTitle className="font-heading text-xl font-bold">Progress Heatmap</CardTitle>
+        <CardTitle className="font-heading text-lg sm:text-xl font-bold leading-tight">Progress Heatmap</CardTitle>
         <CardDescription className="text-sm">Visual comparison of all phases across all cities</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="-mx-4 sm:mx-0 overflow-x-auto">
+        <div className="-mx-4 sm:mx-0 overflow-x-auto overflow-x-touch">
           <div className="min-w-full">
             <table className="w-full border-collapse">
               <thead>

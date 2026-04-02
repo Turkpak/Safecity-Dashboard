@@ -1404,14 +1404,12 @@ export default function Dashboard() {
       <>
         {/* Installation Phase Cards */}
         <div className="w-full">
-          <div className="mb-3 flex items-start justify-between gap-4">
-            <div>
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 min-w-0">
+            <div className="min-w-0">
               <h2 className="text-xl font-bold font-heading mb-1">
                 Best Performing Projects
               </h2>
-              <p className="text-sm text-muted-foreground">
-                Progress breakdown for {title}
-              </p>
+              
             </div>
             {(selectedMilestoneKey || isSelectedProjectInThisScope) && (
               <button
@@ -1766,8 +1764,8 @@ export default function Dashboard() {
           hasDetailedProgress(selectedProgress) && (
             <div className="space-y-4">
               {/* Header with Toggle - Right side where charts are shown */}
-              <div className="flex items-start justify-between gap-4">
-                <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 min-w-0">
+                <div className="min-w-0">
                   <h2 className="text-xl font-bold font-heading mb-1">
                     {progressType === "financial"
                       ? `${selectedPhaseMeta.title} - Financial Progress`
@@ -1780,7 +1778,7 @@ export default function Dashboard() {
                   </p>
                 </div>
                 {/* Progress Type Toggle - Right side */}
-                <div className="flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-primary/20 bg-background shadow-sm hover:border-primary/40 transition-colors flex-shrink-0">
+                <div className="flex items-center gap-2 px-3 py-2 sm:px-4 rounded-lg border-2 border-primary/20 bg-background shadow-sm hover:border-primary/40 transition-colors flex-shrink-0 w-full sm:w-auto justify-center sm:justify-start">
                   <TrendingUp
                     className={`h-4 w-4 ${progressType === "physical" ? "text-primary" : "text-muted-foreground"}`}
                   />
@@ -2399,9 +2397,9 @@ export default function Dashboard() {
 
               return (
                 <div className="space-y-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h2 className="text-lg sm:text-2xl font-bold font-heading">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 min-w-0">
+                    <div className="min-w-0">
+                      <h2 className="text-lg sm:text-2xl font-bold font-heading break-words">
                         Districts in {selectedItemName} Division
                       </h2>
                       <p className="text-sm text-muted-foreground">
@@ -2409,8 +2407,8 @@ export default function Dashboard() {
                       </p>
                     </div>
 
-                    <Breadcrumb className="shrink-0">
-                      <BreadcrumbList className="justify-end">
+                    <Breadcrumb className="w-full min-w-0 overflow-x-auto overflow-x-touch pb-1 sm:w-auto sm:shrink-0 sm:pb-0 scrollbar-hide">
+                      <BreadcrumbList className="justify-start sm:justify-end flex-nowrap whitespace-nowrap min-w-max">
                         <BreadcrumbItem>
                           <BreadcrumbLink asChild>
                             <button
@@ -2521,9 +2519,9 @@ export default function Dashboard() {
 
               return (
                 <div className="space-y-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h2 className="text-lg sm:text-2xl font-bold font-heading">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 min-w-0">
+                    <div className="min-w-0">
+                      <h2 className="text-lg sm:text-2xl font-bold font-heading break-words">
                         Tehsils in {selectedItemName} District ({parentDivisionName}{" "}
                         Division)
                       </h2>
@@ -2532,8 +2530,8 @@ export default function Dashboard() {
                       </p>
                     </div>
 
-                    <Breadcrumb className="shrink-0">
-                      <BreadcrumbList className="justify-end">
+                    <Breadcrumb className="w-full min-w-0 overflow-x-auto overflow-x-touch pb-1 sm:w-auto sm:shrink-0 sm:pb-0 scrollbar-hide">
+                      <BreadcrumbList className="justify-start sm:justify-end flex-nowrap whitespace-nowrap min-w-max">
                         <BreadcrumbItem>
                           <BreadcrumbLink asChild>
                             <button
@@ -2642,9 +2640,9 @@ export default function Dashboard() {
 
               return (
                 <div className="space-y-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h2 className="text-lg sm:text-2xl font-bold font-heading">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 min-w-0">
+                    <div className="min-w-0">
+                      <h2 className="text-lg sm:text-2xl font-bold font-heading break-words">
                         Ongoing projects in {selectedItemName} Tehsil
                       </h2>
                       <p className="text-sm text-muted-foreground">
@@ -2652,8 +2650,8 @@ export default function Dashboard() {
                       </p>
                     </div>
 
-                    <Breadcrumb className="shrink-0">
-                      <BreadcrumbList className="justify-end">
+                    <Breadcrumb className="w-full min-w-0 overflow-x-auto overflow-x-touch pb-1 sm:w-auto sm:shrink-0 sm:pb-0 scrollbar-hide">
+                      <BreadcrumbList className="justify-start sm:justify-end flex-nowrap whitespace-nowrap min-w-max">
                         <BreadcrumbItem>
                           <BreadcrumbLink asChild>
                             <button
@@ -2725,7 +2723,7 @@ export default function Dashboard() {
 
                     {/* dropdown to pick project for KPI/Gantt */}
                     {tehsilProjects.length > 0 && (
-                      <div className="mb-4 w-64">
+                      <div className="mb-4 w-full max-w-md sm:w-64 sm:max-w-none">
                         <Select
                           value={selectedProjectForDetails ? String(selectedProjectForDetails.id) : ""}
                           onValueChange={(val) => {

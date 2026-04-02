@@ -107,7 +107,7 @@ export default function Comparison() {
 
   return (
     <Layout title="City Comparison - Smart Safe Cities">
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 sm:gap-6 w-full min-w-0">
         {/* Header Section */}
 
 

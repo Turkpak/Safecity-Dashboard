@@ -150,7 +150,7 @@ export default function GISLayers() {
 
   return (
     <Layout title="Advanced GIS Intelligence">
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 sm:gap-6 w-full min-w-0">
         {/* Filters — card panel with clear hierarchy */}
         <Card className="border border-border/60 bg-card shadow-sm overflow-hidden">
           <CardContent className="p-4 sm:p-5">
