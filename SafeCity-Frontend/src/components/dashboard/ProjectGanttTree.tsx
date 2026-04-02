@@ -60,11 +60,13 @@ export function ProjectGanttTree({
   projectName,
   projectId,
   onOpenAddDocument,
+  readOnly = false,
 }: {
   tasks: FlatGanttRow[];
   projectName?: string;
   projectId?: number;
   onOpenAddDocument?: (taskId: string, taskName: string) => void;
+  readOnly?: boolean;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const { toast } = useToast();
@@ -213,9 +215,11 @@ export function ProjectGanttTree({
               </div>
             ))}
           </div>
-          <div className="w-20 font-semibold text-sm bg-muted/40 border-l border-border/60 px-3 py-2 text-center">
-            Options
-          </div>
+          {!readOnly && (
+            <div className="w-20 font-semibold text-sm bg-muted/40 border-l border-border/60 px-3 py-2 text-center">
+              Options
+            </div>
+          )}
         </div>
 
         {/* Rows */}
@@ -320,106 +324,112 @@ export function ProjectGanttTree({
                   </div>
                 </div>
 
-                <div className="w-20 border-l border-border/60 flex items-center justify-center">
-                  {/* Show options only for leaf subtasks (not parent WBS rows). */}
-                  {!t.hasChildren && t.depth >= 2 ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          className="h-9 w-9 rounded-lg border border-border/60 bg-background hover:bg-muted/60 flex items-center justify-center"
-                          aria-label="Options"
-                        >
-                          <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onSelect={(e) => {
-                            e.preventDefault();
-                            setDelayRow(t);
-                            setDelayStartDate(t.start ?? "");
-                            setDelayEndDate(t.end ?? t.start ?? "");
-                            setDelayCategory("");
-                            setDelayCategoryOpen(false);
-                            setDelayCategoryQuery("");
-                            const role = user?.role ?? user?.stakeholder_type ?? "";
-                            setDelayOriginator(role ? String(role) : "—");
-                            setDelayActionBy(role ? String(role) : "");
-                            setDelayIssue("");
-                            setDelayRecommendedAction("");
-                            setDelayOpen(true);
-                          }}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Delay
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={(e) => {
-                            e.preventDefault();
-                            if (onOpenAddDocument) {
-                              onOpenAddDocument(t.id, t.label);
-                              return;
-                            }
-                            toast({
-                              title: "Documents not available here",
-                              description: "Open the Photos & Docs tab to add documents for this project.",
-                            });
-                          }}
-                        >
-                          <FileText className="h-4 w-4 mr-2" />
-                          Add documents
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={(e) => {
-                            e.preventDefault();
-                            setActiveRow(t);
-                            setProgressValue(
-                              typeof t.progress === "number" && Number.isFinite(t.progress) ? t.progress : 0,
-                            );
-                            setProgressDate(new Date().toISOString().slice(0, 10));
-                            setProgressImages([]);
-                            setProgressOpen(true);
-                          }}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add progress
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : (
-                    <span className="inline-block h-9 w-9" aria-hidden />
-                  )}
-                </div>
+                {!readOnly && (
+                  <div className="w-20 border-l border-border/60 flex items-center justify-center">
+                    {/* Show options only for leaf subtasks (not parent WBS rows). */}
+                    {!t.hasChildren && t.depth >= 2 ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className="h-9 w-9 rounded-lg border border-border/60 bg-background hover:bg-muted/60 flex items-center justify-center"
+                            aria-label="Options"
+                          >
+                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              setDelayRow(t);
+                              setDelayStartDate(t.start ?? "");
+                              setDelayEndDate(t.end ?? t.start ?? "");
+                              setDelayCategory("");
+                              setDelayCategoryOpen(false);
+                              setDelayCategoryQuery("");
+                              const role = user?.role ?? user?.stakeholder_type ?? "";
+                              setDelayOriginator(role ? String(role) : "—");
+                              setDelayActionBy(role ? String(role) : "");
+                              setDelayIssue("");
+                              setDelayRecommendedAction("");
+                              setDelayOpen(true);
+                            }}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Delay
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              if (onOpenAddDocument) {
+                                onOpenAddDocument(t.id, t.label);
+                                return;
+                              }
+                              toast({
+                                title: "Documents not available here",
+                                description:
+                                  "Open the Photos & Docs tab to add documents for this project.",
+                              });
+                            }}
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            Add documents
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              setActiveRow(t);
+                              setProgressValue(
+                                typeof t.progress === "number" && Number.isFinite(t.progress)
+                                  ? t.progress
+                                  : 0,
+                              );
+                              setProgressDate(new Date().toISOString().slice(0, 10));
+                              setProgressImages([]);
+                              setProgressOpen(true);
+                            }}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add progress
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (
+                      <span className="inline-block h-9 w-9" aria-hidden />
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       </div>
 
-      <Dialog
-        open={delayOpen}
-        onOpenChange={(open) => {
-          setDelayOpen(open);
-          if (!open) {
-            setDelayRow(null);
-            setDelayStartDate("");
-            setDelayEndDate("");
-            setDelayCategory("");
-            setDelayCategoryOpen(false);
-            setDelayCategoryQuery("");
-            setDelayOriginator("");
-            setDelayIssue("");
-            setDelayRecommendedAction("");
-            setDelayActionBy("");
-            setSavingDelay(false);
-          }
-        }}
-      >
-        <DialogContent className="w-[95vw] max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Add Delay</DialogTitle>
-          </DialogHeader>
+      {!readOnly && (
+        <Dialog
+          open={delayOpen}
+          onOpenChange={(open) => {
+            setDelayOpen(open);
+            if (!open) {
+              setDelayRow(null);
+              setDelayStartDate("");
+              setDelayEndDate("");
+              setDelayCategory("");
+              setDelayCategoryOpen(false);
+              setDelayCategoryQuery("");
+              setDelayOriginator("");
+              setDelayIssue("");
+              setDelayRecommendedAction("");
+              setDelayActionBy("");
+              setSavingDelay(false);
+            }
+          }}
+        >
+          <DialogContent className="w-[95vw] max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Add Delay</DialogTitle>
+            </DialogHeader>
 
           <div className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -619,24 +629,26 @@ export function ProjectGanttTree({
               {savingDelay ? "Saving..." : "Save delay log"}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
 
-      <Dialog
-        open={progressOpen}
-        onOpenChange={(open) => {
-          setProgressOpen(open);
-          if (!open) {
-            setActiveRow(null);
-            setProgressImages([]);
-            setSavingProgress(false);
-          }
-        }}
-      >
-        <DialogContent className="w-[95vw] max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Add Progress</DialogTitle>
-          </DialogHeader>
+      {!readOnly && (
+        <Dialog
+          open={progressOpen}
+          onOpenChange={(open) => {
+            setProgressOpen(open);
+            if (!open) {
+              setActiveRow(null);
+              setProgressImages([]);
+              setSavingProgress(false);
+            }
+          }}
+        >
+          <DialogContent className="w-[95vw] max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Add Progress</DialogTitle>
+            </DialogHeader>
 
           <div className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -817,8 +829,9 @@ export function ProjectGanttTree({
               {savingProgress ? "Saving..." : "Save progress"}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

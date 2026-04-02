@@ -49,7 +49,7 @@ export function Header({ title }: { title: string }) {
           </Button>
         </div>
       </div>
-      <div className="pointer-events-none absolute left-0 right-0 bottom-0 h-1 bg-red-600" />
+      <div className="pointer-events-none absolute left-0 right-0 bottom-0 h-0.5 bg-red-600" />
     </header>
   );
 }
