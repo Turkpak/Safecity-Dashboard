@@ -166,7 +166,7 @@ export default function StakeholderManagement() {
   const disabledCount = stakeholders.filter((s) => s.status === "disable").length;
 
   const emptyListMessage = (
-    <div className="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
+    <div className="flex flex-col items-center justify-center gap-3 py-6 px-4 text-center">
       <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center shrink-0">
         <Users className="h-7 w-7 text-muted-foreground" />
       </div>
@@ -186,7 +186,7 @@ export default function StakeholderManagement() {
 
   return (
     <Layout title="Stakeholder Management">
-      <div className="flex flex-col gap-4 sm:gap-6 w-full max-w-[1400px] mx-auto min-w-0 pb-12 sm:pb-20">
+      <div className="flex flex-col gap-3 sm:gap-6 w-full max-w-[1400px] mx-auto min-w-0 pb-12 sm:pb-20">
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">Stakeholders</h1>
         </div>
@@ -194,7 +194,7 @@ export default function StakeholderManagement() {
         {/* Summary stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
           <Card className="border-l-4 border-l-primary/80 shadow-sm">
-            <CardContent className="pt-3 pb-3 sm:pt-5 sm:pb-5">
+            <CardContent className="pt-2 pb-2 sm:pt-5 sm:pb-5">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total</p>
@@ -207,7 +207,7 @@ export default function StakeholderManagement() {
             </CardContent>
           </Card>
           <Card className="border-l-4 border-l-emerald-500/80 shadow-sm">
-            <CardContent className="pt-3 pb-3 sm:pt-5 sm:pb-5">
+            <CardContent className="pt-2 pb-2 sm:pt-5 sm:pb-5">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Active</p>
@@ -218,7 +218,7 @@ export default function StakeholderManagement() {
             </CardContent>
           </Card>
           <Card className="border-l-4 border-l-slate-400/80 shadow-sm">
-            <CardContent className="pt-3 pb-3 sm:pt-5 sm:pb-5">
+            <CardContent className="pt-2 pb-2 sm:pt-5 sm:pb-5">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Disabled</p>
@@ -232,8 +232,8 @@ export default function StakeholderManagement() {
 
         {/* Main list card */}
         <Card className="shadow-md overflow-hidden rounded-xl border-border/80">
-          <CardHeader className="border-b bg-muted/30 pb-4 px-4 sm:px-6 pt-4 sm:pt-6">
-            <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between min-w-0">
+          <CardHeader className="border-b bg-muted/30 pb-3 px-4 sm:px-6 pt-3 sm:pt-6">
+            <div className="flex flex-col gap-2 sm:gap-4 sm:flex-row sm:items-center sm:justify-between min-w-0">
               <div className="min-w-0">
                 <CardTitle className="text-base sm:text-lg flex items-center gap-2 flex-wrap">
                   <LayoutList className="h-5 w-5 text-primary shrink-0" />
@@ -326,7 +326,7 @@ export default function StakeholderManagement() {
           </CardHeader>
           <CardContent className="p-0">
             {/* Toolbar: search + page size */}
-            <div className="flex flex-col gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b bg-muted/20 min-w-0">
+            <div className="flex flex-col gap-2 px-4 sm:px-6 py-2 sm:py-4 border-b bg-muted/20 min-w-0">
               <div className="relative flex-1 min-w-0">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
@@ -355,9 +355,9 @@ export default function StakeholderManagement() {
             {/* Mobile: card list */}
             <div className="md:hidden border-t border-border/60">
               {isLoading ? (
-                <div className="p-3 space-y-2">
+                <div className="p-2 space-y-2">
                   {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="rounded-lg border bg-card p-3 space-y-2">
+                    <div key={i} className="rounded-lg border bg-card p-2 space-y-2">
                       <Skeleton className="h-4 w-20" />
                       <Skeleton className="h-5 w-full" />
                       <Skeleton className="h-5 w-3/4" />
@@ -373,7 +373,7 @@ export default function StakeholderManagement() {
               ) : (
                 <ul className="divide-y divide-border/60 list-none m-0 p-0">
                   {paginated.map((stakeholder, index) => (
-                    <li key={stakeholder.id} className="p-3 space-y-2">
+                    <li key={stakeholder.id} className="p-2 space-y-1.5">
                       <div className="flex items-start justify-between gap-2 min-w-0">
                         <span className="text-xs font-medium text-muted-foreground tabular-nums shrink-0 pt-0.5">
                           #{index + 1}
@@ -383,7 +383,7 @@ export default function StakeholderManagement() {
                           onClick={() => toggleStatus(stakeholder)}
                           disabled={updateMutation.isPending}
                           className={cn(
-                            "inline-flex items-center gap-1.5 rounded-md border px-3 py-2 min-h-10 text-xs font-semibold transition-all hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 shrink-0",
+                            "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 min-h-8 text-xs font-semibold transition-all hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 shrink-0",
                             stakeholder.status === "active"
                               ? "border-transparent bg-primary text-primary-foreground"
                               : "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
@@ -412,7 +412,7 @@ export default function StakeholderManagement() {
                           type="button"
                           size="icon"
                           variant="outline"
-                          className="h-10 w-10 shrink-0 text-primary border-primary/20 hover:bg-primary/10"
+                          className="h-9 w-9 shrink-0 text-primary border-primary/20 hover:bg-primary/10"
                           onClick={() => openEditDialog(stakeholder)}
                           disabled={updateMutation.isPending}
                           aria-label="Edit stakeholder"
@@ -423,7 +423,7 @@ export default function StakeholderManagement() {
                           type="button"
                           size="icon"
                           variant="outline"
-                          className="h-10 w-10 shrink-0 text-destructive border-destructive/20 hover:bg-destructive/10"
+                          className="h-9 w-9 shrink-0 text-destructive border-destructive/20 hover:bg-destructive/10"
                           onClick={() => handleDelete(stakeholder.id)}
                           disabled={deleteMutation.isPending}
                           aria-label="Delete stakeholder"
