@@ -871,8 +871,10 @@ export default function ProjectManagement() {
         {/* Header with search and Add Project button */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0 mb-4">
           <div className="min-w-0">
-            <h1 className="text-3xl font-bold tracking-tight">Added Projects</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-xl sm:text-3xl font-bold tracking-tight leading-tight">
+              Added Projects
+            </h1>
+            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
               {!projectsLoading && projectsData.length > 0
                 ? filteredProjects.length !== projectsData.length
                   ? `${filteredProjects.length} of ${projectsData.length} projects`
@@ -880,9 +882,9 @@ export default function ProjectManagement() {
                 : "Manage and view project details below"}
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-row items-center gap-2 w-full sm:w-auto">
             {!projectsLoading && projectsData.length > 0 && (
-              <div className="w-full sm:w-[280px] md:w-[320px]">
+              <div className="flex-1 min-w-0 sm:w-[280px] sm:flex-none md:w-[320px]">
                 <Input
                   value={locationSearch}
                   onChange={(e) => setLocationSearch(e.target.value)}
@@ -891,9 +893,13 @@ export default function ProjectManagement() {
                 />
               </div>
             )}
-            <Button onClick={() => setShowAddProjectDialog(true)} className="gap-2 w-full sm:w-auto">
+            <Button
+              onClick={() => setShowAddProjectDialog(true)}
+              className="gap-2 shrink-0 px-3 sm:px-4"
+            >
               <Plus className="h-4 w-4" />
-              Add New Project
+              <span className="hidden sm:inline">Add New Project</span>
+              <span className="sm:hidden">Add</span>
             </Button>
           </div>
         </div>
