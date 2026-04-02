@@ -8,7 +8,7 @@ export function Header({ title }: { title: string }) {
   const { setMobileSidebarOpen } = useSidebar();
 
   return (
-    <header className="flex h-16 sm:h-16 items-center border-b bg-card/50 backdrop-blur px-4 sm:px-6 sticky top-0 z-40 min-w-0">
+    <header className="relative flex h-16 sm:h-16 items-center border-b bg-card/25 backdrop-blur px-8 sm:px-8 sticky top-0 z-20 min-w-0">
       <div className="grid w-full grid-cols-3 items-center">
         <div className="flex items-center">
           <Button
@@ -23,8 +23,8 @@ export function Header({ title }: { title: string }) {
         </div>
 
         <h1
-          className="col-start-2 text-center text-xl sm:text-xl md:text-2xl lg:text-2xl font-heading font-bold text-foreground break-words leading-tight block
-          md:col-start-1 md:col-span-2 md:text-left whitespace-normal"
+          className="col-start-2 text-center text-xl sm:text-xl md:text-2xl lg:text-2xl font-heading font-bold text-foreground break-words leading-tight block uppercase
+          md:normal-case md:col-start-1 md:col-span-2 md:text-left whitespace-normal"
         >
           {title}
         </h1>
@@ -49,6 +49,7 @@ export function Header({ title }: { title: string }) {
           </Button>
         </div>
       </div>
+      <div className="pointer-events-none absolute left-0 right-0 bottom-0 h-1 bg-red-600" />
     </header>
   );
 }
