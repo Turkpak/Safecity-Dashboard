@@ -1312,6 +1312,10 @@ export default function Dashboard() {
     "blue" | "green" | "orange" | "purple" | "red" | "yellow"
   > = ["blue", "green", "orange", "purple", "red", "yellow"];
 
+  // Only show this section on the main (no-filter) All Divisions view.
+  const showBestPerformingSection =
+    viewType === "divisions" && !selectedItemType && !selectedItemName;
+
   // Render aggregated charts function
   const renderAggregatedCharts = (
     title: string,
@@ -1413,8 +1417,9 @@ export default function Dashboard() {
 
     return (
       <>
-        {/* Installation Phase Cards */}
-        <div className="w-full">
+        {/* Best Performing Projects (hide inside selected division/district/tehsil views) */}
+        {showBestPerformingSection && (
+          <div className="w-full">
           <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 min-w-0">
             <div className="min-w-0">
               <h2 className="text-xl font-bold font-heading mb-1">
@@ -1518,7 +1523,8 @@ export default function Dashboard() {
               />
             </div>
           )}
-        </div>
+          </div>
+        )}
 
         {/* Financial Progress Pie Charts (hide when a milestone KPI or a single project is selected) */}
         {!selectedMilestoneKey && !isSelectedProjectInThisScope && (
@@ -1529,9 +1535,6 @@ export default function Dashboard() {
                 <CardTitle className="text-base font-heading">
                   Financial Progress Overview
                 </CardTitle>
-                <CardDescription className="text-xs text-muted-foreground">
-                  Planned vs actual and variance
-                </CardDescription>
               </CardHeader>
               <CardContent className="pt-0 px-4 pb-4">
                 <div
@@ -1652,9 +1655,6 @@ export default function Dashboard() {
                 <CardTitle className="text-base font-heading">
                   Overall Progress
                 </CardTitle>
-                <CardDescription className="text-xs text-muted-foreground">
-                  Planned vs actual and variance
-                </CardDescription>
               </CardHeader>
               <CardContent className="pt-0 px-4 pb-4">
                 <div
@@ -2655,12 +2655,7 @@ export default function Dashboard() {
                 <div className="space-y-6">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 min-w-0">
                     <div className="min-w-0">
-                      <h2 className="text-lg sm:text-2xl font-bold font-heading break-words">
-                        Ongoing projects in {selectedItemName} Tehsil
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedItemName} Tehsil
-                      </p>
+                      {/* Title removed per request (avoid duplicate tehsil text). */}
                     </div>
 
                     <Breadcrumb className="w-full min-w-0 overflow-x-auto overflow-x-touch pb-1 sm:w-auto sm:shrink-0 sm:pb-0 scrollbar-hide">
