@@ -1529,9 +1529,6 @@ export default function Dashboard() {
                 <CardTitle className="text-base font-heading">
                   Financial Progress Overview
                 </CardTitle>
-                <CardDescription className="text-xs text-muted-foreground">
-                  Planned vs actual and variance
-                </CardDescription>
               </CardHeader>
               <CardContent className="pt-0 px-4 pb-4">
                 <div
@@ -1652,9 +1649,6 @@ export default function Dashboard() {
                 <CardTitle className="text-base font-heading">
                   Overall Progress
                 </CardTitle>
-                <CardDescription className="text-xs text-muted-foreground">
-                  Planned vs actual and variance
-                </CardDescription>
               </CardHeader>
               <CardContent className="pt-0 px-4 pb-4">
                 <div
