@@ -534,100 +534,18 @@ export default function ProjectManagement() {
 
   // Validate step 1
   const validateStep1 = () => {
-    if (!projectName.trim()) {
-      toast({ title: "Validation Error", description: "Please enter a project name", variant: "destructive" });
-      return false;
-    }
-    if (!selectedProvinceId || !selectedDivisionId || !selectedDistrictId || !selectedTehsilId) {
-      toast({ title: "Validation Error", description: "Please select province, division, district and tehsil", variant: "destructive" });
-      return false;
-    }
-    if (stakeholderIds.length === 0) {
-      toast({ title: "Validation Error", description: "Please select at least one stakeholder", variant: "destructive" });
-      return false;
-    }
-    if (!editingProject && !xerFile) {
-      toast({ title: "Validation Error", description: "Please upload an XER file", variant: "destructive" });
-      return false;
-    }
+    // Frontend validation intentionally disabled (temporary).
     return true;
   };
 
   // Validate step 2
   const validateStep2 = () => {
-    if (!editingProject && !areaFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please upload a project area file",
-        variant: "destructive",
-      });
-      return false;
-    }
+    // Frontend validation intentionally disabled (temporary).
     return true;
   };
 
   const validateStep3 = () => {
-    const requireAll = (enabled: boolean, fields: Array<{ label: string; value: string }>) => {
-      if (!enabled) return true;
-      for (const f of fields) {
-        if (!f.value.trim()) {
-          toast({
-            title: "Validation Error",
-            description: `Please enter ${f.label}.`,
-            variant: "destructive",
-          });
-          return false;
-        }
-      }
-      return true;
-    };
-
-    if (
-      !requireAll(enableAllocation, [
-        { label: "Allocation capital cost (M)", value: allocationCapital },
-        { label: "Allocation revenue cost (M)", value: allocationRevenue },
-        { label: "Allocation total cost (M)", value: allocationTotal },
-      ])
-    )
-      return false;
-
-    if (
-      !requireAll(enablePdRelease, [
-        { label: "P&D release capital cost (M)", value: pdReleaseCapital },
-        { label: "P&D release revenue cost (M)", value: pdReleaseRevenue },
-        { label: "P&D release total cost (M)", value: pdReleaseTotal },
-      ])
-    )
-      return false;
-
-    if (
-      !requireAll(enableSpendingRelease, [
-        { label: "Spending release capital cost (M)", value: spendingReleaseCapital },
-        { label: "Spending release revenue cost (M)", value: spendingReleaseRevenue },
-        { label: "Spending release total cost (M)", value: spendingReleaseTotal },
-      ])
-    )
-      return false;
-
-    if (
-      !requireAll(enablePifraUtilization, [
-        { label: "PIFRA utilization capital cost (M)", value: pifraCapital },
-        { label: "PIFRA utilization revenue cost (M)", value: pifraRevenue },
-        { label: "PIFRA utilization total cost (M)", value: pifraTotal },
-        { label: "PIFRA utilization date", value: pifraDate },
-      ])
-    )
-      return false;
-
-    if (
-      !requireAll(enableUtilPct, [
-        { label: "Capital %", value: utilPctCapital },
-        { label: "Revenue %", value: utilPctRevenue },
-        { label: "Total %", value: utilPctTotal },
-      ])
-    )
-      return false;
-
+    // Frontend validation intentionally disabled (temporary).
     return true;
   };
 
@@ -1478,7 +1396,6 @@ export default function ProjectManagement() {
                     placeholder="Enter project name"
                     value={projectName}
                     onChange={(e) => setProjectName(e.target.value)}
-                    required
                   />
                 </div>
 
@@ -1491,7 +1408,6 @@ export default function ProjectManagement() {
                     value={projectDescription}
                     onChange={(e) => setProjectDescription(e.target.value)}
                     rows={4}
-                    required
                   />
                 </div>
 
@@ -1504,7 +1420,6 @@ export default function ProjectManagement() {
                       type="date"
                       value={startingDate}
                       onChange={(e) => setStartingDate(e.target.value)}
-                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -1514,7 +1429,6 @@ export default function ProjectManagement() {
                       placeholder="Enter reference number"
                       value={referenceNumber}
                       onChange={(e) => setReferenceNumber(e.target.value)}
-                      required
                     />
                   </div>
                 </div>

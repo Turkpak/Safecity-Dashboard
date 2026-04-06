@@ -47,6 +47,8 @@ export interface GanttTask {
   /** Database id of ProjectActivity (required for update-task-actual). */
   db_id?: number;
   label: string;
+  /** Duration from nested gantt API (usually in days). */
+  duration?: number;
   start: string | null;
   end: string | null;
   /** Actual start date from backend (YYYY-MM-DD). */
@@ -115,6 +117,7 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
       activity_id: node?.activity_id ? String(node.activity_id) : undefined,
       db_id: typeof node?.id === "number" ? node.id : node?.id ? Number(node.id) : undefined,
       label: String(node?.name ?? node?.activity_name ?? `#${id}`),
+      duration: typeof node?.duration === "number" && Number.isFinite(node.duration) ? node.duration : undefined,
       start: range.start,
       end: range.end,
       actual_start: asDate(node?.actual_start),
@@ -143,6 +146,7 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
     activity_id: act.activity_id,
     db_id: typeof act.id === "number" ? act.id : Number(act.id),
     label: act.activity_name || `#${act.activity_id}`,
+    duration: typeof act.duration === "number" && Number.isFinite(act.duration) ? act.duration : undefined,
     start: act.start_date || null,
     end: act.end_date || act.start_date || null,
     actual_start: act.actual_start ?? null,
