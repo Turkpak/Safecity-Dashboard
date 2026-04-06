@@ -567,20 +567,21 @@ export default function ProjectManagement() {
   };
 
   const validateStep3 = () => {
-    const requireAll = (enabled: boolean, fields: Array<{ label: string; value: string }>) => {
-      if (!enabled) return true;
-      for (const f of fields) {
-        if (!f.value.trim()) {
-          toast({
-            title: "Validation Error",
-            description: `Please enter ${f.label}.`,
-            variant: "destructive",
-          });
-          return false;
-        }
-      }
-      return true;
-    };
+    const requireAll = (enabled: boolean, fields: Array<{ label: string; value: any }>) => {
+  if (!enabled) return true;
+  for (const f of fields) {
+    const val = f.value ?? ""; // handle null/undefined
+    if (String(val).trim() === "") {
+      toast({
+        title: "Validation Error",
+        description: `Please enter ${f.label}.`,
+        variant: "destructive",
+      });
+      return false;
+    }
+  }
+  return true;
+};
 
     if (
       !requireAll(enableAllocation, [
