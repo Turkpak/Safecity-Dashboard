@@ -457,10 +457,20 @@ class TaskSerializer(serializers.ModelSerializer):
         ]
 
 class ActivityDelayLogSerializer(serializers.ModelSerializer):
+    action_by_info = serializers.SerializerMethodField()
+
     class Meta:
         model = ActivityDelayLog
         fields = "__all__"
         read_only_fields = ["originator", "created_by"]
+
+    def get_action_by_info(self, obj):
+        if obj.action_by:
+            return {
+                "stakeholder_type": obj.action_by.stakeholder_type,
+                "stakeholder_title": obj.action_by.stakeholder_title
+            }
+        return None
 # --------------------------------------------------------
 # Pictorial Archive
 # --------------------------------------------------------

@@ -361,10 +361,11 @@ class ActivityDelayLog(models.Model):
 
     # details
     originator = models.CharField(max_length=100, null=True, blank=True)
-    action_by = models.CharField(max_length=100)
+    category = models.CharField(max_length=100, null=True, blank=True)
+    action_by = models.ForeignKey(Stakeholder, on_delete=models.DO_NOTHING, null=True, blank=True)
 
-    issue = models.TextField()
-    recommended_action = models.TextField()
+    issue = models.TextField(null=True, blank=True)
+    recommended_action = models.TextField(null=True, blank=True)
 
     # tracking
     created_by = models.ForeignKey(MyUser, on_delete=models.SET_NULL, null=True, blank=True)

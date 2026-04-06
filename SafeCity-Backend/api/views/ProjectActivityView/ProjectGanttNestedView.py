@@ -8,9 +8,18 @@ from api.models import Project, ProjectActivity, ActivityDelayLog
 def get_delay_info(activity):
     delay = ActivityDelayLog.objects.filter(activity=activity).order_by('-created_at').first()
     if delay:
+        action_by_info = None
+        if delay.action_by:
+            action_by_info = {
+                "id": delay.action_by.id,
+                "stakeholder_type": delay.action_by.stakeholder_type,
+                "stakeholder_title": delay.action_by.stakeholder_title,
+            }
+
         return {
             "originator": delay.originator,
-            "action_by": delay.action_by,
+            "category": delay.category,             
+            "action_by": action_by_info,           
             "delay_days": delay.delay_days,
             "delay_start_date": delay.delay_start_date.isoformat() if delay.delay_start_date else None,
             "delay_end_date": delay.delay_end_date.isoformat() if delay.delay_end_date else None,
