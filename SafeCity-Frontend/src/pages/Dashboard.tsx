@@ -2655,12 +2655,7 @@ export default function Dashboard() {
                 <div className="space-y-6">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 min-w-0">
                     <div className="min-w-0">
-                      <h2 className="text-lg sm:text-2xl font-bold font-heading break-words">
-                        Ongoing projects in {selectedItemName} Tehsil
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedItemName} Tehsil
-                      </p>
+                      {/* Title removed per request (avoid duplicate tehsil text). */}
                     </div>
 
                     <Breadcrumb className="w-full min-w-0 overflow-x-auto overflow-x-touch pb-1 sm:w-auto sm:shrink-0 sm:pb-0 scrollbar-hide">
