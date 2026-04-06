@@ -543,7 +543,7 @@ export function ProjectGanttTree({
                   <SelectContent>
                     {Array.from(
                       new Set(
-                        [user?.role, user?.stakeholder_type, "super_admin", "contractor", "consultant"]
+                        [user?.role, user?.stakeholder_type, user?.mname, "super_admin", "contractor", "consultant"]
                           .filter(Boolean)
                           .map((v) => String(v))
                       )
@@ -624,6 +624,7 @@ export function ProjectGanttTree({
                     activity: delayActivityId,
                     delay_start_date: delayStartDate,
                     delay_end_date: delayEndDate,
+                    category : delayCategory,
                     action_by: delayActionBy,
                     issue: delayIssue.trim(),
                     recommended_action: delayRecommendedAction.trim(),
