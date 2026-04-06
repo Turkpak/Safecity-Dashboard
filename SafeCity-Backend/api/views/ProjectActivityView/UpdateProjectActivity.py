@@ -12,9 +12,20 @@ class ProjectActivityUpdateView(viewsets.ViewSet):
         except ProjectActivity.DoesNotExist:
             return Response({"error": "Not found"}, status=404)
 
-        serializer = ProjectActivitySerializer(obj, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
+        # ✅ manually assign values
+        obj.progress = request.data.get("progress", obj.progress)
 
-        return Response(serializer.errors, status=400)
+        if request.data.get("actual_start"):
+            obj.actual_start = request.data.get("actual_start")
+
+        if "actual_end" in request.data:
+            obj.actual_end = request.data.get("actual_end")
+
+        # ✅ ADD THIS (YOU MISSED THIS)
+        if request.data.get("progress_date"):
+            obj.progress_date = request.data.get("progress_date")
+
+        obj.save()
+
+        serializer = ProjectActivitySerializer(obj)
+        return Response(serializer.data)

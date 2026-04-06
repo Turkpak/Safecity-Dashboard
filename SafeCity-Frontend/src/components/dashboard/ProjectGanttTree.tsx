@@ -782,17 +782,18 @@ export function ProjectGanttTree({
                   await updateTaskActual(activeRow.db_id, {
                     progress: Math.max(0, Math.min(100, Number(progressValue))),
 
-                    // ✅ only send if not already set
                     actual_start:
                       progressValue > 0 && !activeRow.actual_start
                         ? progressDate
                         : undefined,
 
-                    // ✅ only when completed
                     actual_end:
                       progressValue === 100
-                        ? progressDate
+                        ? (progressDate || new Date().toISOString().slice(0,10))
                         : undefined,
+
+                    // ✅ ADD THIS
+                    progress_date: progressDate,
                   });
 
                   if (progressImages.length > 0 && projectId != null) {

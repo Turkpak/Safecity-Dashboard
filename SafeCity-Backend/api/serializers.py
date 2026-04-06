@@ -188,7 +188,7 @@ class ProjectActivitySerializer(serializers.ModelSerializer):
     project_name = serializers.SerializerMethodField()
     class Meta:
         model = ProjectActivity
-        fields = ["id", "project", "project_name", "activity_id", "activity_name", "start_date", "end_date", "progress", "progress_date"]
+        fields = ["id", "project", "project_name", "activity_id", "activity_name", "start_date", "end_date", "progress", "actual_start", "actual_end", "progress_date", "duration"]
     
     def get_project_name(self, obj):
         return obj.project.project_name

@@ -153,6 +153,7 @@ export type UpdateTaskActualInput = {
   actual_start?: string | null;
   /** ISO date (YYYY-MM-DD) */
   actual_end?: string | null;
+  progress_date?: string | null;
   remarks?: string | null;
 };
 
