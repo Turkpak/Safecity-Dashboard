@@ -23,8 +23,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { updateTaskActual, createPictorialArchive, addDelayLog } from "@/api";
@@ -64,6 +62,20 @@ function parseDate(s: string | null): Date | null {
   if (!s) return null;
   const d = new Date(s);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function parseISODateParts(s: string | null): { y: number; m: number; d: number } | null {
+  if (!s) return null;
+  // Expect "YYYY-MM-DD"
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]); // 1..12
+  const d = Number(m[3]); // 1..31
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return null;
+  if (mo < 1 || mo > 12) return null;
+  if (d < 1 || d > 31) return null;
+  return { y, m: mo, d };
 }
 
 function buildMonthsArray(rangeStart: Date, rangeEnd: Date) {
@@ -109,8 +121,6 @@ export function ProjectGanttTree({
   const [delayStartDate, setDelayStartDate] = useState<string>("");
   const [delayEndDate, setDelayEndDate] = useState<string>("");
   const [delayCategory, setDelayCategory] = useState<string>("");
-  const [delayCategoryOpen, setDelayCategoryOpen] = useState(false);
-  const [delayCategoryQuery, setDelayCategoryQuery] = useState("");
   const [delayOriginator, setDelayOriginator] = useState<string>("");
   const [delayIssue, setDelayIssue] = useState<string>("");
   const [delayRecommendedAction, setDelayRecommendedAction] = useState<string>("");
@@ -187,19 +197,38 @@ export function ProjectGanttTree({
 
   const monthsArray = useMemo(() => buildMonthsArray(dateRange.start, dateRange.end), [dateRange]);
 
-  const getTaskLeftPct = (start: string | null) => {
-    const s = parseDate(start);
-    if (!s) return 0;
-    const days = (s.getTime() - dateRange.start.getTime()) / (1000 * 60 * 60 * 24);
-    return (days / totalDays) * 100;
-  };
+  // Month columns are fixed width (120px). Use pixel positioning to avoid drift.
+  const MONTH_COL_PX = 120;
+  const timelineWidthPx = useMemo(() => Math.max(1, monthsArray.length) * MONTH_COL_PX, [monthsArray.length]);
 
-  const getTaskWidthPct = (start: string | null, end: string | null) => {
-    const s = parseDate(start);
-    const e = parseDate(end);
-    if (!s || !e) return 1;
-    const days = (e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24) + 1;
-    return (days / totalDays) * 100;
+  const monthScalePx = useMemo(() => {
+    const startMonth = new Date(dateRange.start.getFullYear(), dateRange.start.getMonth(), 1);
+    const startKey = startMonth.getFullYear() * 12 + startMonth.getMonth(); // month index
+
+    const daysInMonth = (y: number, m1: number) => new Date(y, m1, 0).getDate(); // m1: 1..12
+
+    const posPx = (iso: string | null, edge: "start" | "end"): number => {
+      const p = parseISODateParts(iso);
+      if (!p) return 0;
+      const key = p.y * 12 + (p.m - 1);
+      const idx = key - startKey; // 0..months-1
+      const dim = daysInMonth(p.y, p.m);
+      const frac = edge === "start" ? (p.d - 1) / dim : p.d / dim;
+      const raw = (idx + frac) * MONTH_COL_PX;
+      // clamp inside timeline
+      return Math.max(0, Math.min(timelineWidthPx, raw));
+    };
+
+    return { posPx };
+  }, [dateRange.start, timelineWidthPx]);
+
+  const getTaskLeftPx = (start: string | null) => monthScalePx.posPx(start, "start");
+  const getTaskRightPx = (end: string | null) => monthScalePx.posPx(end, "end");
+  const getTaskWidthPx = (start: string | null, end: string | null) => {
+    const l = getTaskLeftPx(start);
+    const r = getTaskRightPx(end);
+    // keep visible even for same-day tasks
+    return Math.max(6, r - l);
   };
 
   type DisplayRow = FlatGanttRow & { depth: number; hasChildren: boolean };
@@ -232,13 +261,15 @@ export function ProjectGanttTree({
           <div className="w-80 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2">
             WBS Subprocess
           </div>
-          <div className="flex-1 grid grid-flow-col auto-cols-[120px] text-xs text-center">
-            {monthsArray.map((d, i) => (
-              <div key={i} className="border-l py-2 font-medium">
-                {d.toLocaleDateString("en-US", { month: "short" })}
-                <div className="text-[10px] text-muted-foreground">{d.getFullYear()}</div>
-              </div>
-            ))}
+          <div className="flex-1 overflow-hidden">
+            <div className="grid grid-flow-col auto-cols-[120px] text-xs text-center" style={{ width: timelineWidthPx }}>
+              {monthsArray.map((d, i) => (
+                <div key={i} className="border-l py-2 font-medium">
+                  {d.toLocaleDateString("en-US", { month: "short" })}
+                  <div className="text-[10px] text-muted-foreground">{d.getFullYear()}</div>
+                </div>
+              ))}
+            </div>
           </div>
           {!readOnly && (
             <div className="w-20 font-semibold text-sm bg-muted/40 border-l border-border/60 px-3 py-2 text-center">
@@ -250,9 +281,9 @@ export function ProjectGanttTree({
         {/* Rows */}
         <div className="space-y-2">
           {displayRows.map((t) => {
-            const left = getTaskLeftPct(t.start);
-            const width = getTaskWidthPct(t.start, t.end);
-            const actualWidth = width * (clamp(t.progress ?? 0, 0, 100) / 100);
+            const leftPx = getTaskLeftPx(t.start);
+            const widthPx = getTaskWidthPx(t.start, t.end);
+            const actualWidthPx = widthPx * (clamp(t.progress ?? 0, 0, 100) / 100);
             const s = parseDate(t.start);
             const e = parseDate(t.end);
             const w =
@@ -335,26 +366,28 @@ export function ProjectGanttTree({
                   </div>
                 </div>
 
-                <div className="flex-1 relative h-12 overflow-visible bg-background/30">
-                  {/* Planned bar (top row) */}
-                  <div
-                    className="absolute h-4 rounded-md top-2 bg-sky-600"
-                    style={{ left: `${left}%`, width: `${width}%` }}
-                    title={`Planned: ${t.start ?? "—"} → ${t.end ?? "—"}`}
-                  >
-                    <span className="absolute left-2 top-0.5 text-[10px] font-semibold text-white/90 select-none">
-                      P:{Math.round(clamp(t.progress ?? 0, 0, 100))}%
-                    </span>
-                  </div>
-                  {/* Actual/progress bar (bottom row) */}
-                  <div
-                    className="absolute h-4 rounded-md top-7 bg-sky-300"
-                    style={{ left: `${left}%`, width: `${actualWidth}%` }}
-                    title={`Actual: ${Math.round(t.progress ?? 0)}%`}
-                  >
-                    <span className="absolute left-2 top-0.5 text-[10px] font-semibold text-slate-900/70 select-none">
-                      A:{Math.round(clamp(t.progress ?? 0, 0, 100))}%
-                    </span>
+                <div className="flex-1 overflow-hidden bg-background/30">
+                  <div className="relative h-12 overflow-visible" style={{ width: timelineWidthPx }}>
+                    {/* Planned bar (top row) */}
+                    <div
+                      className="absolute h-4 rounded-md top-2 bg-sky-600"
+                      style={{ left: `${leftPx}px`, width: `${widthPx}px` }}
+                      title={`Planned: ${t.start ?? "—"} → ${t.end ?? "—"}`}
+                    >
+                      <span className="absolute left-2 top-0.5 text-[10px] font-semibold text-white/90 select-none">
+                        P:{Math.round(clamp(t.progress ?? 0, 0, 100))}%
+                      </span>
+                    </div>
+                    {/* Actual/progress bar (bottom row) */}
+                    <div
+                      className="absolute h-4 rounded-md top-7 bg-sky-300"
+                      style={{ left: `${leftPx}px`, width: `${actualWidthPx}px` }}
+                      title={`Actual: ${Math.round(t.progress ?? 0)}%`}
+                    >
+                      <span className="absolute left-2 top-0.5 text-[10px] font-semibold text-slate-900/70 select-none">
+                        A:{Math.round(clamp(t.progress ?? 0, 0, 100))}%
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -380,8 +413,6 @@ export function ProjectGanttTree({
                               setDelayStartDate(t.start ?? "");
                               setDelayEndDate(t.end ?? t.start ?? "");
                               setDelayCategory("");
-                              setDelayCategoryOpen(false);
-                              setDelayCategoryQuery("");
                               const role = user?.role ?? user?.stakeholder_type ?? "";
                               setDelayOriginator(role ? String(role) : "—");
                               setDelayActionBy(role ? String(role) : "");
@@ -450,8 +481,6 @@ export function ProjectGanttTree({
               setDelayStartDate("");
               setDelayEndDate("");
               setDelayCategory("");
-              setDelayCategoryOpen(false);
-              setDelayCategoryQuery("");
               setDelayOriginator("");
               setDelayIssue("");
               setDelayRecommendedAction("");
@@ -499,57 +528,11 @@ export function ProjectGanttTree({
               </div>
               <div className="space-y-1.5">
                 <Label>Category</Label>
-                <Popover open={delayCategoryOpen} onOpenChange={setDelayCategoryOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={delayCategoryOpen}
-                      className="w-full justify-between font-normal h-10 px-3 text-sm"
-                    >
-                      <span className="truncate">{delayCategory ? delayCategory : "Select category"}</span>
-                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-                    <Command
-                      filter={(value, search) => {
-                        const q = (search || "").toLowerCase();
-                        if (!q) return 1;
-                        return (value || "").toLowerCase().includes(q) ? 1 : 0;
-                      }}
-                    >
-                      <CommandInput
-                        placeholder="Type category…"
-                        value={delayCategoryQuery}
-                        onValueChange={setDelayCategoryQuery}
-                      />
-                      <CommandList>
-                        <CommandEmpty>
-                          <div className="p-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="w-full justify-center"
-                              disabled={!delayCategoryQuery.trim()}
-                              onClick={() => {
-                                const v = delayCategoryQuery.trim();
-                                if (!v) return;
-                                setDelayCategory(v);
-                                setDelayCategoryOpen(false);
-                              }}
-                            >
-                              Use “{delayCategoryQuery.trim() || "…"}”
-                            </Button>
-                          </div>
-                        </CommandEmpty>
-                        <CommandGroup />
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <Input
+                  value={delayCategory}
+                  onChange={(e) => setDelayCategory(e.target.value)}
+                  placeholder="Type category…"
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Action by</Label>
