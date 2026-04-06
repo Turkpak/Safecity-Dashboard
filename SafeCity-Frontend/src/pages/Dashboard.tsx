@@ -1312,6 +1312,10 @@ export default function Dashboard() {
     "blue" | "green" | "orange" | "purple" | "red" | "yellow"
   > = ["blue", "green", "orange", "purple", "red", "yellow"];
 
+  // Only show this section on the main (no-filter) All Divisions view.
+  const showBestPerformingSection =
+    viewType === "divisions" && !selectedItemType && !selectedItemName;
+
   // Render aggregated charts function
   const renderAggregatedCharts = (
     title: string,
@@ -1413,8 +1417,9 @@ export default function Dashboard() {
 
     return (
       <>
-        {/* Installation Phase Cards */}
-        <div className="w-full">
+        {/* Best Performing Projects (hide inside selected division/district/tehsil views) */}
+        {showBestPerformingSection && (
+          <div className="w-full">
           <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 min-w-0">
             <div className="min-w-0">
               <h2 className="text-xl font-bold font-heading mb-1">
@@ -1518,7 +1523,8 @@ export default function Dashboard() {
               />
             </div>
           )}
-        </div>
+          </div>
+        )}
 
         {/* Financial Progress Pie Charts (hide when a milestone KPI or a single project is selected) */}
         {!selectedMilestoneKey && !isSelectedProjectInThisScope && (
