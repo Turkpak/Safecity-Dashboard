@@ -23,8 +23,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { updateTaskActual, createPictorialArchive, addDelayLog } from "@/api";
@@ -123,8 +121,6 @@ export function ProjectGanttTree({
   const [delayStartDate, setDelayStartDate] = useState<string>("");
   const [delayEndDate, setDelayEndDate] = useState<string>("");
   const [delayCategory, setDelayCategory] = useState<string>("");
-  const [delayCategoryOpen, setDelayCategoryOpen] = useState(false);
-  const [delayCategoryQuery, setDelayCategoryQuery] = useState("");
   const [delayOriginator, setDelayOriginator] = useState<string>("");
   const [delayIssue, setDelayIssue] = useState<string>("");
   const [delayRecommendedAction, setDelayRecommendedAction] = useState<string>("");
@@ -417,8 +413,6 @@ export function ProjectGanttTree({
                               setDelayStartDate(t.start ?? "");
                               setDelayEndDate(t.end ?? t.start ?? "");
                               setDelayCategory("");
-                              setDelayCategoryOpen(false);
-                              setDelayCategoryQuery("");
                               const role = user?.role ?? user?.stakeholder_type ?? "";
                               setDelayOriginator(role ? String(role) : "—");
                               setDelayActionBy(role ? String(role) : "");
@@ -487,8 +481,6 @@ export function ProjectGanttTree({
               setDelayStartDate("");
               setDelayEndDate("");
               setDelayCategory("");
-              setDelayCategoryOpen(false);
-              setDelayCategoryQuery("");
               setDelayOriginator("");
               setDelayIssue("");
               setDelayRecommendedAction("");
@@ -536,57 +528,11 @@ export function ProjectGanttTree({
               </div>
               <div className="space-y-1.5">
                 <Label>Category</Label>
-                <Popover open={delayCategoryOpen} onOpenChange={setDelayCategoryOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={delayCategoryOpen}
-                      className="w-full justify-between font-normal h-10 px-3 text-sm"
-                    >
-                      <span className="truncate">{delayCategory ? delayCategory : "Select category"}</span>
-                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-                    <Command
-                      filter={(value, search) => {
-                        const q = (search || "").toLowerCase();
-                        if (!q) return 1;
-                        return (value || "").toLowerCase().includes(q) ? 1 : 0;
-                      }}
-                    >
-                      <CommandInput
-                        placeholder="Type category…"
-                        value={delayCategoryQuery}
-                        onValueChange={setDelayCategoryQuery}
-                      />
-                      <CommandList>
-                        <CommandEmpty>
-                          <div className="p-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="w-full justify-center"
-                              disabled={!delayCategoryQuery.trim()}
-                              onClick={() => {
-                                const v = delayCategoryQuery.trim();
-                                if (!v) return;
-                                setDelayCategory(v);
-                                setDelayCategoryOpen(false);
-                              }}
-                            >
-                              Use “{delayCategoryQuery.trim() || "…"}”
-                            </Button>
-                          </div>
-                        </CommandEmpty>
-                        <CommandGroup />
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <Input
+                  value={delayCategory}
+                  onChange={(e) => setDelayCategory(e.target.value)}
+                  placeholder="Type category…"
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Action by</Label>
