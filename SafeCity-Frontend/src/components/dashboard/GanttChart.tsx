@@ -1,5 +1,5 @@
 // ProjectGanttChart.tsx
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -44,46 +44,46 @@ export function ProjectGanttChart({ projectId: propProjectId, searchQuery = "" }
   const [selectedDelayLog, setSelectedDelayLog] = useState<string[] | null>(null);
   const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({ start: new Date(), end: new Date() });
 
-  useEffect(() => {
-    const fetchGantt = async () => {
-      if (!selectedProjectId) {
-        setTasks([]);
-        return;
+  const loadGantt = useCallback(async () => {
+    if (!selectedProjectId) {
+      setTasks([]);
+      return;
+    }
+    try {
+      setLoading(true);
+      const fetchedTasks = await getProjectGanttData(selectedProjectId);
+      // Backend now provides real progress in 0..100 and proper dates (including rollups for WBS nodes).
+      const normalized = (fetchedTasks || []).map((t: any) => ({
+        ...t,
+        progress:
+          typeof t?.progress === "number" && Number.isFinite(t.progress)
+            ? Math.max(0, Math.min(100, t.progress))
+            : 0,
+      }));
+
+      setTasks(normalized);
+
+      const starts = normalized.map((t) => t.start && new Date(t.start)).filter(Boolean) as Date[];
+      const ends = normalized.map((t) => t.end && new Date(t.end)).filter(Boolean) as Date[];
+      if (starts.length && ends.length) {
+        setDateRange({
+          start: new Date(Math.min(...starts.map((d) => d.getTime()))),
+          end: new Date(Math.max(...ends.map((d) => d.getTime()))),
+        });
       }
-      try {
-        setLoading(true);
-        const fetchedTasks = await getProjectGanttData(selectedProjectId);
-        // Backend now provides real progress in 0..100 and proper dates (including rollups for WBS nodes).
-        const normalized = (fetchedTasks || []).map((t: any) => ({
-          ...t,
-          progress:
-            typeof t?.progress === "number" && Number.isFinite(t.progress)
-              ? Math.max(0, Math.min(100, t.progress))
-              : 0,
-        }));
 
-        setTasks(normalized);
-
-        const starts = normalized.map((t) => t.start && new Date(t.start)).filter(Boolean) as Date[];
-        const ends = normalized.map((t) => t.end && new Date(t.end)).filter(Boolean) as Date[];
-        if (starts.length && ends.length) {
-          setDateRange({
-            start: new Date(Math.min(...starts.map((d) => d.getTime()))),
-            end: new Date(Math.max(...ends.map((d) => d.getTime()))),
-          });
-        }
-
-        setError(null);
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load Gantt data");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchGantt();
+      setError(null);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to load Gantt data");
+    } finally {
+      setLoading(false);
+    }
   }, [selectedProjectId]);
+
+  useEffect(() => {
+    loadGantt();
+  }, [loadGantt]);
 
   const totalDays = Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / (1000*60*60*24)) + 1;
 
@@ -186,6 +186,7 @@ export function ProjectGanttChart({ projectId: propProjectId, searchQuery = "" }
                 ? projects.find((p) => p.id === selectedProjectId)?.project_name ?? `#${selectedProjectId}`
                 : undefined
             }
+            onDelayLogSaved={loadGantt}
           />
         </CardContent>
       </Card>

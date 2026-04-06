@@ -1,5 +1,15 @@
 import React, { useMemo, useState } from "react";
-import { MoreVertical, Plus, Upload, FileText, FolderKanban, ListChecks, CornerDownRight, ChevronDown } from "lucide-react";
+import {
+  MoreVertical,
+  Plus,
+  Upload,
+  FileText,
+  FolderKanban,
+  ListChecks,
+  CornerDownRight,
+  ChevronDown,
+  AlertTriangle,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,11 +38,23 @@ type FlatGanttRow = {
   parent?: string;
   order?: number;
   db_id?: number;
+  /** From nested gantt `activity_id` — this is what `POST add-delay-log/` expects as `activity`. */
+  activity_id?: string;
 
   // ✅ ADD THESE
   actual_start?: string | null;
   actual_end?: string | null;
+  has_delay?: boolean;
+  delay_info?: unknown;
 };
+
+/** Delay log API uses nested gantt `activity_id` (numeric string), not the row's internal `id` (`db_id`). */
+function parseDelayLogActivityId(row: FlatGanttRow): number | null {
+  const raw = row.activity_id;
+  if (raw == null || String(raw).trim() === "") return null;
+  const n = Number(String(raw).trim());
+  return Number.isFinite(n) ? n : null;
+}
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -60,12 +82,15 @@ export function ProjectGanttTree({
   projectName,
   projectId,
   onOpenAddDocument,
+  onDelayLogSaved,
   readOnly = false,
 }: {
   tasks: FlatGanttRow[];
   projectName?: string;
   projectId?: number;
   onOpenAddDocument?: (taskId: string, taskName: string) => void;
+  /** Called after a delay log is saved so the parent can refetch `project-gantt-nested` (updates `has_delay`). */
+  onDelayLogSaved?: () => void | Promise<void>;
   readOnly?: boolean;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -292,6 +317,15 @@ export function ProjectGanttTree({
                     <div className={depthFont}>
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="truncate block">{t.label}</span>
+                        {t.has_delay ? (
+                          <span
+                            className="inline-flex items-center gap-0.5 shrink-0 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-200"
+                            title="A delay log exists for this activity"
+                          >
+                            <AlertTriangle className="h-3 w-3" aria-hidden />
+                            Delay
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                     <div className="text-[10px] text-muted-foreground">
@@ -572,7 +606,7 @@ export function ProjectGanttTree({
                 savingDelay ||
                 !delayRow ||
                 projectId == null ||
-                !delayRow.db_id ||
+                parseDelayLogActivityId(delayRow) == null ||
                 !delayStartDate ||
                 !delayEndDate ||
                 !delayOriginator ||
@@ -591,10 +625,11 @@ export function ProjectGanttTree({
                   });
                   return;
                 }
-                if (!delayRow.db_id || !Number.isFinite(delayRow.db_id)) {
+                const delayActivityId = parseDelayLogActivityId(delayRow);
+                if (delayActivityId == null) {
                   toast({
                     title: "Cannot save delay log",
-                    description: "Missing activity id from API. Please refresh and try again.",
+                    description: "Missing activity_id from Gantt API. Please refresh and try again.",
                     variant: "destructive",
                   });
                   return;
@@ -603,7 +638,7 @@ export function ProjectGanttTree({
                   setSavingDelay(true);
                   await addDelayLog({
                     project: projectId,
-                    activity: delayRow.db_id,
+                    activity: delayActivityId,
                     delay_start_date: delayStartDate,
                     delay_end_date: delayEndDate,
                     action_by: delayActionBy,
@@ -615,6 +650,7 @@ export function ProjectGanttTree({
                     description: `Delay ${delayDays} day(s) • ${delayCategory} • "${delayRow.label}".`,
                   });
                   setDelayOpen(false);
+                  await onDelayLogSaved?.();
                 } catch (err) {
                   toast({
                     title: "Failed to save delay log",

@@ -7,7 +7,6 @@ import { PlannedVsActualChart } from "@/components/dashboard/PlannedVsActualChar
 import { HierarchyCard } from "@/components/dashboard/HierarchyCard";
 import { SubProject } from "@/components/dashboard/SubProjectCard";
 import { MilestoneDetailsPanel } from "@/components/dashboard/MilestoneDetailsPanel";
-import { ProjectGanttTree } from "@/components/dashboard/ProjectGanttTree";
 import { exportDashboardToPPTX } from "@/utils/exportToPPTX";
 import {
   PieChart,
@@ -53,7 +52,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useTheme } from "@/hooks/use-theme";
 import { CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -894,6 +893,18 @@ export default function Dashboard() {
     };
   }, [selectedProjectForDetails?.id]);
 
+  /** Refetch nested gantt after delay log POST so `has_delay` / `delay_info` update in the UI. */
+  const refetchSelectedProjectGantt = useCallback(async () => {
+    const pid = selectedProjectForDetails?.id;
+    if (!pid) return;
+    try {
+      const data = await getProjectGanttData(pid);
+      setSelectedProjectGanttTasks(Array.isArray(data) ? data : []);
+    } catch {
+      setSelectedProjectGanttTasks([]);
+    }
+  }, [selectedProjectForDetails?.id]);
+
   // Auto-collapse sidebar while project details (Gantt) are open, and restore prior state on close.
   useEffect(() => {
     const detailsOpen = !!selectedProjectForDetails?.id;
@@ -1501,6 +1512,8 @@ export default function Dashboard() {
                 phase={selectedProjectPhase}
                 phaseColor="#3b82f6"
                 flatGanttTasks={selectedProjectGanttTasks as any}
+                ganttProjectId={selectedProjectForDetails!.id}
+                onProjectGanttRefresh={refetchSelectedProjectGantt}
                 onClear={() => setSelectedProjectForDetails(null)}
               />
             </div>
@@ -2796,6 +2809,8 @@ export default function Dashboard() {
                         phase={selectedProjectPhase}
                         phaseColor="#3b82f6"
                         flatGanttTasks={selectedProjectGanttTasks as any}
+                        ganttProjectId={selectedProjectForDetails.id}
+                        onProjectGanttRefresh={refetchSelectedProjectGantt}
                         onClear={() => setSelectedProjectForDetails(null)}
                       />
                     )}
@@ -3310,6 +3325,8 @@ export default function Dashboard() {
                   phase={selectedProjectPhase}
                   phaseColor="#3b82f6"
                   flatGanttTasks={selectedProjectGanttTasks as any}
+                  ganttProjectId={selectedProjectForDetails.id}
+                  onProjectGanttRefresh={refetchSelectedProjectGantt}
                   onClear={() => setSelectedProjectForDetails(null)}
                 />
               )}

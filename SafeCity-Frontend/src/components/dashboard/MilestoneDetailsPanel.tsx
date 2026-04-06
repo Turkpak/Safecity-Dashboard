@@ -2038,6 +2038,8 @@ export function MilestoneDetailsPanel({
   onClear,
   showAllTabs = false,
   flatGanttTasks,
+  ganttProjectId,
+  onProjectGanttRefresh,
 }: {
   milestoneTitle: string;
   phase: MilestonePhaseProgress;
@@ -2054,7 +2056,16 @@ export function MilestoneDetailsPanel({
     parent?: string;
     actual_start?: string | null;
     actual_end?: string | null;
+    db_id?: number;
+    activity_id?: string;
+    order?: number;
+    has_delay?: boolean;
+    delay_info?: unknown;
   }>;
+  /** Numeric project id for delay-log API and gantt refetch (with flatGanttTasks). */
+  ganttProjectId?: number;
+  /** Refetch nested gantt after saving a delay log. */
+  onProjectGanttRefresh?: () => void | Promise<void>;
 }) {
   const [tab, setTab] = useState<"gantt" | "wbs" | "photos" | "logs">("gantt");
 
@@ -2334,7 +2345,9 @@ export function MilestoneDetailsPanel({
                 <ProjectGanttTree
                   tasks={flatGanttTasks as any}
                   projectName={milestoneTitle}
+                  projectId={ganttProjectId}
                   onOpenAddDocument={openAddDocumentFromGantt}
+                  onDelayLogSaved={onProjectGanttRefresh}
                 />
               ) : (
                 <>
