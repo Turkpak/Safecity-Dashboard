@@ -57,6 +57,10 @@ export interface GanttTask {
   parent?: string;
   /** Stable ordering index to preserve API/XER sibling order. */
   order?: number;
+  /** From nested gantt: true when a delay log exists for this activity. */
+  has_delay?: boolean;
+  /** From nested gantt: delay log summary when present. */
+  delay_info?: unknown;
 }
 
 export interface GanttResponse {
@@ -118,6 +122,8 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
       progress: typeof node?.progress === "number" && Number.isFinite(node.progress) ? node.progress : 0,
       parent,
       order: orderCounter++,
+      has_delay: Boolean(node?.has_delay),
+      delay_info: node?.delay_info ?? undefined,
     });
     const children: any[] = Array.isArray(node?.subtasks) ? node.subtasks : [];
     for (const c of children) flattenNested(c, id);
@@ -144,6 +150,8 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
     progress: act.progress ?? 0,
     parent: act.parent_id ? String(act.parent_id) : undefined,
     order: idx,
+    has_delay: Boolean(act.has_delay),
+    delay_info: act.delay_info ?? undefined,
   }));
 }
 

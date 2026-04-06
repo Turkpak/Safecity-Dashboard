@@ -2,6 +2,7 @@ import { post } from "./client";
 
 export type AddDelayLogInput = {
   project: number;
+  /** Matches `activity_id` from `GET project-gantt-nested/:id/` (numeric). */
   activity: number;
   /** ISO date (YYYY-MM-DD) */
   delay_start_date: string;
