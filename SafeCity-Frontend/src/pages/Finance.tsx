@@ -574,98 +574,103 @@ export default function Finance() {
   }, [stageBreakdownItems]);
 
   return (
-    <Layout title="Financial & Budget Analytics">
-      <div className="flex flex-col gap-6">
+    <Layout title={isMobile ? "FINANCIAL ANALYTICS" : "Financial & Budget Analytics"}>
+      <div className="flex flex-col gap-4 sm:gap-6 w-full min-w-0">
         {/* Filters */}
-        <div className="flex flex-nowrap items-center gap-3 overflow-x-auto pb-1">
+        <div className="flex flex-wrap items-center gap-3 min-w-0">
           <Filter className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
-          <div className="flex items-center gap-2 shrink-0">
-            <label className="text-sm font-medium text-muted-foreground shrink-0">Division</label>
-            <Select value={selectedDivisionId} onValueChange={handleDivisionChange} disabled={divisionsLoading}>
-              <SelectTrigger className="h-9 w-[140px] border-border/50 bg-background rounded-md">
-                <SelectValue placeholder={divisionsLoading ? "Loading…" : "All"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                {divisions.map((d) => (
-                  <SelectItem key={d.id} value={String(d.id)}>
-                    {d.division_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <label className="text-sm font-medium text-muted-foreground shrink-0">District</label>
-            <Select
-              value={selectedDistrictId}
-              onValueChange={handleDistrictChange}
-              disabled={selectedDivisionId === "all" || districtsLoading}
-            >
-              <SelectTrigger
-                className={cn(
-                  "h-9 w-[140px] border-border/50 bg-background rounded-md",
-                  (selectedDivisionId === "all" || districtsLoading) && "opacity-50 cursor-not-allowed"
-                )}
-              >
-                <SelectValue placeholder={districtsLoading ? "Loading…" : "All"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                {selectedDivisionId !== "all" &&
-                  districts.map((d) => (
+          <div className="grid w-full grid-cols-2 gap-3 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-3 min-w-0">
+            <div className="flex flex-col gap-1 min-w-0 sm:flex sm:flex-wrap sm:flex-row sm:items-center sm:gap-2">
+              <label className="text-sm font-medium text-muted-foreground">Division</label>
+              <Select value={selectedDivisionId} onValueChange={handleDivisionChange} disabled={divisionsLoading}>
+                <SelectTrigger className="h-9 w-full sm:w-[140px] border-border/50 bg-background rounded-md">
+                  <SelectValue placeholder={divisionsLoading ? "Loading…" : "All"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  {divisions.map((d) => (
                     <SelectItem key={d.id} value={String(d.id)}>
-                      {d.district_name}
+                      {d.division_name}
                     </SelectItem>
                   ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <label className="text-sm font-medium text-muted-foreground shrink-0">Tehsil</label>
-            <Select
-              value={selectedTehsilId}
-              onValueChange={handleTehsilChange}
-              disabled={selectedDivisionId === "all" || selectedDistrictId === "all" || tehsilsLoading}
-            >
-              <SelectTrigger
-                className={cn(
-                  "h-9 w-[140px] border-border/50 bg-background rounded-md",
-                  (selectedDivisionId === "all" ||
-                    selectedDistrictId === "all" ||
-                    tehsilsLoading) &&
-                    "opacity-50 cursor-not-allowed"
-                )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1 min-w-0 sm:flex sm:flex-wrap sm:flex-row sm:items-center sm:gap-2">
+              <label className="text-sm font-medium text-muted-foreground">District</label>
+              <Select
+                value={selectedDistrictId}
+                onValueChange={handleDistrictChange}
+                disabled={selectedDivisionId === "all" || districtsLoading}
               >
-                <SelectValue placeholder={tehsilsLoading ? "Loading…" : "All"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                {selectedDivisionId !== "all" &&
-                  selectedDistrictId !== "all" &&
-                  tehsils.map((t) => (
-                    <SelectItem key={t.id} value={String(t.id)}>
-                      {t.tehsil_name}
+                <SelectTrigger
+                  className={cn(
+                    "h-9 w-full sm:w-[140px] border-border/50 bg-background rounded-md",
+                    (selectedDivisionId === "all" || districtsLoading) && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  <SelectValue placeholder={districtsLoading ? "Loading…" : "All"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  {selectedDivisionId !== "all" &&
+                    districts.map((d) => (
+                      <SelectItem key={d.id} value={String(d.id)}>
+                        {d.district_name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1 min-w-0 sm:flex sm:flex-wrap sm:flex-row sm:items-center sm:gap-2">
+              <label className="text-sm font-medium text-muted-foreground">Tehsil</label>
+              <Select
+                value={selectedTehsilId}
+                onValueChange={handleTehsilChange}
+                disabled={selectedDivisionId === "all" || selectedDistrictId === "all" || tehsilsLoading}
+              >
+                <SelectTrigger
+                  className={cn(
+                    "h-9 w-full sm:w-[140px] border-border/50 bg-background rounded-md",
+                    (selectedDivisionId === "all" ||
+                      selectedDistrictId === "all" ||
+                      tehsilsLoading) &&
+                      "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  <SelectValue placeholder={tehsilsLoading ? "Loading…" : "All"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  {selectedDivisionId !== "all" &&
+                    selectedDistrictId !== "all" &&
+                    tehsils.map((t) => (
+                      <SelectItem key={t.id} value={String(t.id)}>
+                        {t.tehsil_name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1 min-w-0 sm:flex sm:flex-wrap sm:flex-row sm:items-center sm:gap-2">
+              <label className="text-sm font-medium text-muted-foreground">Project</label>
+              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                <SelectTrigger className="h-9 w-full sm:w-[160px] border-border/50 bg-background rounded-md">
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All ({filteredProjects.length})</SelectItem>
+                  {filteredProjects.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      {p.project_name || `#${p.id}`}
                     </SelectItem>
                   ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <label className="text-sm font-medium text-muted-foreground shrink-0">Project</label>
-            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-              <SelectTrigger className="h-9 w-[160px] border-border/50 bg-background rounded-md">
-                <SelectValue placeholder="All" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All ({filteredProjects.length})</SelectItem>
-                {filteredProjects.map((p) => (
-                  <SelectItem key={p.id} value={String(p.id)}>
-                    {p.project_name || `#${p.id}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           {(selectedDivisionId !== "all" ||
             selectedDistrictId !== "all" ||

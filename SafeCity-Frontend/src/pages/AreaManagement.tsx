@@ -103,7 +103,7 @@ export default function AreaManagement() {
 
     return (
         <Layout title="Area & Spatial Management">
-            <div className="flex flex-col gap-8 max-w-[1400px] mx-auto pb-20">
+            <div className="flex flex-col gap-8 w-full max-w-[1400px] mx-auto min-w-0 pb-20">
                 {/* Visual Progress Header */}
                 <div className="flex flex-col items-center justify-center w-full py-4">
                     <div className="flex items-start w-full max-w-3xl relative">

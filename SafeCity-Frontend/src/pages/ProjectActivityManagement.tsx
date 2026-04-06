@@ -160,7 +160,7 @@ export default function ProjectActivityManagement() {
 
   return (
     <Layout title="Project Activities">
-      <div className="flex flex-col gap-8 max-w-[1400px] mx-auto pb-20">
+      <div className="flex flex-col gap-8 w-full max-w-[1400px] mx-auto min-w-0 pb-20">
 
         {/* Project Selector */}
         <Card className="border-none shadow-sm overflow-hidden">

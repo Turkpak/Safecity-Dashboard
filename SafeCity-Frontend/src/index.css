@@ -17,6 +17,12 @@ body {
   display: none;
 }
 
+/* Momentum scrolling for horizontal regions (tables, breadcrumbs) on touch devices */
+.overflow-x-touch {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Grid pattern background */
 .bg-grid-pattern {
   background-image: 

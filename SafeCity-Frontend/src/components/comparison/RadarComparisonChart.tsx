@@ -25,7 +25,7 @@ export function RadarComparisonChart({ data, cities }: RadarComparisonChartProps
   return (
     <Card className="shadow-lg border-border/50 border-2 transition-colors hover:border-[#101a3c]">
       <CardHeader className="pb-4">
-        <CardTitle className="font-heading text-xl font-bold">Multi-City Phase Comparison</CardTitle>
+        <CardTitle className="font-heading text-lg sm:text-xl font-bold leading-tight">Multi-City Phase Comparison</CardTitle>
         <CardDescription className="text-sm">Radar chart comparing top {isMobile ? 3 : 5} cities across all phases</CardDescription>
       </CardHeader>
       <CardContent>

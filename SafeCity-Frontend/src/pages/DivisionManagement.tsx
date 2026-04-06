@@ -115,7 +115,7 @@ export default function DivisionManagement() {
 
   return (
     <Layout title="Area Hierarchy Management">
-      <div className="flex flex-col gap-8 max-w-[1400px] mx-auto pb-20">
+      <div className="flex flex-col gap-8 w-full max-w-[1400px] mx-auto min-w-0 pb-20">
         <div>
           <h1 className="text-2xl font-bold text-primary">Division — Add / Edit</h1>
           <p className="text-muted-foreground text-sm">Create a new division or edit an existing one.</p>

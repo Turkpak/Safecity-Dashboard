@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { MoreVertical, Plus, Upload, FileText, FolderKanban, ListChecks, CornerDownRight } from "lucide-react";
+import { MoreVertical, Plus, Upload, FileText, FolderKanban, ListChecks, CornerDownRight, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,9 +13,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { updateTaskActual, createPictorialArchive } from "@/api";
+import { updateTaskActual, createPictorialArchive, addDelayLog } from "@/api";
 
 type FlatGanttRow = {
   id: string;
@@ -58,11 +60,13 @@ export function ProjectGanttTree({
   projectName,
   projectId,
   onOpenAddDocument,
+  readOnly = false,
 }: {
   tasks: FlatGanttRow[];
   projectName?: string;
   projectId?: number;
   onOpenAddDocument?: (taskId: string, taskName: string) => void;
+  readOnly?: boolean;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const { toast } = useToast();
@@ -72,13 +76,16 @@ export function ProjectGanttTree({
   const [activeRow, setActiveRow] = useState<FlatGanttRow | null>(null);
   const [progressValue, setProgressValue] = useState<number>(0);
   const [progressDate, setProgressDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
-  const [progressImage, setProgressImage] = useState<File | null>(null);
+  const [progressImages, setProgressImages] = useState<File[]>([]);
   const [savingProgress, setSavingProgress] = useState(false);
 
   const [delayOpen, setDelayOpen] = useState(false);
   const [delayRow, setDelayRow] = useState<FlatGanttRow | null>(null);
   const [delayStartDate, setDelayStartDate] = useState<string>("");
   const [delayEndDate, setDelayEndDate] = useState<string>("");
+  const [delayCategory, setDelayCategory] = useState<string>("");
+  const [delayCategoryOpen, setDelayCategoryOpen] = useState(false);
+  const [delayCategoryQuery, setDelayCategoryQuery] = useState("");
   const [delayOriginator, setDelayOriginator] = useState<string>("");
   const [delayIssue, setDelayIssue] = useState<string>("");
   const [delayRecommendedAction, setDelayRecommendedAction] = useState<string>("");
@@ -208,9 +215,11 @@ export function ProjectGanttTree({
               </div>
             ))}
           </div>
-          <div className="w-20 font-semibold text-sm bg-muted/40 border-l border-border/60 px-3 py-2 text-center">
-            Options
-          </div>
+          {!readOnly && (
+            <div className="w-20 font-semibold text-sm bg-muted/40 border-l border-border/60 px-3 py-2 text-center">
+              Options
+            </div>
+          )}
         </div>
 
         {/* Rows */}
@@ -315,100 +324,112 @@ export function ProjectGanttTree({
                   </div>
                 </div>
 
-                <div className="w-20 border-l border-border/60 flex items-center justify-center">
-                  {/* Show options only for leaf subtasks (not parent WBS rows). */}
-                  {!t.hasChildren && t.depth >= 2 ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          className="h-9 w-9 rounded-lg border border-border/60 bg-background hover:bg-muted/60 flex items-center justify-center"
-                          aria-label="Options"
-                        >
-                          <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onSelect={(e) => {
-                            e.preventDefault();
-                            setDelayRow(t);
-                            setDelayStartDate("");
-                            setDelayEndDate("");
-                            const role = user?.role ?? user?.stakeholder_type ?? "";
-                            setDelayOriginator(role ? String(role) : "—");
-                            setDelayActionBy(role ? String(role) : "");
-                            setDelayIssue("");
-                            setDelayRecommendedAction("");
-                            setDelayOpen(true);
-                          }}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add delay log
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={(e) => {
-                            e.preventDefault();
-                            if (onOpenAddDocument) {
-                              onOpenAddDocument(t.id, t.label);
-                              return;
-                            }
-                            toast({
-                              title: "Documents not available here",
-                              description: "Open the Photos & Docs tab to add documents for this project.",
-                            });
-                          }}
-                        >
-                          <FileText className="h-4 w-4 mr-2" />
-                          Add documents
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={(e) => {
-                            e.preventDefault();
-                            setActiveRow(t);
-                            setProgressValue(
-                              typeof t.progress === "number" && Number.isFinite(t.progress) ? t.progress : 0,
-                            );
-                            setProgressDate(new Date().toISOString().slice(0, 10));
-                            setProgressImage(null);
-                            setProgressOpen(true);
-                          }}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add progress
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : (
-                    <span className="inline-block h-9 w-9" aria-hidden />
-                  )}
-                </div>
+                {!readOnly && (
+                  <div className="w-20 border-l border-border/60 flex items-center justify-center">
+                    {/* Show options only for leaf subtasks (not parent WBS rows). */}
+                    {!t.hasChildren && t.depth >= 2 ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className="h-9 w-9 rounded-lg border border-border/60 bg-background hover:bg-muted/60 flex items-center justify-center"
+                            aria-label="Options"
+                          >
+                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              setDelayRow(t);
+                              setDelayStartDate(t.start ?? "");
+                              setDelayEndDate(t.end ?? t.start ?? "");
+                              setDelayCategory("");
+                              setDelayCategoryOpen(false);
+                              setDelayCategoryQuery("");
+                              const role = user?.role ?? user?.stakeholder_type ?? "";
+                              setDelayOriginator(role ? String(role) : "—");
+                              setDelayActionBy(role ? String(role) : "");
+                              setDelayIssue("");
+                              setDelayRecommendedAction("");
+                              setDelayOpen(true);
+                            }}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Delay
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              if (onOpenAddDocument) {
+                                onOpenAddDocument(t.id, t.label);
+                                return;
+                              }
+                              toast({
+                                title: "Documents not available here",
+                                description:
+                                  "Open the Photos & Docs tab to add documents for this project.",
+                              });
+                            }}
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            Add documents
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              setActiveRow(t);
+                              setProgressValue(
+                                typeof t.progress === "number" && Number.isFinite(t.progress)
+                                  ? t.progress
+                                  : 0,
+                              );
+                              setProgressDate(new Date().toISOString().slice(0, 10));
+                              setProgressImages([]);
+                              setProgressOpen(true);
+                            }}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add progress
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (
+                      <span className="inline-block h-9 w-9" aria-hidden />
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       </div>
 
-      <Dialog
-        open={delayOpen}
-        onOpenChange={(open) => {
-          setDelayOpen(open);
-          if (!open) {
-            setDelayRow(null);
-            setDelayStartDate("");
-            setDelayEndDate("");
-            setDelayOriginator("");
-            setDelayIssue("");
-            setDelayRecommendedAction("");
-            setDelayActionBy("");
-            setSavingDelay(false);
-          }
-        }}
-      >
-        <DialogContent className="w-[95vw] max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Add Delay Log</DialogTitle>
-          </DialogHeader>
+      {!readOnly && (
+        <Dialog
+          open={delayOpen}
+          onOpenChange={(open) => {
+            setDelayOpen(open);
+            if (!open) {
+              setDelayRow(null);
+              setDelayStartDate("");
+              setDelayEndDate("");
+              setDelayCategory("");
+              setDelayCategoryOpen(false);
+              setDelayCategoryQuery("");
+              setDelayOriginator("");
+              setDelayIssue("");
+              setDelayRecommendedAction("");
+              setDelayActionBy("");
+              setSavingDelay(false);
+            }
+          }}
+        >
+          <DialogContent className="w-[95vw] max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Add Delay</DialogTitle>
+            </DialogHeader>
 
           <div className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -424,11 +445,11 @@ export function ProjectGanttTree({
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-1.5">
-                <Label>Start date</Label>
+                <Label>Delay Start date</Label>
                 <Input type="date" value={delayStartDate} onChange={(e) => setDelayStartDate(e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label>End date</Label>
+                <Label>Delay End date</Label>
                 <Input type="date" value={delayEndDate} onChange={(e) => setDelayEndDate(e.target.value)} />
               </div>
               <div className="space-y-1.5">
@@ -437,10 +458,64 @@ export function ProjectGanttTree({
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-1.5">
                 <Label>Originator</Label>
                 <Input value={delayOriginator} readOnly />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Category</Label>
+                <Popover open={delayCategoryOpen} onOpenChange={setDelayCategoryOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={delayCategoryOpen}
+                      className="w-full justify-between font-normal h-10 px-3 text-sm"
+                    >
+                      <span className="truncate">{delayCategory ? delayCategory : "Select category"}</span>
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                    <Command
+                      filter={(value, search) => {
+                        const q = (search || "").toLowerCase();
+                        if (!q) return 1;
+                        return (value || "").toLowerCase().includes(q) ? 1 : 0;
+                      }}
+                    >
+                      <CommandInput
+                        placeholder="Type category…"
+                        value={delayCategoryQuery}
+                        onValueChange={setDelayCategoryQuery}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          <div className="p-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="w-full justify-center"
+                              disabled={!delayCategoryQuery.trim()}
+                              onClick={() => {
+                                const v = delayCategoryQuery.trim();
+                                if (!v) return;
+                                setDelayCategory(v);
+                                setDelayCategoryOpen(false);
+                              }}
+                            >
+                              Use “{delayCategoryQuery.trim() || "…"}”
+                            </Button>
+                          </div>
+                        </CommandEmpty>
+                        <CommandGroup />
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-1.5">
                 <Label>Action by</Label>
@@ -496,22 +571,48 @@ export function ProjectGanttTree({
               disabled={
                 savingDelay ||
                 !delayRow ||
+                projectId == null ||
+                !delayRow.db_id ||
                 !delayStartDate ||
                 !delayEndDate ||
                 !delayOriginator ||
+                !delayCategory ||
                 !delayIssue.trim() ||
                 !delayRecommendedAction.trim() ||
                 !delayActionBy
               }
               onClick={async () => {
                 if (!delayRow) return;
+                if (projectId == null) {
+                  toast({
+                    title: "Cannot save delay log",
+                    description: "Missing project id. Please refresh and try again.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                if (!delayRow.db_id || !Number.isFinite(delayRow.db_id)) {
+                  toast({
+                    title: "Cannot save delay log",
+                    description: "Missing activity id from API. Please refresh and try again.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
                 try {
                   setSavingDelay(true);
-                  // Backend persistence not implemented yet for delay logs.
-                  // For now: just acknowledge and keep UI consistent.
+                  await addDelayLog({
+                    project: projectId,
+                    activity: delayRow.db_id,
+                    delay_start_date: delayStartDate,
+                    delay_end_date: delayEndDate,
+                    action_by: delayActionBy,
+                    issue: delayIssue.trim(),
+                    recommended_action: delayRecommendedAction.trim(),
+                  });
                   toast({
                     title: "Delay log saved",
-                    description: `Delay ${delayDays} day(s) logged for "${delayRow.label}".`,
+                    description: `Delay ${delayDays} day(s) • ${delayCategory} • "${delayRow.label}".`,
                   });
                   setDelayOpen(false);
                 } catch (err) {
@@ -528,24 +629,26 @@ export function ProjectGanttTree({
               {savingDelay ? "Saving..." : "Save delay log"}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
 
-      <Dialog
-        open={progressOpen}
-        onOpenChange={(open) => {
-          setProgressOpen(open);
-          if (!open) {
-            setActiveRow(null);
-            setProgressImage(null);
-            setSavingProgress(false);
-          }
-        }}
-      >
-        <DialogContent className="w-[95vw] max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Add Progress</DialogTitle>
-          </DialogHeader>
+      {!readOnly && (
+        <Dialog
+          open={progressOpen}
+          onOpenChange={(open) => {
+            setProgressOpen(open);
+            if (!open) {
+              setActiveRow(null);
+              setProgressImages([]);
+              setSavingProgress(false);
+            }
+          }}
+        >
+          <DialogContent className="w-[95vw] max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Add Progress</DialogTitle>
+            </DialogHeader>
 
           <div className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -580,11 +683,11 @@ export function ProjectGanttTree({
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-1.5">
-                <Label>Start date</Label>
+                <Label> Start date</Label>
                 <Input type="date" value={activeRow?.start ?? ""} readOnly />
               </div>
               <div className="space-y-1.5">
-                <Label>End date</Label>
+                <Label> End date</Label>
                 <Input type="date" value={activeRow?.end ?? ""} readOnly />
               </div>
               <div className="space-y-1.5">
@@ -597,7 +700,7 @@ export function ProjectGanttTree({
               <Label>Picture (optional)</Label>
               <div
                 className={`relative border-2 border-dashed rounded-lg p-5 flex items-center justify-between gap-4 transition-all ${
-                  progressImage
+                  progressImages.length > 0
                     ? "border-primary bg-primary/5"
                     : "border-muted-foreground/20 hover:border-primary/50 cursor-pointer"
                 }`}
@@ -613,23 +716,25 @@ export function ProjectGanttTree({
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium">
-                    {progressImage ? progressImage.name : "Click to upload a progress picture"}
+                    {progressImages.length > 0
+                      ? `${progressImages.length} file(s) selected`
+                      : "Click to upload progress picture(s)"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {progressImage
-                      ? `${(progressImage.size / 1024).toFixed(1)} KB`
+                    {progressImages.length > 0
+                      ? progressImages.map((f) => f.name).join(", ")
                       : "PNG, JPG, JPEG"}
                   </p>
                 </div>
 
-                {progressImage ? (
+                {progressImages.length > 0 ? (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setProgressImage(null);
+                      setProgressImages([]);
                     }}
                   >
                     Remove
@@ -644,8 +749,12 @@ export function ProjectGanttTree({
                   id="gantt-progress-image-input"
                   type="file"
                   accept="image/*"
+                  multiple
                   className="hidden"
-                  onChange={(e) => setProgressImage(e.target.files?.[0] ?? null)}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    setProgressImages(files);
+                  }}
                 />
               </div>
             </div>
@@ -686,20 +795,22 @@ export function ProjectGanttTree({
                         : undefined,
                   });
 
-                  if (progressImage && projectId != null) {
-                    await createPictorialArchive({
-                      project: projectId,
-                      image: progressImage,
-                      image_date: progressDate || new Date().toISOString().slice(0, 10),
-                      description: `Progress update • Activity: ${activeRow.label} • ${Math.round(progressValue)}%`,
-                    });
+                  if (progressImages.length > 0 && projectId != null) {
+                    for (const img of progressImages) {
+                      await createPictorialArchive({
+                        project: projectId,
+                        image: img,
+                        image_date: progressDate || new Date().toISOString().slice(0, 10),
+                        description: `Progress update • Activity: ${activeRow.label} • ${Math.round(progressValue)}%`,
+                      });
+                    }
                   }
 
                   toast({
                     title: "Progress saved",
-                    description: progressImage
+                    description: progressImages.length > 0
                       ? projectId != null
-                        ? "Progress updated and picture attached."
+                        ? "Progress updated and picture(s) attached."
                         : "Progress updated (picture not saved: missing project context)."
                       : "Progress updated successfully.",
                   });
@@ -718,8 +829,9 @@ export function ProjectGanttTree({
               {savingProgress ? "Saving..." : "Save progress"}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

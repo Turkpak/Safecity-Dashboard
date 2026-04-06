@@ -369,11 +369,15 @@ export default function UserManagement() {
     <Layout title="User Management">
       <div className="space-y-6">
         {/* Header with Add New User button on the right — Super Admin only */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          
-          <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Button
+            onClick={() => setDialogOpen(true)}
+            size="sm"
+            className="gap-2 w-fit self-start sm:w-auto sm:self-auto shrink-0 px-3"
+          >
             <UserPlus className="h-4 w-4" />
-            Add New User
+            <span className="sm:hidden">Add</span>
+            <span className="hidden sm:inline">Add New User</span>
           </Button>
         </div>
 
@@ -667,8 +671,8 @@ export default function UserManagement() {
               {usersWithPermissionsLoading ? (
                 <p className="text-muted-foreground text-sm">Loading users and permissions…</p>
               ) : (
-                <div className="flex flex-wrap items-end gap-4">
-                  <div className="space-y-2 min-w-[200px]">
+                <div className="grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap sm:items-end sm:gap-4">
+                  <div className="space-y-2 min-w-0">
                     <Label htmlFor="permissions-name-combobox">Name</Label>
                     <Popover open={nameComboboxOpen} onOpenChange={setNameComboboxOpen}>
                       <PopoverTrigger asChild>
@@ -677,7 +681,7 @@ export default function UserManagement() {
                           variant="outline"
                           role="combobox"
                           aria-expanded={nameComboboxOpen}
-                          className="w-[280px] max-w-full justify-between font-normal h-9 px-3 text-sm"
+                          className="w-full justify-between font-normal h-9 px-3 text-sm"
                         >
                           <span className="truncate">
                             {selectedUserWithPermissions
@@ -687,7 +691,7 @@ export default function UserManagement() {
                           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[280px] p-0" align="start">
+                      <PopoverContent className="w-[min(420px,calc(100vw-2rem))] p-0" align="start">
                         <Command
                           filter={(value, search) => {
                             const label = (value || "").toLowerCase();
@@ -721,12 +725,12 @@ export default function UserManagement() {
                       </PopoverContent>
                     </Popover>
                   </div>
-                  <div className="space-y-2 min-w-[140px]">
+                  <div className="space-y-2 min-w-0">
                     <Label htmlFor="permissions-role-display">Role</Label>
                     <Input
                       id="permissions-role-display"
                       readOnly
-                      className="bg-muted w-[140px]"
+                      className="bg-muted w-full"
                       value={selectedUserWithPermissions ? formatRole(selectedUserWithPermissions.role) : "—"}
                     />
                   </div>
@@ -735,7 +739,7 @@ export default function UserManagement() {
                       variant="destructive"
                       size="sm"
                       onClick={() => setSelectedUserIdForPermissions(null)}
-                      className="shrink-0 h-8 text-white bg-red-600 hover:bg-red-700 border-0"
+                      className="col-span-2 sm:col-span-auto shrink-0 h-8 text-white bg-red-600 hover:bg-red-700 border-0"
                     >
                       Clear selection
                     </Button>

@@ -8,8 +8,12 @@ import { useQuery } from "@tanstack/react-query";
 import { listDivisions, listProjects } from "@/api";
 import type { Division, Project } from "@/api/types";
 import { useMemo } from "react";
+import { useWindowSize } from "@/hooks/use-window-size";
 
 export default function Comparison() {
+  const { width } = useWindowSize();
+  const isMobile = width < 640;
+
   // Division completion chart should be API-driven:
   // completion % per division is calculated from all projects under that division
   // (projects already belong to district -> tehsil -> project, and also carry division id).
@@ -106,8 +110,8 @@ export default function Comparison() {
 
 
   return (
-    <Layout title="City Comparison - Smart Safe Cities">
-      <div className="flex flex-col gap-6">
+    <Layout title={isMobile ? "CITY COMPARISON" : "City Comparison - Smart Safe Cities"}>
+      <div className="flex flex-col gap-4 sm:gap-6 w-full min-w-0">
         {/* Header Section */}
 
 

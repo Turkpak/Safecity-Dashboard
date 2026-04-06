@@ -24,15 +24,16 @@ export function CityCompletionChart({ cityData, description = "District Wise Pro
   const isTablet = width >= 640 && width < 1024;
   // Keep bar width visually consistent even when the number of divisions changes.
   const barSize = isMobile ? 28 : isTablet ? 34 : 42;
+  const tickLabel = (s: string) => (s || "").replace(/\s*Division\s*$/i, "");
 
   return (
     <Card className="shadow-lg border-border/50 border-2 transition-colors hover:border-[#101a3c]">
       <CardHeader className="pb-4">
-        <CardTitle className="font-heading text-xl font-bold">Smart Safe Cities Phase I (Completion %)</CardTitle>
+        <CardTitle className="font-heading text-lg sm:text-xl font-bold leading-tight">Smart Safe Cities Phase I (Completion %)</CardTitle>
         <CardDescription className="text-sm">{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="w-full" style={{ height: isMobile ? '320px' : isTablet ? '380px' : '450px' }}>
+        <div className="w-full" style={{ height: isMobile ? '320px' : isTablet ? '380px' : '380px' }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart 
               data={sortedData} 
@@ -41,16 +42,17 @@ export function CityCompletionChart({ cityData, description = "District Wise Pro
               margin={{ 
                 top: isMobile ? 5 : 10, 
                 right: isMobile ? 5 : 10, 
-                left: isMobile ? 18 : 30, 
-                bottom: isMobile ? 130 : isTablet ? 110 : 95 
+                left: isMobile ? 10 : 30, 
+                bottom: isMobile ? 80 : isTablet ? 110 : 70 
               }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
               <XAxis 
                 dataKey="city" 
-                angle={isMobile ? -60 : -45}
+                tickFormatter={tickLabel}
+                angle={isMobile ? -35 : -45}
                 textAnchor="end"
-                height={isMobile ? 130 : isTablet ? 110 : 100}
+                height={isMobile ? 80 : isTablet ? 110 : 80}
                 tick={{ 
                   fontSize: isMobile ? 8 : isTablet ? 10 : 11, 
                   fill: "hsl(var(--muted-foreground))" 
@@ -85,7 +87,7 @@ export function CityCompletionChart({ cityData, description = "District Wise Pro
               />
               <Legend 
                 wrapperStyle={{ 
-                  paddingTop: isMobile ? "8px" : isTablet ? "15px" : "20px",
+                  paddingTop: isMobile ? "8px" : isTablet ? "15px" : "8px",
                   fontSize: isMobile ? '9px' : isTablet ? '10px' : '12px'
                 }}
                 iconType="circle"
