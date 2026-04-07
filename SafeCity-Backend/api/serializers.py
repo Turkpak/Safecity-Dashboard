@@ -278,8 +278,8 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         project.stakeholder.set(stakeholders)
 
         if xer_file:
-            project.xer_file = xer_file
-
+            # project.xer_file = xer_file
+            project.xer_file = self._generate_xer_path(project, xer_file.name)
         # Handle GeoJSON
         if boundary_file:
             project.geom = self._parse_boundary_file(boundary_file)
@@ -308,7 +308,7 @@ class ProjectSerializer(GeoFeatureModelSerializer):
             instance.stakeholder.set(stakeholders)
 
         if xer_file:
-            instance.xer_file = xer_file
+            instance.xer_file = self._generate_xer_path(instance, xer_file.name)
             if not instance.activities.exists():
                 try:
                     self._save_activities(instance, xer_file)
@@ -322,6 +322,24 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         instance.save()
         return instance
 
+    # ------------------------
+    # Generate file path without saving
+    # ------------------------
+    def _generate_xer_path(self, project, filename):
+        from django.utils.text import slugify
+        from datetime import datetime
+        import uuid
+        import os
+
+        ext = filename.split('.')[-1].lower()
+        filename = f"{uuid.uuid4()}.{ext}"
+
+        project_name = f"{project.id}-{slugify(project.project_name)}" if project.project_name else "no-project"
+        date_folder = datetime.now().strftime("%Y-%m-%d")
+        subfolder = "xer"
+
+        path = os.path.join("projects", project_name, date_folder, subfolder, filename)
+        return path.replace("\\", "/")  # Ensure forward slashes for frontend
     # ---------- Private: Parse GeoJSON & Ensure MultiPolygon ----------
     def _parse_boundary_file(self, boundary_file):
         try:
