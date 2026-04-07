@@ -57,6 +57,10 @@ router.register(r'update-project-activity', ProjectActivityUpdateView, basename=
 router.register(r'delete-project-activity', ProjectActivityDeleteView, basename='delete-project-activity')
 # router.register(r'project-gantt', ProjectGanttView, basename='project-gantt')
 
+router.register(r'create-progress-image', ProgressImageCreateViewSet, basename='create-progress-image')
+router.register(r'list-progress-image', ListProgressImageView, basename='list-progress-image')
+router.register(r'update-progress-image', ProgressImageUpdateView, basename='update-progress-image')
+router.register(r'delete-progress-image', DeleteProgressImageView, basename='delete-progress-image')
 
 #--------------------------------- Pictorial Archive View ---------------------------------
 router.register(r'create-pictorial-archive', PictorialArchiveCreateView, basename='create-pictorial-archive')

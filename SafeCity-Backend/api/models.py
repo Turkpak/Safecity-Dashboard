@@ -342,6 +342,20 @@ class ProjectActivity(models.Model):
         ordering = []
     def __str__(self):
         return f"{self.activity_name} ({self.project.project_name})"
+    
+class ProgressImage(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="images")
+    activity = models.ForeignKey(ProjectActivity, on_delete=models.CASCADE, related_name="images")
+
+    image = models.ImageField(upload_to=project_image_file_path)
+
+    caption = models.CharField(max_length=255, null=True, blank=True)
+    image_date = models.DateField(null=True, blank=True)
+
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.activity.activity_name} - {self.image_date}"
 
 class TaskDependency(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
@@ -398,6 +412,8 @@ class PictorialArchive(models.Model):
 
     def __str__(self):
         return f"{self.project.project_name} - {self.image_date}"
+
+
 
 class UserPermission(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)

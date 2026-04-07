@@ -1,8 +1,26 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from api.models import Project, ProjectActivity, ActivityDelayLog
+from api.models import Project, ProjectActivity, ActivityDelayLog, ProgressImage
 
+def get_activity_images(activity):
+    images = ProgressImage.objects.filter(activity=activity)
+    image_list = []
+    if images.exists():
+        image_list = [
+            {
+                "id": img.id,
+                "url": img.image.url if img.image else None,
+                "caption": img.caption,
+                "image_date": img.image_date.isoformat() if img.image_date else None,
+                "uploaded_at": img.uploaded_at.isoformat() if img.uploaded_at else None,
+            }
+            for img in images
+        ]
+    return {
+        "has_images": bool(image_list),
+        "images": image_list
+    }
 
 # ---------- helper to get delay info ----------
 def get_delay_info(activity):
@@ -122,6 +140,7 @@ class ProjectGanttNestedView(APIView):
                 else:
                     duration = 0
 
+                activity_images = get_activity_images(act)
                 # -----------------------------
                 # NODE
                 # -----------------------------
@@ -137,6 +156,8 @@ class ProjectGanttNestedView(APIView):
                     "actual_start": act.actual_start.isoformat() if act.actual_start else None,
                     "actual_end": act.actual_end.isoformat() if act.actual_end else None,
                     "progress_date": act.progress_date.isoformat() if act.progress_date else None,
+                    "has_images": activity_images["has_images"], 
+                    "images": activity_images["images"],                    
                     "has_delay": has_delay_flag,
                     "delay_info": delay_info,
                     "subtasks": subtasks
