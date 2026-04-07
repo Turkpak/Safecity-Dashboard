@@ -545,7 +545,68 @@ export default function ProjectManagement() {
   };
 
   const validateStep3 = () => {
-    // Frontend validation intentionally disabled (temporary).
+    const requireAll = (enabled: boolean, fields: Array<{ label: string; value: any }>) => {
+  if (!enabled) return true;
+  for (const f of fields) {
+    const val = f.value ?? ""; // handle null/undefined
+    if (String(val).trim() === "") {
+      toast({
+        title: "Validation Error",
+        description: `Please enter ${f.label}.`,
+        variant: "destructive",
+      });
+      return false;
+    }
+  }
+  return true;
+};
+
+    if (
+      !requireAll(enableAllocation, [
+        { label: "Allocation capital cost (M)", value: allocationCapital },
+        { label: "Allocation revenue cost (M)", value: allocationRevenue },
+        { label: "Allocation total cost (M)", value: allocationTotal },
+      ])
+    )
+      return false;
+
+    if (
+      !requireAll(enablePdRelease, [
+        { label: "P&D release capital cost (M)", value: pdReleaseCapital },
+        { label: "P&D release revenue cost (M)", value: pdReleaseRevenue },
+        { label: "P&D release total cost (M)", value: pdReleaseTotal },
+      ])
+    )
+      return false;
+
+    if (
+      !requireAll(enableSpendingRelease, [
+        { label: "Spending release capital cost (M)", value: spendingReleaseCapital },
+        { label: "Spending release revenue cost (M)", value: spendingReleaseRevenue },
+        { label: "Spending release total cost (M)", value: spendingReleaseTotal },
+      ])
+    )
+      return false;
+
+    if (
+      !requireAll(enablePifraUtilization, [
+        { label: "PIFRA utilization capital cost (M)", value: pifraCapital },
+        { label: "PIFRA utilization revenue cost (M)", value: pifraRevenue },
+        { label: "PIFRA utilization total cost (M)", value: pifraTotal },
+        { label: "PIFRA utilization date", value: pifraDate },
+      ])
+    )
+      return false;
+
+    if (
+      !requireAll(enableUtilPct, [
+        { label: "Capital %", value: utilPctCapital },
+        { label: "Revenue %", value: utilPctRevenue },
+        { label: "Total %", value: utilPctTotal },
+      ])
+    )
+      return false;
+
     return true;
   };
 

@@ -555,7 +555,7 @@ export function ProjectGanttTree({
                   <SelectContent>
                     {Array.from(
                       new Set(
-                        [user?.role, user?.stakeholder_type, user?.mname, "super_admin", "contractor", "consultant"]
+                        [user?.role, user?.stakeholder_type, "super_admin", "contractor", "consultant"]
                           .filter(Boolean)
                           .map((v) => String(v))
                       )
@@ -631,13 +631,15 @@ export function ProjectGanttTree({
                 }
                 try {
                   setSavingDelay(true);
+                  console.log(delayRow?.activity_id); 
+                  
                   await addDelayLog({
                     project: projectId,
-                    activity: delayActivityId,
+                    activity: Number(delayRow.activity_id),
                     delay_start_date: delayStartDate,
                     delay_end_date: delayEndDate,
                     category : delayCategory,
-                    action_by: delayActionBy,
+                    action_by: Number(delayActionBy),
                     issue: delayIssue.trim(),
                     recommended_action: delayRecommendedAction.trim(),
                   });
