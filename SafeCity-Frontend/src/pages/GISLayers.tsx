@@ -167,17 +167,67 @@ export default function GISLayers() {
     return list;
   }, [projects, divisionNumeric, districtNumeric, selectedTehsilId]);
 
-  const totalFiltered = filteredProjects.length;
-  const inProgressCount = Math.round(totalFiltered * 0.5);
-  const inDelayCount = Math.round(totalFiltered * 0.15);
-  const pendingCount = Math.max(0, totalFiltered - inProgressCount - inDelayCount);
+  /**
+   * Project status counts (no hardcoding).
+   *
+   * Backend does not currently provide a direct "status" field, so we derive:
+   * - pending: no activity has progress > 0 and no activity has actual_start
+   * - in_progress: at least one activity has progress between 0 and 100 (or actual_start exists) AND not delayed
+   * - in_delay: at least one activity has planned end_date in the past AND progress < 100
+   *
+   * Note: this is heuristic but keeps UI fully data-driven.
+   */
+  const projectCounts = useMemo(() => {
+    const asTime = (v: unknown): number | null => {
+      if (!v) return null;
+      const s = String(v).trim();
+      if (!s) return null;
+      const t = new Date(s).getTime();
+      return Number.isFinite(t) ? t : null;
+    };
+    const today = new Date();
+    // normalize to local midnight to avoid partial-day edge cases
+    today.setHours(0, 0, 0, 0);
+    const todayT = today.getTime();
 
-  const projectCounts = {
-    total: totalFiltered,
-    in_progress: inProgressCount,
-    in_delay: inDelayCount,
-    pending: pendingCount,
-  } as const;
+    let pending = 0;
+    let in_progress = 0;
+    let in_delay = 0;
+
+    for (const p of filteredProjects) {
+      const acts = Array.isArray(p.activities) ? p.activities : [];
+      if (acts.length === 0) {
+        pending += 1;
+        continue;
+      }
+
+      // ProjectActivity type in frontend exposes `percent_complete` + `finish_date`.
+      // (Nested gantt exposes different keys, but projects list uses ProjectActivitySerializer.)
+      const anyStarted = acts.some((a) => Number(a.percent_complete ?? 0) > 0) || acts.some((a) => !!a.start_date);
+      const anyIncomplete = acts.some((a) => Number(a.percent_complete ?? 0) < 100);
+
+      const isDelayed = acts.some((a) => {
+        const endT = asTime(a.finish_date);
+        const prog = Number(a.percent_complete ?? 0);
+        return endT != null && endT < todayT && Number.isFinite(prog) && prog < 100;
+      });
+
+      if (!anyStarted) {
+        pending += 1;
+      } else if (isDelayed && anyIncomplete) {
+        in_delay += 1;
+      } else {
+        in_progress += 1;
+      }
+    }
+
+    return {
+      total: filteredProjects.length,
+      pending,
+      in_progress,
+      in_delay,
+    } as const;
+  }, [filteredProjects]);
 
   const mapView = useMemo(
     () =>

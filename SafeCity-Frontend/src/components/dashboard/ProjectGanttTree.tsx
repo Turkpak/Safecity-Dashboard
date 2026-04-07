@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   MoreVertical,
   Plus,
@@ -25,7 +25,8 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { updateTaskActual, createPictorialArchive, addDelayLog } from "@/api";
+import { updateTaskActual, createPictorialArchive, addDelayLog, listStakeholders } from "@/api";
+import type { Stakeholder } from "@/api/types";
 
 type FlatGanttRow = {
   id: string;
@@ -38,7 +39,7 @@ type FlatGanttRow = {
   parent?: string;
   order?: number;
   db_id?: number;
-  /** From nested gantt `activity_id` — this is what `POST add-delay-log/` expects as `activity`. */
+  /** From nested gantt `activity_id` (external schedule id). */
   activity_id?: string;
 
   // ✅ ADD THESE
@@ -48,12 +49,13 @@ type FlatGanttRow = {
   delay_info?: unknown;
 };
 
-/** Delay log API uses nested gantt `activity_id` (numeric string), not the row's internal `id` (`db_id`). */
+/**
+ * Delay log API expects the backend ProjectActivity `id` (nested gantt `id`).
+ * We store that as `db_id` on each row.
+ */
 function parseDelayLogActivityId(row: FlatGanttRow): number | null {
-  const raw = row.activity_id;
-  if (raw == null || String(raw).trim() === "") return null;
-  const n = Number(String(raw).trim());
-  return Number.isFinite(n) ? n : null;
+  const n = row.db_id;
+  return typeof n === "number" && Number.isFinite(n) ? n : null;
 }
 
 function clamp(n: number, min: number, max: number) {
@@ -80,6 +82,13 @@ function parseISODateParts(s: string | null): { y: number; m: number; d: number 
   return { y, m: mo, d };
 }
 
+function parseISOToLocalMidnight(s: string | null): Date | null {
+  const p = parseISODateParts(s);
+  if (!p) return null;
+  // Local midnight (avoids timezone shifting that happens with new Date("YYYY-MM-DD"))
+  return new Date(p.y, p.m - 1, p.d, 0, 0, 0, 0);
+}
+
 function buildMonthsArray(rangeStart: Date, rangeEnd: Date) {
   const months: Date[] = [];
   const cur = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
@@ -97,6 +106,7 @@ export function ProjectGanttTree({
   projectId,
   onOpenAddDocument,
   onDelayLogSaved,
+  onProgressSaved,
   readOnly = false,
 }: {
   tasks: FlatGanttRow[];
@@ -105,6 +115,8 @@ export function ProjectGanttTree({
   onOpenAddDocument?: (taskId: string, taskName: string) => void;
   /** Called after a delay log is saved so the parent can refetch `project-gantt-nested` (updates `has_delay`). */
   onDelayLogSaved?: () => void | Promise<void>;
+  /** Called after progress is saved so the parent can refetch gantt (updates `progress`/actual dates). */
+  onProgressSaved?: () => void | Promise<void>;
   readOnly?: boolean;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -126,8 +138,32 @@ export function ProjectGanttTree({
   const [delayOriginator, setDelayOriginator] = useState<string>("");
   const [delayIssue, setDelayIssue] = useState<string>("");
   const [delayRecommendedAction, setDelayRecommendedAction] = useState<string>("");
+  // Stakeholder id (as string for Select component)
   const [delayActionBy, setDelayActionBy] = useState<string>("");
   const [savingDelay, setSavingDelay] = useState(false);
+  const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
+  const [stakeholdersLoaded, setStakeholdersLoaded] = useState(false);
+  const [stakeholdersLoading, setStakeholdersLoading] = useState(false);
+
+  const loadStakeholders = async (): Promise<void> => {
+    if (stakeholdersLoading) return;
+    try {
+      setStakeholdersLoading(true);
+      const list = await listStakeholders();
+      setStakeholders(Array.isArray(list) ? list : []);
+      setStakeholdersLoaded(true);
+    } catch (err) {
+      setStakeholders([]);
+      setStakeholdersLoaded(false); // allow retry on next open
+      toast({
+        title: "Failed to load stakeholders",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setStakeholdersLoading(false);
+    }
+  };
 
   const delayDays = useMemo(() => {
     if (!delayStartDate || !delayEndDate) return 0;
@@ -252,8 +288,19 @@ export function ProjectGanttTree({
     return <div className="py-6 text-center text-muted-foreground">No schedule tasks found for this project.</div>;
   }
 
+  const selectedActionByStakeholder = useMemo(() => {
+    const idNum = Number(delayActionBy);
+    if (!Number.isFinite(idNum)) return null;
+    return stakeholders.find((s) => s.id === idNum) ?? null;
+  }, [delayActionBy, stakeholders]);
+
   // Frontend-only derived weight: share of overall schedule duration (rough, but gives the UI a meaningful number).
   const overallMs = Math.max(1, dateRange.end.getTime() - dateRange.start.getTime());
+  const todayT = useMemo(() => {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    return t.getTime();
+  }, []);
 
   return (
     <div className="overflow-x-auto">
@@ -366,7 +413,32 @@ export function ProjectGanttTree({
                     </div>
                     <div className="text-[10px] text-muted-foreground">
                       Weight {w.toFixed(0)}%{" "}
-                      <span className="text-red-600 font-semibold">• Behind</span>
+                      {(() => {
+                        const prog = typeof t.progress === "number" && Number.isFinite(t.progress) ? t.progress : 0;
+                        const completed = prog >= 100 || !!t.actual_end;
+                        const started = prog > 0 || !!t.actual_start;
+                        const startT = parseISOToLocalMidnight(t.start)?.getTime() ?? null;
+                        const endT = parseISOToLocalMidnight(t.end)?.getTime() ?? null;
+
+                        let label: "Pending" | "In Progress" | "Behind" | "Completed" = "Pending";
+                        let cls = "text-muted-foreground font-semibold";
+
+                        if (completed) {
+                          label = "Completed";
+                          cls = "text-emerald-600 font-semibold";
+                        } else if (endT != null && endT < todayT) {
+                          label = "Behind";
+                          cls = "text-red-600 font-semibold";
+                        } else if (started) {
+                          label = "In Progress";
+                          cls = "text-blue-600 font-semibold";
+                        } else if (startT != null && startT > todayT) {
+                          label = "Pending";
+                          cls = "text-amber-600 font-semibold";
+                        }
+
+                        return <span className={cls}>• {label}</span>;
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -387,7 +459,7 @@ export function ProjectGanttTree({
                       title={`Planned: ${t.start ?? "—"} → ${t.end ?? "—"}`}
                     >
                       <span className="absolute left-2 top-0.5 text-[10px] font-semibold text-white/90 select-none">
-                        P:{Math.round(clamp(t.progress ?? 0, 0, 100))}%
+                        Planned
                       </span>
                     </div>
                     {/* Actual/progress bar (bottom row) */}
@@ -427,7 +499,9 @@ export function ProjectGanttTree({
                               setDelayCategory("");
                               const role = user?.role ?? user?.stakeholder_type ?? "";
                               setDelayOriginator(role ? String(role) : "—");
-                              setDelayActionBy(role ? String(role) : "");
+                              // Default "Action by" to the logged-in user's stakeholder id if available.
+                              const sid = (user as any)?.stakeholder_id;
+                              setDelayActionBy(sid != null ? String(sid) : "");
                               setDelayIssue("");
                               setDelayRecommendedAction("");
                               setDelayOpen(true);
@@ -488,6 +562,9 @@ export function ProjectGanttTree({
           open={delayOpen}
           onOpenChange={(open) => {
             setDelayOpen(open);
+            if (open && !stakeholdersLoaded) {
+              void loadStakeholders();
+            }
             if (!open) {
               setDelayRow(null);
               setDelayStartDate("");
@@ -548,24 +625,45 @@ export function ProjectGanttTree({
               </div>
               <div className="space-y-1.5">
                 <Label>Action by</Label>
-                <Select value={delayActionBy} onValueChange={setDelayActionBy}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from(
-                      new Set(
-                        [user?.role, user?.stakeholder_type, "super_admin", "contractor", "consultant"]
-                          .filter(Boolean)
-                          .map((v) => String(v))
-                      )
-                    ).map((r) => (
-                      <SelectItem key={r} value={r}>
-                        {r}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {stakeholders.length > 0 ? (
+                  <Select value={delayActionBy} onValueChange={setDelayActionBy}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={stakeholdersLoading ? "Loading..." : "Select stakeholder"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {stakeholders.map((s) => (
+                        <SelectItem key={s.id} value={String(s.id)}>
+                          {s.stakeholder_title} ({s.stakeholder_type})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="space-y-2">
+                    <Input
+                      value={delayActionBy}
+                      onChange={(e) => setDelayActionBy(e.target.value)}
+                      placeholder={stakeholdersLoading ? "Loading stakeholders..." : "Enter stakeholder id (e.g. 1)"}
+                      inputMode="numeric"
+                    />
+                    {!stakeholdersLoading && (
+                      <Button type="button" variant="outline" size="sm" onClick={() => void loadStakeholders()}>
+                        Retry load stakeholders
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Stakeholder type</Label>
+                <Input value={selectedActionByStakeholder?.stakeholder_type ?? ""} readOnly />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Stakeholder title</Label>
+                <Input value={selectedActionByStakeholder?.stakeholder_title ?? ""} readOnly />
               </div>
             </div>
 
@@ -608,7 +706,7 @@ export function ProjectGanttTree({
                 !delayCategory ||
                 !delayIssue.trim() ||
                 !delayRecommendedAction.trim() ||
-                !delayActionBy
+                !Number.isFinite(Number(delayActionBy))
               }
               onClick={async () => {
                 if (!delayRow) return;
@@ -624,22 +722,29 @@ export function ProjectGanttTree({
                 if (delayActivityId == null) {
                   toast({
                     title: "Cannot save delay log",
-                    description: "Missing activity_id from Gantt API. Please refresh and try again.",
+                    description: "Missing activity id from API. Please refresh and try again.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                const actionById = Number(delayActionBy);
+                if (!Number.isFinite(actionById)) {
+                  toast({
+                    title: "Cannot save delay log",
+                    description: "Please select Action by stakeholder.",
                     variant: "destructive",
                   });
                   return;
                 }
                 try {
                   setSavingDelay(true);
-                  console.log(delayRow?.activity_id); 
-                  
                   await addDelayLog({
                     project: projectId,
-                    activity: Number(delayRow.activity_id),
+                    activity: delayActivityId,
                     delay_start_date: delayStartDate,
                     delay_end_date: delayEndDate,
-                    category : delayCategory,
-                    action_by: Number(delayActionBy),
+                    category: delayCategory.trim(),
+                    action_by: actionById,
                     issue: delayIssue.trim(),
                     recommended_action: delayRecommendedAction.trim(),
                   });
@@ -850,6 +955,7 @@ export function ProjectGanttTree({
                       : "Progress updated successfully.",
                   });
                   setProgressOpen(false);
+                  await onProgressSaved?.();
                 } catch (err) {
                   toast({
                     title: "Failed to save progress",

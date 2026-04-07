@@ -2348,6 +2348,7 @@ export function MilestoneDetailsPanel({
                   projectId={ganttProjectId}
                   onOpenAddDocument={openAddDocumentFromGantt}
                   onDelayLogSaved={onProjectGanttRefresh}
+                  onProgressSaved={onProjectGanttRefresh}
                 />
               ) : (
                 <>
