@@ -16,11 +16,24 @@ function normalizeProjectFeature(f: {
 }): Project {
   const props = (f.properties ?? f) as Record<string, unknown>;
   const geom = (f as { geometry?: unknown }).geometry ?? props.geom;
-  return {
+  const project = {
     id: (f.id ?? props.id) as number,
     ...(props as Omit<Project, "id" | "geom">),
     ...(geom !== undefined && { geom }),
   } as Project;
+
+  // Normalize activities shape so UI can rely on ONE approach:
+  // percent_complete + finish_date (legacy naming) regardless of backend serializer keys.
+  if (Array.isArray((project as any).activities)) {
+    (project as any).activities = (project as any).activities.map((a: any) => {
+      const percent_complete =
+        a?.percent_complete ?? a?.progress ?? 0;
+      const finish_date =
+        a?.finish_date ?? a?.end_date ?? null;
+      return { ...a, percent_complete, finish_date };
+    });
+  }
+  return project;
 }
 
 export async function listProjects(): Promise<Project[]> {

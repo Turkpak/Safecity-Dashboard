@@ -252,8 +252,16 @@ export interface ProjectActivity {
   activity_id: string;
   activity_name: string;
   start_date: string | null;
-  finish_date: string | null;
-  percent_complete: number;
+  // Legacy / older schema (kept for compatibility with some endpoints)
+  finish_date?: string | null;
+  percent_complete?: number;
+  // Current backend schema (ProjectActivitySerializer)
+  end_date?: string | null;
+  progress?: number;
+  actual_start?: string | null;
+  actual_end?: string | null;
+  progress_date?: string | null;
+  duration?: number | null;
   parent?: string | null; // optional for hierarchical relationships
 }
 
