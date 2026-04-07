@@ -238,6 +238,12 @@ export function ProjectGanttTree({
   // Month columns are fixed width (120px). Use pixel positioning to avoid drift.
   const MONTH_COL_PX = 120;
   const timelineWidthPx = useMemo(() => Math.max(1, monthsArray.length) * MONTH_COL_PX, [monthsArray.length]);
+  const tableMinWidthPx = useMemo(() => {
+    const wbsCol = 320; // w-80
+    const durationCol = 112; // w-28
+    const optionsCol = readOnly ? 0 : 80; // w-20
+    return wbsCol + durationCol + timelineWidthPx + optionsCol;
+  }, [timelineWidthPx, readOnly]);
 
   const monthScalePx = useMemo(() => {
     const startMonth = new Date(dateRange.start.getFullYear(), dateRange.start.getMonth(), 1);
@@ -304,7 +310,7 @@ export function ProjectGanttTree({
 
   return (
     <div className="overflow-x-auto">
-      <div className="min-w-[1200px]">
+      <div style={{ minWidth: Math.max(1200, tableMinWidthPx) }}>
         {/* Header */}
         <div className="flex border-b mb-3">
           <div className="w-80 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2">
@@ -313,7 +319,7 @@ export function ProjectGanttTree({
           <div className="w-28 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2 text-center">
             Duration
           </div>
-          <div className="flex-1 overflow-hidden">
+          <div className="shrink-0">
             <div className="grid grid-flow-col auto-cols-[120px] text-xs text-center" style={{ width: timelineWidthPx }}>
               {monthsArray.map((d, i) => (
                 <div key={i} className="border-l py-2 font-medium">
@@ -450,8 +456,8 @@ export function ProjectGanttTree({
                   {typeof t.duration === "number" ? t.duration : "—"}
                 </div>
 
-                <div className="flex-1 overflow-hidden bg-background/30">
-                  <div className="relative h-12 overflow-visible" style={{ width: timelineWidthPx }}>
+                <div className="shrink-0 bg-background/30" style={{ width: timelineWidthPx }}>
+                  <div className="relative h-12 overflow-visible">
                     {/* Planned bar (top row) */}
                     <div
                       className="absolute h-4 rounded-md top-2 bg-sky-600"
