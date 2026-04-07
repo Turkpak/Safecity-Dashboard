@@ -16,11 +16,24 @@ function normalizeProjectFeature(f: {
 }): Project {
   const props = (f.properties ?? f) as Record<string, unknown>;
   const geom = (f as { geometry?: unknown }).geometry ?? props.geom;
-  return {
+  const project = {
     id: (f.id ?? props.id) as number,
     ...(props as Omit<Project, "id" | "geom">),
     ...(geom !== undefined && { geom }),
   } as Project;
+
+  // Normalize activities shape so UI can rely on ONE approach:
+  // percent_complete + finish_date (legacy naming) regardless of backend serializer keys.
+  if (Array.isArray((project as any).activities)) {
+    (project as any).activities = (project as any).activities.map((a: any) => {
+      const percent_complete =
+        a?.percent_complete ?? a?.progress ?? 0;
+      const finish_date =
+        a?.finish_date ?? a?.end_date ?? null;
+      return { ...a, percent_complete, finish_date };
+    });
+  }
+  return project;
 }
 
 export async function listProjects(): Promise<Project[]> {
@@ -65,6 +78,27 @@ function appendFormValue(form: FormData, key: string, value: unknown): void {
   form.append(key, String(value));
 }
 
+/** Django `DateField` expects `YYYY-MM-DD` or null; never send `""` (400 validation). */
+function normalizeDateFieldForApi(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  const s = String(value).trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const head = s.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(head)) return head;
+  return null;
+}
+
+function sanitizeProjectDates<T extends Record<string, unknown>>(payload: T): T {
+  const out = { ...payload } as T;
+  for (const key of ["project_starting_date", "pifra_utilization_date"] as const) {
+    if (key in out) {
+      (out as Record<string, unknown>)[key] = normalizeDateFieldForApi(out[key]);
+    }
+  }
+  return out;
+}
+
 export async function createProject(payload: ProjectCreateInput): Promise<Project> {
   const hasFiles = payload.xer_file != null || payload.boundary_file != null;
 
@@ -73,7 +107,11 @@ export async function createProject(payload: ProjectCreateInput): Promise<Projec
     appendFormValue(form, "stakeholder", payload.stakeholder);
     appendFormValue(form, "project_name", payload.project_name ?? "");
     appendFormValue(form, "project_description", payload.project_description ?? "");
-    appendFormValue(form, "project_starting_date", payload.project_starting_date ?? "");
+    appendFormValue(
+      form,
+      "project_starting_date",
+      normalizeDateFieldForApi(payload.project_starting_date) ?? undefined,
+    );
     appendFormValue(form, "project_reference_no", payload.project_reference_no ?? "");
     appendFormValue(form, "province", payload.province);
     appendFormValue(form, "division", payload.division);
@@ -93,7 +131,11 @@ export async function createProject(payload: ProjectCreateInput): Promise<Projec
     appendFormValue(form, "pifra_utilization_capital_cost", payload.pifra_utilization_capital_cost);
     appendFormValue(form, "pifra_utilization_revenue_cost", payload.pifra_utilization_revenue_cost);
     appendFormValue(form, "pifra_utilization_total_cost", payload.pifra_utilization_total_cost);
-    appendFormValue(form, "pifra_utilization_date", payload.pifra_utilization_date);
+    appendFormValue(
+      form,
+      "pifra_utilization_date",
+      normalizeDateFieldForApi(payload.pifra_utilization_date) ?? undefined,
+    );
     appendFormValue(form, "percentage_utilization_capital", payload.percentage_utilization_capital);
     appendFormValue(form, "percentage_utilization_revenue", payload.percentage_utilization_revenue);
     appendFormValue(form, "percentage_utilization_total", payload.percentage_utilization_total);
@@ -109,7 +151,9 @@ export async function createProject(payload: ProjectCreateInput): Promise<Projec
     return request<Project>(CREATE, { method: "POST", formData: form });
   }
 
-  return post<Project>(CREATE, {
+  return post<Project>(
+    CREATE,
+    sanitizeProjectDates({
     stakeholder: payload.stakeholder,
     project_name: payload.project_name ?? null,
     project_description: payload.project_description ?? null,
@@ -137,11 +181,15 @@ export async function createProject(payload: ProjectCreateInput): Promise<Projec
     percentage_utilization_capital: payload.percentage_utilization_capital ?? null,
     percentage_utilization_revenue: payload.percentage_utilization_revenue ?? null,
     percentage_utilization_total: payload.percentage_utilization_total ?? null,
-  });
+    } as Record<string, unknown>),
+  );
 }
 
 export async function updateProject(id: number, payload: ProjectUpdateInput): Promise<Project> {
-  return put<Project>(`${UPDATE}${id}/`, payload);
+  return put<Project>(
+    `${UPDATE}${id}/`,
+    sanitizeProjectDates({ ...payload } as Record<string, unknown>) as ProjectUpdateInput,
+  );
 }
 
 export async function deleteProject(id: number): Promise<void> {

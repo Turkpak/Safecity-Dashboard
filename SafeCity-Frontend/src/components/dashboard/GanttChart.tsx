@@ -187,6 +187,7 @@ export function ProjectGanttChart({ projectId: propProjectId, searchQuery = "" }
                 : undefined
             }
             onDelayLogSaved={loadGantt}
+            onProgressSaved={loadGantt}
           />
         </CardContent>
       </Card>

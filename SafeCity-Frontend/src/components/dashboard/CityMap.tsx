@@ -46,6 +46,33 @@ const getIncidentIcon = (severity: string) => L.divIcon({
   iconAnchor: [12, 12]
 });
 
+type ProjectStatus = "pending" | "in_progress" | "in_delay";
+
+const PROJECT_STATUS_STYLE: Record<ProjectStatus, { color: string; fillColor: string }> = {
+  in_progress: { color: "#2563eb", fillColor: "#2563eb" }, // blue-600
+  in_delay: { color: "#e11d48", fillColor: "#e11d48" }, // rose-600
+  pending: { color: "#d97706", fillColor: "#d97706" }, // amber-600
+};
+
+function getProjectStatusIcon(status: ProjectStatus) {
+  const cfg = PROJECT_STATUS_STYLE[status] ?? PROJECT_STATUS_STYLE.pending;
+  const label = status === "in_delay" ? "!" : status === "in_progress" ? "▶" : "⏳";
+  return L.divIcon({
+    className: "project-status-icon",
+    html: `<div style="
+      width: 26px; height: 26px;
+      border-radius: 9999px;
+      background: ${cfg.color};
+      border: 2px solid rgba(255,255,255,0.95);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-weight: 800; font-size: 13px; line-height: 1;
+    ">${label}</div>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  });
+}
+
 const MOCK_DATA = {
   cameras: [
     // Lahore
@@ -437,20 +464,60 @@ export function CityMap({
 
           {geoData && (
             <LayersControl.Overlay checked name="Proposed Area Boundary">
-              <GeoJSON
-                data={geoData}
-                pathOptions={{
-                  color: '#ef4444',
-                  fillColor: '#ef4444',
-                  fillOpacity: 0.1,
-                  weight: 3,
-                  dashArray: '10, 10'
-                }}
-                onEachFeature={(feature, layer) => {
-                  const name = feature.properties?.project_name;
-                  if (name != null && name !== '') layer.bindPopup(String(name));
-                }}
-              />
+              <>
+                <GeoJSON
+                  data={geoData}
+                  style={(feature: any) => {
+                    const status: ProjectStatus = feature?.properties?.status ?? "pending";
+                    const cfg = PROJECT_STATUS_STYLE[status] ?? PROJECT_STATUS_STYLE.pending;
+                    return {
+                      color: cfg.color,
+                      fillColor: cfg.fillColor,
+                      fillOpacity: 0.12,
+                      weight: 3,
+                    };
+                  }}
+                  onEachFeature={(feature, layer) => {
+                    const name = feature.properties?.project_name;
+                    const status: ProjectStatus = feature?.properties?.status ?? "pending";
+                    const statusLabel =
+                      status === "in_progress" ? "In Progress" : status === "in_delay" ? "Delayed" : "Pending";
+                    if (name != null && name !== '')
+                      layer.bindPopup(`<b>${String(name)}</b><br/>${statusLabel}`);
+                  }}
+                />
+
+                {/* One status marker per project (center of boundary) */}
+                {Array.isArray((geoData as any)?.features) &&
+                  (geoData as any).features
+                    .filter((f: any) => f?.properties?.__marker && Array.isArray(f?.properties?.__center))
+                    .map((f: any, idx: number) => {
+                      const center = f.properties.__center as [number, number];
+                      const status: ProjectStatus = f?.properties?.status ?? "pending";
+                      const name = f?.properties?.project_name ?? "Project";
+                      return (
+                        <Marker
+                          key={`proj-center-${f?.properties?.id ?? idx}`}
+                          position={center}
+                          icon={getProjectStatusIcon(status)}
+                        >
+                          <Popup>
+                            <div className="p-2 text-xs font-sans">
+                              <p className="font-bold">{String(name)}</p>
+                              <p className="text-muted-foreground">
+                                Status:{" "}
+                                {status === "in_progress"
+                                  ? "In Progress"
+                                  : status === "in_delay"
+                                    ? "Delayed"
+                                    : "Pending"}
+                              </p>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      );
+                    })}
+              </>
             </LayersControl.Overlay>
           )}
         </LayersControl>
