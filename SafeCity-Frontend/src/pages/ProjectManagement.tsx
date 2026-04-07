@@ -534,35 +534,13 @@ export default function ProjectManagement() {
 
   // Validate step 1
   const validateStep1 = () => {
-    if (!projectName.trim()) {
-      toast({ title: "Validation Error", description: "Please enter a project name", variant: "destructive" });
-      return false;
-    }
-    if (!selectedProvinceId || !selectedDivisionId || !selectedDistrictId || !selectedTehsilId) {
-      toast({ title: "Validation Error", description: "Please select province, division, district and tehsil", variant: "destructive" });
-      return false;
-    }
-    if (stakeholderIds.length === 0) {
-      toast({ title: "Validation Error", description: "Please select at least one stakeholder", variant: "destructive" });
-      return false;
-    }
-    if (!editingProject && !xerFile) {
-      toast({ title: "Validation Error", description: "Please upload an XER file", variant: "destructive" });
-      return false;
-    }
+    // Frontend validation intentionally disabled (temporary).
     return true;
   };
 
   // Validate step 2
   const validateStep2 = () => {
-    if (!editingProject && !areaFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please upload a project area file",
-        variant: "destructive",
-      });
-      return false;
-    }
+    // Frontend validation intentionally disabled (temporary).
     return true;
   };
 
@@ -1479,7 +1457,6 @@ export default function ProjectManagement() {
                     placeholder="Enter project name"
                     value={projectName}
                     onChange={(e) => setProjectName(e.target.value)}
-                    required
                   />
                 </div>
 
@@ -1492,7 +1469,6 @@ export default function ProjectManagement() {
                     value={projectDescription}
                     onChange={(e) => setProjectDescription(e.target.value)}
                     rows={4}
-                    required
                   />
                 </div>
 
@@ -1505,7 +1481,6 @@ export default function ProjectManagement() {
                       type="date"
                       value={startingDate}
                       onChange={(e) => setStartingDate(e.target.value)}
-                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -1515,7 +1490,6 @@ export default function ProjectManagement() {
                       placeholder="Enter reference number"
                       value={referenceNumber}
                       onChange={(e) => setReferenceNumber(e.target.value)}
-                      required
                     />
                   </div>
                 </div>

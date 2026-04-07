@@ -30,6 +30,8 @@ import { updateTaskActual, createPictorialArchive, addDelayLog } from "@/api";
 type FlatGanttRow = {
   id: string;
   label: string;
+  /** Duration from nested gantt API (usually in days). */
+  duration?: number;
   start: string | null;
   end: string | null;
   progress: number;
@@ -261,6 +263,9 @@ export function ProjectGanttTree({
           <div className="w-80 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2">
             WBS Subprocess
           </div>
+          <div className="w-28 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2 text-center">
+            Duration
+          </div>
           <div className="flex-1 overflow-hidden">
             <div className="grid grid-flow-col auto-cols-[120px] text-xs text-center" style={{ width: timelineWidthPx }}>
               {monthsArray.map((d, i) => (
@@ -364,6 +369,13 @@ export function ProjectGanttTree({
                       <span className="text-red-600 font-semibold">• Behind</span>
                     </div>
                   </div>
+                </div>
+
+                <div
+                  className="w-28 border-r border-border/60 px-3 py-2 flex items-center justify-center text-xs tabular-nums text-muted-foreground"
+                  title={typeof t.duration === "number" ? `${t.duration}` : "—"}
+                >
+                  {typeof t.duration === "number" ? t.duration : "—"}
                 </div>
 
                 <div className="flex-1 overflow-hidden bg-background/30">
