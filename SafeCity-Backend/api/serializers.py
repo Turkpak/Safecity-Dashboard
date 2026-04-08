@@ -186,12 +186,18 @@ class StakeholderSerializer(serializers.ModelSerializer):
 
 class ProjectActivitySerializer(serializers.ModelSerializer):
     project_name = serializers.SerializerMethodField()
+    duration_display = serializers.SerializerMethodField()
     class Meta:
         model = ProjectActivity
-        fields = ["id", "project", "project_name", "activity_id", "activity_name", "start_date", "end_date", "progress", "actual_start", "actual_end", "progress_date", "duration"]
+        fields = ["id", "project", "project_name", "activity_id", "activity_name", "start_date", "end_date", "progress", "actual_start", "actual_end", "progress_date", "progress_status", "duration", "duration_display"]
     
     def get_project_name(self, obj):
         return obj.project.project_name
+    
+    def get_duration_display(self, obj):
+        # Use total_duration property to include child durations if needed
+        duration = getattr(obj, "total_duration", obj.duration) or 0
+        return f"{int(duration)} day" if duration == 1 else f"{int(duration)} days"
 
 class ProgressImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -431,11 +437,7 @@ class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectActivity
         fields = [
-            "id",
-            "activity_id",
-            "activity_name",
-            "parent_id",
-
+            "id", "activity_id", "activity_name", "parent_id",
             # planned
             "start_date",
             "end_date",

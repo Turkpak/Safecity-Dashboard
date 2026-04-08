@@ -70,7 +70,6 @@ def has_delay(tasks):
             return True
     return False
 
-
 class ProjectGanttNestedView(APIView):
 
     def get(self, request, project_id):
@@ -131,14 +130,9 @@ class ProjectGanttNestedView(APIView):
                     avg_progress *= 100
 
                 # -----------------------------
-                # ✅ DURATION (fixed logic)
+                # ✅ DURATION 
                 # -----------------------------
-                if act.duration:
-                    duration = act.duration
-                elif subtasks:
-                    duration = sum(child.get("duration", 0) for child in subtasks)
-                else:
-                    duration = 0
+                duration = act.duration or 0
 
                 activity_images = get_activity_images(act)
                 # -----------------------------
@@ -150,9 +144,11 @@ class ProjectGanttNestedView(APIView):
                     "activity_id": act.activity_id,
                     "name": act.activity_name,
                     "duration": duration,
+                    "duration_display": act.duration_display,
                     "start_date": act.start_date.isoformat() if act.start_date else None,
                     "end_date": act.end_date.isoformat() if act.end_date else None,
                     "progress": round(avg_progress, 2),
+                    "progress_status": act.progress_status,
                     "actual_start": act.actual_start.isoformat() if act.actual_start else None,
                     "actual_end": act.actual_end.isoformat() if act.actual_end else None,
                     "progress_date": act.progress_date.isoformat() if act.progress_date else None,
@@ -195,6 +191,7 @@ class ProjectGanttNestedView(APIView):
             "start_date": start_date,
             "end_date": end_date,
             "duration": duration,
+            "duration_display": act.duration_display,
             "schedulePercentageComplete": 0,
             "performancePercentageComplete": 0,
             "tasks": root_tasks
