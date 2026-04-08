@@ -1488,7 +1488,6 @@ function GanttMini({
                     <div className="min-w-0 flex-1">
                       <div className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold text-foreground truncate`}>{t.name}</div>
                       <div className={`${isMobile ? 'text-[9px]' : 'text-[10px]'} text-muted-foreground`}>
-                        Weight {(t.weight * 100).toFixed(0)}% •{" "}
                         <span
                           className={
                             t.status === "ahead"
@@ -1750,9 +1749,6 @@ function GanttMini({
                           {/* Left label column */}
                           <div className="p-1.5 border-r-2 border-border min-w-0 relative z-10 bg-muted/10">
                             <div className={`${isMobile ? 'text-[11px]' : 'text-xs'} font-medium text-foreground/90 truncate`}>{c.name}</div>
-                            <div className={`${isMobile ? 'text-[8px]' : 'text-[9px]'} text-muted-foreground`}>
-                              Weight {(c.weight * 100).toFixed(0)}%
-                            </div>
                           </div>
 
                           {/* Timeline container - month columns only */}

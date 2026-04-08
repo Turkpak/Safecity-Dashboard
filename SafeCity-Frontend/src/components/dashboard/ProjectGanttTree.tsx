@@ -89,6 +89,12 @@ function parseISOToLocalMidnight(s: string | null): Date | null {
   return new Date(p.y, p.m - 1, p.d, 0, 0, 0, 0);
 }
 
+function formatISODateForCell(s: string | null | undefined): string {
+  const v = typeof s === "string" ? s.trim() : "";
+  // Keep the same "YYYY-MM-DD" format that backend provides / tooltip shows.
+  return v || "—";
+}
+
 function buildMonthsArray(rangeStart: Date, rangeEnd: Date) {
   const months: Date[] = [];
   const cur = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
@@ -243,8 +249,10 @@ export function ProjectGanttTree({
   const tableMinWidthPx = useMemo(() => {
     const wbsCol = 320; // w-80
     const durationCol = 112; // w-28
+    const startDateCol = 128; // w-32
+    const endDateCol = 128; // w-32
     const optionsCol = readOnly ? 0 : 80; // w-20
-    return wbsCol + durationCol + timelineWidthPx + optionsCol;
+    return wbsCol + durationCol + startDateCol + endDateCol + timelineWidthPx + optionsCol;
   }, [timelineWidthPx, readOnly]);
 
   const monthScalePx = useMemo(() => {
@@ -320,6 +328,12 @@ export function ProjectGanttTree({
           </div>
           <div className="w-28 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2 text-center">
             Duration
+          </div>
+          <div className="w-32 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2 text-center">
+            Start_Date
+          </div>
+          <div className="w-32 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2 text-center">
+            End_Date
           </div>
           <div className="shrink-0">
             <div className="grid grid-flow-col auto-cols-[120px] text-xs text-center" style={{ width: timelineWidthPx }}>
@@ -420,7 +434,6 @@ export function ProjectGanttTree({
                       </div>
                     </div>
                     <div className="text-[10px] text-muted-foreground">
-                      Weight {w.toFixed(0)}%{" "}
                       {(() => {
                         const prog = typeof t.progress === "number" && Number.isFinite(t.progress) ? t.progress : 0;
                         const completed = prog >= 100 || !!t.actual_end;
@@ -456,6 +469,20 @@ export function ProjectGanttTree({
                   title={typeof t.duration === "number" ? `${t.duration}` : "—"}
                 >
                   {typeof t.duration === "number" ? t.duration : "—"}
+                </div>
+
+                <div
+                  className="w-32 border-r border-border/60 px-3 py-2 flex items-center justify-center text-xs tabular-nums text-muted-foreground"
+                  title={t.start ?? "—"}
+                >
+                  {formatISODateForCell(t.start)}
+                </div>
+
+                <div
+                  className="w-32 border-r border-border/60 px-3 py-2 flex items-center justify-center text-xs tabular-nums text-muted-foreground"
+                  title={t.end ?? "—"}
+                >
+                  {formatISODateForCell(t.end)}
                 </div>
 
                 <div className="shrink-0 bg-background/30" style={{ width: timelineWidthPx }}>
