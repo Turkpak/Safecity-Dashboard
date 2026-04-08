@@ -1,6 +1,6 @@
 export const API_PREFIX = "/api";
 
-const DEFAULT_BACKEND_URL = "http://127.0.0.1:8000";
+export const DEFAULT_BACKEND_URL = "http://localhost:8000";
 
 /**
  * In dev we use Vite proxy: request goes to same origin (e.g. /api/create-stakeholder/)
@@ -26,4 +26,16 @@ export function apiUrl(path: string): string {
   const base = getApiBaseUrl();
   const p = path.startsWith("/") ? path : `/${path}`;
   return base ? `${base}${API_PREFIX}${p}` : `${API_PREFIX}${p}`;
+}
+
+/**
+ * Build an absolute URL for Django-served media (e.g. `/media/...`).
+ * When dev uses Vite proxy (`API_BASE_URL === ""`), media is NOT under `/api`,
+ * so we fall back to the backend origin.
+ */
+export function mediaUrl(path: string): string {
+  const p = path.startsWith("/") ? path : `/${path}`;
+  // Prefer localhost:8000 in dev to match browser host and avoid edge DNS issues on Windows.
+  const base = API_BASE_URL || DEFAULT_BACKEND_URL;
+  return `${base}${p}`;
 }

@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { updateTaskActual, createPictorialArchive, addDelayLog, listStakeholders } from "@/api";
+import { updateTaskActual, createProgressImage, addDelayLog, listStakeholders } from "@/api";
 import type { Stakeholder } from "@/api/types";
 
 type FlatGanttRow = {
@@ -128,6 +128,8 @@ export function ProjectGanttTree({
   const [progressValue, setProgressValue] = useState<number>(0);
   const [progressDate, setProgressDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [progressImages, setProgressImages] = useState<File[]>([]);
+  const [progressCaption, setProgressCaption] = useState<string>("");
+  const [uploadingProgressImages, setUploadingProgressImages] = useState(false);
   const [savingProgress, setSavingProgress] = useState(false);
 
   const [delayOpen, setDelayOpen] = useState(false);
@@ -786,6 +788,8 @@ export function ProjectGanttTree({
             if (!open) {
               setActiveRow(null);
               setProgressImages([]);
+              setProgressCaption("");
+              setUploadingProgressImages(false);
               setSavingProgress(false);
             }
           }}
@@ -870,6 +874,9 @@ export function ProjectGanttTree({
                       ? progressImages.map((f) => f.name).join(", ")
                       : "PNG, JPG, JPEG"}
                   </p>
+                  {uploadingProgressImages ? (
+                    <p className="text-xs text-muted-foreground mt-1">Uploading…</p>
+                  ) : null}
                 </div>
 
                 {progressImages.length > 0 ? (
@@ -899,7 +906,64 @@ export function ProjectGanttTree({
                   onChange={(e) => {
                     const files = Array.from(e.target.files ?? []);
                     setProgressImages(files);
+                    e.target.value = "";
+                    if (!files.length) return;
+                    if (!activeRow?.db_id || !Number.isFinite(activeRow.db_id)) {
+                      toast({
+                        title: "Cannot upload image",
+                        description: "Missing activity id. Please refresh and try again.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    if (projectId == null) {
+                      toast({
+                        title: "Cannot upload image",
+                        description: "Missing project id. Please reopen this project and try again.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    const imageDate = progressDate || new Date().toISOString().slice(0, 10);
+                    const fallbackCaption = `Progress update • Activity: ${activeRow.label} • ${Math.round(progressValue)}%`;
+                    const caption = (progressCaption || fallbackCaption).trim();
+
+                    (async () => {
+                      try {
+                        setUploadingProgressImages(true);
+                        for (const img of files) {
+                          await createProgressImage({
+                            project: projectId,
+                            activity: activeRow.db_id!,
+                            image: img,
+                            image_date: imageDate,
+                            caption,
+                          });
+                        }
+                        toast({
+                          title: "Image uploaded",
+                          description: files.length === 1 ? "Progress image uploaded successfully." : `${files.length} images uploaded successfully.`,
+                        });
+                      } catch (err) {
+                        toast({
+                          title: "Failed to upload image",
+                          description: err instanceof Error ? err.message : "Please try again.",
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setUploadingProgressImages(false);
+                      }
+                    })();
                   }}
+                />
+              </div>
+              <div className="mt-2 space-y-1.5">
+                <Label>Caption (optional)</Label>
+                <Input
+                  placeholder="e.g., Site survey completed"
+                  value={progressCaption}
+                  onChange={(e) => setProgressCaption(e.target.value)}
                 />
               </div>
             </div>
@@ -941,24 +1005,10 @@ export function ProjectGanttTree({
                     progress_date: progressDate,
                   });
 
-                  if (progressImages.length > 0 && projectId != null) {
-                    for (const img of progressImages) {
-                      await createPictorialArchive({
-                        project: projectId,
-                        image: img,
-                        image_date: progressDate || new Date().toISOString().slice(0, 10),
-                        description: `Progress update • Activity: ${activeRow.label} • ${Math.round(progressValue)}%`,
-                      });
-                    }
-                  }
-
                   toast({
                     title: "Progress saved",
-                    description: progressImages.length > 0
-                      ? projectId != null
-                        ? "Progress updated and picture(s) attached."
-                        : "Progress updated (picture not saved: missing project context)."
-                      : "Progress updated successfully.",
+                    description:
+                      progressImages.length > 0 ? "Progress updated. (Images upload when you select them.)" : "Progress updated successfully.",
                   });
                   setProgressOpen(false);
                   await onProgressSaved?.();

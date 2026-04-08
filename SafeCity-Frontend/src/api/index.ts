@@ -15,6 +15,7 @@ export * from "./tehsil";
 export * from "./stakeholder";
 export * from "./project";
 export * from "./pictorialArchive";
+export * from "./progressImage";
 export * from "./finance";
 export * from "./user";
 export * from "./projectActivity";

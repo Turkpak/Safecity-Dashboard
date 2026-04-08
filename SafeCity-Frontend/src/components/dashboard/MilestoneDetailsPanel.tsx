@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, X, Plus, Trash2, Edit2, Calendar, AlertTriangle, Clock, Image as ImageIcon, XCircle, MoreVertical, Upload, FileText, Download } from "lucide-react";
+import { AlertCircle, X, Plus, Trash2, Edit2, Calendar, AlertTriangle, Clock, Image as ImageIcon, XCircle, MoreVertical, Upload, FileText, Download, Tag, User, Building2, CalendarRange } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ProjectGanttTree } from "@/components/dashboard/ProjectGanttTree";
 import { listDelayLogs } from "@/api/delayLog";
+import { listProgressImages } from "@/api/progressImage";
+import { mediaUrl } from "@/api/config";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type PhaseTimelinePoint = {
@@ -99,14 +101,6 @@ type GanttTask = {
   plannedOverride?: number; // 0..100
 };
 
-// Frontend-only: progress photos and documents (in-memory, no backend)
-type ProgressPhotoItem = {
-  id: string;
-  file: File;
-  objectUrl: string;
-  date: string; // YYYY-MM-DD
-  caption?: string;
-};
 type ProgressDocItem = {
   id: string;
   file: File;
@@ -129,6 +123,7 @@ type DelayLog = {
 };
 
 type ApiDelayLog = Awaited<ReturnType<typeof listDelayLogs>>["data"][number];
+type ApiProgressImage = Awaited<ReturnType<typeof listProgressImages>>[number];
 
 type DelayLogFormData = {
   loggedBy: string;
@@ -2074,8 +2069,7 @@ export function MilestoneDetailsPanel({
 }) {
   const [tab, setTab] = useState<"gantt" | "wbs" | "photos" | "logs">("gantt");
 
-  // Frontend-only: progress photos (with timeline date) and documents
-  const [progressPhotos, setProgressPhotos] = useState<ProgressPhotoItem[]>([]);
+  // Frontend-only: documents (photos are API-driven via list-progress-image)
   const [progressDocs, setProgressDocs] = useState<ProgressDocItem[]>([]);
 
   // Dialogs opened from Gantt activity options (three dots)
@@ -2086,28 +2080,6 @@ export function MilestoneDetailsPanel({
   const photoDialogInputRef = React.useRef<HTMLInputElement>(null);
   const docDialogInputRef = React.useRef<HTMLInputElement>(null);
 
-  const progressPhotosRef = React.useRef(progressPhotos);
-  progressPhotosRef.current = progressPhotos;
-  useEffect(() => {
-    return () => {
-      progressPhotosRef.current.forEach((p) => URL.revokeObjectURL(p.objectUrl));
-    };
-  }, []);
-
-  const removePhoto = (id: string) => {
-    setProgressPhotos((prev) => {
-      const item = prev.find((p) => p.id === id);
-      if (item) URL.revokeObjectURL(item.objectUrl);
-      return prev.filter((p) => p.id !== id);
-    });
-  };
-  const downloadPhoto = (item: ProgressPhotoItem) => {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(item.file);
-    a.download = item.file.name || `progress-${item.date}.jpg`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
   const addDocument = (file: File) => {
     const id = `doc-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setProgressDocs((prev) => [...prev, { id, file, name: file.name, uploadedAt: new Date().toISOString() }]);
@@ -2147,6 +2119,27 @@ export function MilestoneDetailsPanel({
   });
   const apiDelayLogs = (apiDelayLogsData?.data ?? []) as ApiDelayLog[];
 
+  const { data: apiProgressImagesData, isFetching: apiProgressImagesLoading } = useQuery({
+    queryKey: ["progress-images", ganttProjectId],
+    queryFn: async () => {
+      if (ganttProjectId == null) return [] as ApiProgressImage[];
+      return await listProgressImages({ project: ganttProjectId });
+    },
+    enabled: ganttProjectId != null,
+    staleTime: 30 * 1000,
+  });
+  const apiProgressImages = (apiProgressImagesData ?? []) as ApiProgressImage[];
+  const DELAY_LOGS_PAGE_SIZE = 3;
+  const [delayLogsPage, setDelayLogsPage] = useState(0);
+  const delayLogsTotalPages = Math.max(1, Math.ceil(apiDelayLogs.length / DELAY_LOGS_PAGE_SIZE));
+  useEffect(() => {
+    setDelayLogsPage(0);
+  }, [ganttProjectId, apiDelayLogs.length]);
+  const pagedDelayLogs = useMemo(() => {
+    const start = delayLogsPage * DELAY_LOGS_PAGE_SIZE;
+    return apiDelayLogs.slice(start, start + DELAY_LOGS_PAGE_SIZE);
+  }, [apiDelayLogs, delayLogsPage]);
+
   // Calculate overall project progress considering delays
   const overallProgress = useMemo(() => {
     if (adjustedSubProjects.length === 0) return { actual: 0, planned: 0, impact: 0 };
@@ -2179,14 +2172,6 @@ export function MilestoneDetailsPanel({
   const openAddDocumentFromGantt = (taskId: string, taskName: string) => {
     setSelectedTaskForMedia({ taskId, taskName });
     setAddDocumentDialogOpen(true);
-  };
-  const savePhotoFromDialog = () => {
-    if (!photoDialogForm) return;
-    const id = `photo-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    setProgressPhotos((prev) => [...prev, { id, file: photoDialogForm.file, objectUrl: photoDialogForm.objectUrl, date: photoDialogForm.date, caption: photoDialogForm.caption || undefined }]);
-    setPhotoDialogForm(null);
-    setAddPhotoDialogOpen(false);
-    setSelectedTaskForMedia(null);
   };
   const closePhotoDialog = () => {
     if (photoDialogForm) URL.revokeObjectURL(photoDialogForm.objectUrl);
@@ -2494,30 +2479,100 @@ export function MilestoneDetailsPanel({
               {/* Progress Photos — display only; upload via Gantt activity options (⋮) */}
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold">Progress Photos</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  {progressPhotos.length === 0 ? (
-                    <p className="col-span-full text-sm text-muted-foreground">No photos yet. Use the options menu (⋮) on an activity in the Gantt chart to add a photo.</p>
-                  ) : null}
-                  {[...progressPhotos].sort((a, b) => b.date.localeCompare(a.date)).map((item) => (
-                    <Card key={item.id} className="overflow-hidden border border-border/60">
-                      <div className="aspect-square relative bg-muted">
-                        <img src={item.objectUrl} alt={item.caption || item.date} className="w-full h-full object-cover" />
-                        <Badge className="absolute bottom-1 left-1 text-[10px] bg-black/70">{item.date}</Badge>
-                        <div className="absolute top-1 right-1 flex gap-1">
-                          <Button type="button" size="icon" variant="secondary" className="h-7 w-7" onClick={() => downloadPhoto(item)} title="Download">
-                            <Download className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button type="button" size="icon" variant="destructive" className="h-7 w-7" onClick={() => removePhoto(item.id)} title="Remove">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                      <CardContent className="p-2">
-                        <p className="text-xs text-muted-foreground truncate" title={item.caption}>{item.caption || "—"}</p>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                {apiProgressImagesLoading ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <Skeleton className="h-56 w-full" />
+                    <Skeleton className="h-56 w-full" />
+                    <Skeleton className="h-56 w-full" />
+                  </div>
+                ) : apiProgressImages.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No photos yet. Use the options menu (⋮) on an activity in the Gantt chart to add a photo.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {[...apiProgressImages]
+                      .sort((a, b) => String(b.uploaded_at).localeCompare(String(a.uploaded_at)))
+                      .map((item) => {
+                        const src = item.image?.startsWith("http") ? item.image : mediaUrl(item.image || "");
+                        const uploaded = new Date(item.uploaded_at);
+                        const uploadedLabel = Number.isFinite(uploaded.getTime())
+                          ? uploaded.toLocaleString()
+                          : String(item.uploaded_at);
+                        return (
+                          <Card key={item.id} className="overflow-hidden border border-border/60">
+                            <div className="h-40 sm:h-44 relative bg-muted">
+                              <img
+                                src={src}
+                                alt={item.caption || item.image_date}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                              />
+                              <div className="absolute top-1 right-1 flex gap-1">
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="secondary"
+                                  className="h-7 w-7"
+                                  onClick={() => window.open(src, "_blank")}
+                                  title="Open"
+                                >
+                                  <ImageIcon className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="secondary"
+                                  className="h-7 w-7"
+                                  onClick={() => {
+                                    const a = document.createElement("a");
+                                    a.href = src;
+                                    a.download = `progress-${item.image_date || item.id}.png`;
+                                    a.click();
+                                  }}
+                                  title="Download"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                            <CardContent className="p-3 space-y-2">
+                              <div className="text-sm font-semibold leading-snug line-clamp-2" title={item.caption ?? ""}>
+                                {item.caption || "—"}
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="default"
+                                  className="h-7 px-2.5 text-[11px] rounded-full bg-blue-600 text-white hover:bg-blue-600/90"
+                                >
+                                  {item.image_date}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2.5 text-[11px] rounded-full border-sky-200 text-sky-700 hover:text-sky-800"
+                                >
+                                  Activity #{item.activity}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2.5 text-[11px] rounded-full"
+                                  title={uploadedLabel}
+                                >
+                                  Uploaded
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
 
               {/* Documents — display only; upload via Gantt activity options (⋮) */}
@@ -2569,10 +2624,35 @@ export function MilestoneDetailsPanel({
                     <div className="text-sm text-muted-foreground">
                       {apiDelayLogs.length} delay log{apiDelayLogs.length !== 1 ? "s" : ""} recorded
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        onClick={() => setDelayLogsPage((p) => Math.max(0, p - 1))}
+                        disabled={delayLogsPage <= 0}
+                      >
+                        Prev
+                      </Button>
+                      <div className="text-xs text-muted-foreground tabular-nums min-w-[84px] text-center">
+                        Page {delayLogsPage + 1} / {delayLogsTotalPages}
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        onClick={() => setDelayLogsPage((p) => Math.min(delayLogsTotalPages - 1, p + 1))}
+                        disabled={delayLogsPage >= delayLogsTotalPages - 1}
+                      >
+                        Next
+                      </Button>
+                    </div>
                   </div>
 
-                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-                    {apiDelayLogs.map((log) => {
+                  <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+                    {pagedDelayLogs.map((log) => {
                       const created = new Date(log.created_at);
                       const createdLabel = Number.isFinite(created.getTime())
                         ? created.toLocaleString()
@@ -2582,6 +2662,26 @@ export function MilestoneDetailsPanel({
                         : log.action_by != null
                           ? `#${log.action_by}`
                           : "—";
+                      const severity: "low" | "medium" | "high" =
+                        log.delay_days >= 10 ? "high" : log.delay_days >= 5 ? "medium" : "low";
+                      const severityStyles =
+                        severity === "high"
+                          ? {
+                              accent: "bg-rose-600",
+                              badge: "bg-rose-600 hover:bg-rose-600 text-white",
+                              icon: "text-rose-600",
+                            }
+                          : severity === "medium"
+                            ? {
+                                accent: "bg-amber-500",
+                                badge: "bg-amber-500 hover:bg-amber-500 text-white",
+                                icon: "text-amber-600",
+                              }
+                            : {
+                                accent: "bg-slate-400",
+                                badge: "bg-slate-700 hover:bg-slate-700 text-white",
+                                icon: "text-slate-600",
+                              };
 
                       return (
                         <Card
@@ -2589,59 +2689,79 @@ export function MilestoneDetailsPanel({
                           className="overflow-hidden border border-border/60 bg-card shadow-sm hover:shadow-md transition-shadow"
                         >
                           <CardContent className="p-0">
-                            <div className="p-4 border-b border-border/60 bg-muted/20">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div className="text-sm font-semibold truncate" title={`Activity #${log.activity}`}>
-                                    Activity #{log.activity}
-                                  </div>
-                                  <div className="text-[11px] text-muted-foreground mt-0.5">
-                                    {createdLabel}
+                            <div className="flex">
+                              <div className={`w-1.5 ${severityStyles.accent}`} aria-hidden />
+                              <div className="flex-1">
+                                <div className="p-4 border-b border-border/60 bg-muted/15">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <AlertTriangle className={`h-4 w-4 ${severityStyles.icon} shrink-0`} aria-hidden />
+                                        <div className="text-sm font-semibold truncate" title={`Activity #${log.activity}`}>
+                                          Activity #{log.activity}
+                                        </div>
+                                      </div>
+                                      <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                        <Calendar className="h-3.5 w-3.5" aria-hidden />
+                                        {createdLabel}
+                                      </div>
+                                    </div>
+                                    <Badge className={`shrink-0 ${severityStyles.badge}`}>
+                                      {log.delay_days} day{log.delay_days !== 1 ? "s" : ""} delay
+                                    </Badge>
                                   </div>
                                 </div>
-                                <Badge className="shrink-0 bg-rose-600 hover:bg-rose-600 text-white">
-                                  {log.delay_days} day{log.delay_days !== 1 ? "s" : ""} delay
-                                </Badge>
                               </div>
                             </div>
 
                             <div className="p-4 space-y-3">
                               <div className="grid grid-cols-2 gap-2">
                                 <div className="rounded-lg border border-border/60 bg-background p-2">
-                                  <div className="text-[10px] font-semibold text-muted-foreground uppercase">Start</div>
-                                  <div className="text-xs font-medium">{log.delay_start_date}</div>
+                                  <div className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground uppercase">
+                                    <CalendarRange className="h-3.5 w-3.5" aria-hidden />
+                                    Start
+                                  </div>
+                                  <div className="text-xs font-medium mt-0.5">{log.delay_start_date}</div>
                                 </div>
                                 <div className="rounded-lg border border-border/60 bg-background p-2">
-                                  <div className="text-[10px] font-semibold text-muted-foreground uppercase">End</div>
-                                  <div className="text-xs font-medium">{log.delay_end_date}</div>
+                                  <div className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground uppercase">
+                                    <CalendarRange className="h-3.5 w-3.5" aria-hidden />
+                                    End
+                                  </div>
+                                  <div className="text-xs font-medium mt-0.5">{log.delay_end_date}</div>
                                 </div>
                               </div>
 
                               <div className="flex flex-wrap gap-2 text-xs">
-                                <Badge variant="secondary" className="gap-1">
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/30 px-3 py-1">
+                                  <Tag className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
                                   <span className="text-muted-foreground">Category</span>
                                   <span className="font-semibold text-foreground">{log.category ?? "—"}</span>
-                                </Badge>
-                                <Badge variant="secondary" className="gap-1">
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/30 px-3 py-1">
+                                  <User className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
                                   <span className="text-muted-foreground">Originator</span>
                                   <span className="font-semibold text-foreground">{log.originator ?? "—"}</span>
-                                </Badge>
-                                <Badge variant="secondary" className="gap-1">
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/30 px-3 py-1">
+                                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
                                   <span className="text-muted-foreground">Action by</span>
                                   <span className="font-semibold text-foreground">{actionByLabel}</span>
-                                </Badge>
+                                </span>
                               </div>
 
                               <div className="grid gap-2">
                                 <div className="rounded-lg border border-border/60 bg-background p-3">
-                                  <div className="text-[10px] font-semibold text-muted-foreground uppercase">Issue</div>
-                                  <div className="text-xs text-foreground/90 whitespace-pre-wrap mt-1">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="text-[10px] font-semibold text-muted-foreground uppercase">Issue</div>
+                                  </div>
+                                  <div className="text-xs text-foreground/90 whitespace-pre-wrap mt-1 leading-relaxed">
                                     {log.issue ?? "—"}
                                   </div>
                                 </div>
                                 <div className="rounded-lg border border-border/60 bg-background p-3">
                                   <div className="text-[10px] font-semibold text-muted-foreground uppercase">Recommended action</div>
-                                  <div className="text-xs text-foreground/90 whitespace-pre-wrap mt-1">
+                                  <div className="text-xs text-foreground/90 whitespace-pre-wrap mt-1 leading-relaxed">
                                     {log.recommended_action ?? "—"}
                                   </div>
                                 </div>
@@ -2708,7 +2828,7 @@ export function MilestoneDetailsPanel({
               </div>
               <DialogFooter>
                 <Button type="button" variant="ghost" onClick={closePhotoDialog}>Cancel</Button>
-                <Button type="button" onClick={savePhotoFromDialog}>Save photo</Button>
+                <Button type="button" onClick={closePhotoDialog}>Close</Button>
               </DialogFooter>
             </div>
           ) : (
