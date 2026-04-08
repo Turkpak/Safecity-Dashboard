@@ -56,3 +56,25 @@ export async function listDelayLogs(params?: { project?: number; activity?: numb
   return requestRaw<ListDelayLogsResponse>(path, { method: "GET" });
 }
 
+export type UpdateDelayLogInput = {
+  project: number;
+  activity: number;
+  delay_start_date: string; // YYYY-MM-DD
+  delay_end_date: string; // YYYY-MM-DD
+  category: string;
+  issue: string;
+  recommended_action: string;
+};
+
+export type UpdateDelayLogResponse = {
+  status?: boolean;
+  message?: string;
+  data?: DelayLogItem;
+  [k: string]: unknown;
+};
+
+export async function updateDelayLog(id: number, payload: UpdateDelayLogInput): Promise<UpdateDelayLogResponse> {
+  // Backend expects /api/update-delay-log/<id>/ with a JSON body.
+  return requestRaw<UpdateDelayLogResponse>(`update-delay-log/${id}/`, { method: "PUT", body: payload });
+}
+

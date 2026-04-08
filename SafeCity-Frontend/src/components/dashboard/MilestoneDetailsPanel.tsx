@@ -23,7 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ProjectGanttTree } from "@/components/dashboard/ProjectGanttTree";
-import { listDelayLogs } from "@/api/delayLog";
+import { listDelayLogs, updateDelayLog } from "@/api/delayLog";
 import { listProgressImages, updateProgressImage } from "@/api/progressImage";
 import { mediaUrl } from "@/api/config";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -2102,6 +2102,24 @@ export function MilestoneDetailsPanel({
     setUpdatingImage(false);
   };
 
+  const [updateDelayOpen, setUpdateDelayOpen] = useState(false);
+  const [updatingDelay, setUpdatingDelay] = useState(false);
+  const [updateDelayForm, setUpdateDelayForm] = useState<{
+    id: number;
+    project: number;
+    activity: number;
+    delay_start_date: string;
+    delay_end_date: string;
+    category: string;
+    issue: string;
+    recommended_action: string;
+  } | null>(null);
+  const closeUpdateDelayDialog = () => {
+    setUpdateDelayForm(null);
+    setUpdateDelayOpen(false);
+    setUpdatingDelay(false);
+  };
+
   const addDocument = (file: File) => {
     const id = `doc-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setProgressDocs((prev) => [...prev, { id, file, name: file.name, uploadedAt: new Date().toISOString() }]);
@@ -2742,9 +2760,32 @@ export function MilestoneDetailsPanel({
                                         {createdLabel}
                                       </div>
                                     </div>
-                                    <Badge className={`shrink-0 ${severityStyles.badge}`}>
-                                      {log.delay_days} day{log.delay_days !== 1 ? "s" : ""} delay
-                                    </Badge>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8"
+                                        onClick={() => {
+                                          setUpdateDelayForm({
+                                            id: log.id,
+                                            project: log.project,
+                                            activity: log.activity,
+                                            delay_start_date: log.delay_start_date,
+                                            delay_end_date: log.delay_end_date,
+                                            category: log.category ?? "",
+                                            issue: log.issue ?? "",
+                                            recommended_action: log.recommended_action ?? "",
+                                          });
+                                          setUpdateDelayOpen(true);
+                                        }}
+                                      >
+                                        Update
+                                      </Button>
+                                      <Badge className={`shrink-0 ${severityStyles.badge}`}>
+                                        {log.delay_days} day{log.delay_days !== 1 ? "s" : ""} delay
+                                      </Badge>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -3084,6 +3125,116 @@ export function MilestoneDetailsPanel({
                   }}
                 >
                   {updatingImage ? "Updating..." : "Update"}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Update Delay Log dialog (from Delay Logs cards) */}
+      <Dialog open={updateDelayOpen} onOpenChange={(open) => { if (!open) closeUpdateDelayDialog(); }}>
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-xl font-bold">Update Delay Log</DialogTitle>
+            <DialogDescription className="text-sm">
+              Update the delay details for this activity.
+            </DialogDescription>
+          </DialogHeader>
+
+          {updateDelayForm ? (
+            <div className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label>Project</Label>
+                  <Input value={String(updateDelayForm.project)} readOnly />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Activity</Label>
+                  <Input value={String(updateDelayForm.activity)} readOnly />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Category</Label>
+                  <Input
+                    value={updateDelayForm.category}
+                    onChange={(e) => setUpdateDelayForm((p) => (p ? { ...p, category: e.target.value } : p))}
+                    placeholder="e.g. Utility shifting"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Delay start date</Label>
+                  <Input
+                    type="date"
+                    value={updateDelayForm.delay_start_date}
+                    onChange={(e) => setUpdateDelayForm((p) => (p ? { ...p, delay_start_date: e.target.value } : p))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Delay end date</Label>
+                  <Input
+                    type="date"
+                    value={updateDelayForm.delay_end_date}
+                    onChange={(e) => setUpdateDelayForm((p) => (p ? { ...p, delay_end_date: e.target.value } : p))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Issue</Label>
+                  <Textarea
+                    value={updateDelayForm.issue}
+                    onChange={(e) => setUpdateDelayForm((p) => (p ? { ...p, issue: e.target.value } : p))}
+                    rows={4}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Recommended action</Label>
+                  <Textarea
+                    value={updateDelayForm.recommended_action}
+                    onChange={(e) => setUpdateDelayForm((p) => (p ? { ...p, recommended_action: e.target.value } : p))}
+                    rows={4}
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={closeUpdateDelayDialog} disabled={updatingDelay}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  disabled={
+                    updatingDelay ||
+                    !updateDelayForm.delay_start_date ||
+                    !updateDelayForm.delay_end_date ||
+                    !updateDelayForm.category
+                  }
+                  onClick={async () => {
+                    if (!updateDelayForm) return;
+                    try {
+                      setUpdatingDelay(true);
+                      await updateDelayLog(updateDelayForm.id, {
+                        project: updateDelayForm.project,
+                        activity: updateDelayForm.activity,
+                        delay_start_date: updateDelayForm.delay_start_date,
+                        delay_end_date: updateDelayForm.delay_end_date,
+                        category: updateDelayForm.category,
+                        issue: updateDelayForm.issue,
+                        recommended_action: updateDelayForm.recommended_action,
+                      });
+                      await queryClient.invalidateQueries({ queryKey: ["delay-logs", ganttProjectId] });
+                      await onProjectGanttRefresh?.();
+                      closeUpdateDelayDialog();
+                    } finally {
+                      setUpdatingDelay(false);
+                    }
+                  }}
+                >
+                  {updatingDelay ? "Updating..." : "Update"}
                 </Button>
               </DialogFooter>
             </div>
