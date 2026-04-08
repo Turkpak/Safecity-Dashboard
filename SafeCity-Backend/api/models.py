@@ -7,6 +7,8 @@ from django.contrib.gis.db import models as gis_models
 from .utils import project_doc_file_path, project_image_file_path
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 # from xerparser.xer import Reader
 
 from django.contrib.auth.models import (
@@ -329,11 +331,20 @@ class ProjectActivity(models.Model):
     actual_start = models.DateField(null=True, blank=True)
     actual_end = models.DateField(null=True, blank=True)
 
-    # ✅ EXTRA
     remarks = models.TextField(null=True, blank=True)
 
     progress = models.FloatField(default=0)
     progress_date = models.DateField(null=True, blank=True)
+    progress_status = models.CharField(
+        max_length=20,
+        default="Not Started",
+        choices=[
+            ("Not Started", "Not Started"),
+            ("In Progress", "In Progress"),
+            ("Completed", "Completed")
+        ]
+    )
+    
     duration = models.FloatField(null=True, blank=True)
 
     task_type = models.CharField(max_length=20, default="task")
@@ -342,6 +353,37 @@ class ProjectActivity(models.Model):
         ordering = []
     def __str__(self):
         return f"{self.activity_name} ({self.project.project_name})"
+    @property
+    def duration_display(self):
+        if self.duration:
+            return f"{int(self.duration)} day" if self.duration == 1 else f"{int(self.duration)} days"
+        return "0 days"
+    
+    # -----------------------------
+    # Property to calculate total duration including subtasks
+    # -----------------------------
+    @property
+    def total_duration(self):
+        if self.children.exists():
+            return sum(child.duration or 0 for child in self.children.all())
+        return self.duration or 0
+    
+# -----------------------------
+# Signal: Auto-calculate duration before saving
+# -----------------------------
+@receiver(pre_save, sender=ProjectActivity)
+def update_activity_fields(sender, instance, **kwargs):
+    # Calculate duration
+    if instance.start_date and instance.end_date:
+        instance.duration = (instance.end_date - instance.start_date).days + 1
+
+    # Update progress_status based on progress
+    if instance.progress == 0:
+        instance.progress_status = "Not Started"
+    elif instance.progress >= 100:
+        instance.progress_status = "Completed"
+    else:
+        instance.progress_status = "In Progress"
     
 class ProgressImage(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="images")

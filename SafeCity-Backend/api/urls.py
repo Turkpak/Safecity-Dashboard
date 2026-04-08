@@ -82,7 +82,9 @@ urlpatterns = [
 
     # urls.py
     path('project-gantt-nested/<int:project_id>/', ProjectGanttNestedView.as_view(), name='project-gantt-nested'),
-    
+
+    path('project-gantt-all/', ProjectGanttAllView.as_view(), name='project-gantt-all'),
+    # *
     path('project-summary/', ProjectSummaryView.as_view(), name='project-summary'),
 
     path("add-delay-log/", ActivityDelayLogCreateView.as_view()),
