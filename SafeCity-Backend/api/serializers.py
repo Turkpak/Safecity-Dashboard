@@ -206,12 +206,6 @@ class ProgressImageSerializer(serializers.ModelSerializer):
 # --------------------------------------------------------
 # Project
 # --------------------------------------------------------
-import json
-from django.contrib.gis.geos import GEOSGeometry, MultiPolygon, Polygon
-from rest_framework import serializers
-from rest_framework_gis.serializers import GeoFeatureModelSerializer
-from api.models import Project, ProjectActivity, Stakeholder, TaskDependency
-from api.utils import parse_xer  # Assuming you have a parse_xer utility
 
 class ProjectSerializer(GeoFeatureModelSerializer):
     province_name = serializers.SerializerMethodField()
