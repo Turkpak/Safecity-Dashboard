@@ -1327,6 +1327,48 @@ export default function Dashboard() {
     const isAggregatedView = title.startsWith("All Punjab");
     const useProjectCards =
       Array.isArray(projectsInGeography) && projectsInGeography.length > 0;
+    const scopeProjects: Project[] =
+      Array.isArray(projectsInGeography) && projectsInGeography.length > 0
+        ? projectsInGeography
+        : apiProjects;
+
+    const clamp01 = (n: number) => Math.max(0, Math.min(100, n));
+    const num = (v: unknown): number => {
+      if (v === null || v === undefined) return 0;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+    const getActivityProgress = (a: any): number =>
+      clamp01(num(a?.progress ?? a?.percent_complete ?? 0));
+
+    // Financial utilization % (All divisions / scoped)
+    const sumBudgetAllocated = scopeProjects.reduce(
+      (acc, p) => acc + num((p as any)?.total_budget_allocated),
+      0,
+    );
+    const sumBudgetUtilized = scopeProjects.reduce(
+      (acc, p) => acc + num((p as any)?.budget_utilized),
+      0,
+    );
+    const utilizationPct =
+      sumBudgetAllocated > 0 ? clamp01((sumBudgetUtilized / sumBudgetAllocated) * 100) : 0;
+
+    // Physical progress %: average of activity progresses (project-level avg, then avg across projects)
+    const physicalPct = (() => {
+      if (!scopeProjects.length) return 0;
+      let sum = 0;
+      for (const p of scopeProjects) {
+        const acts: any[] = Array.isArray((p as any)?.activities) ? (p as any).activities : [];
+        if (acts.length === 0) {
+          sum += 0;
+          continue;
+        }
+        const projAvg =
+          acts.reduce((acc, a) => acc + getActivityProgress(a), 0) / Math.max(1, acts.length);
+        sum += projAvg;
+      }
+      return clamp01(sum / Math.max(1, scopeProjects.length));
+    })();
 
     // Calculate overall planned and actual from all phases
     let totalPlanned = 0;
@@ -1353,14 +1395,23 @@ export default function Dashboard() {
     const variance = avgActual - avgPlanned;
     const absVariance = Math.abs(variance);
 
-    // Calculate financial/budget metrics (different from installation progress)
-    // Financial metrics are calculated based on overall progress with budget considerations
-    // Backend progress logic not implemented yet — keep financial overview at 0%.
-    const overallProgress = 0;
-    const financialPlanned = 0;
-    const financialActual = 0;
-    const financialVariance = 0;
-    const absFinancialVariance = 0;
+    // Financial donut (percent-based): planned=100, actual=util%, variance=remaining to 100
+    const financialPlanned = 100;
+    const financialActual = utilizationPct;
+    const absFinancialVariance = Math.max(0, 100 - financialActual);
+
+    // Overall progress donut (physical, percent-based)
+    const overallPlannedPct = 100;
+    const overallActualPct = physicalPct;
+    const overallVariancePct = Math.max(0, 100 - overallActualPct);
+    const overallMax = Math.max(overallPlannedPct, overallActualPct);
+    const overallTotalForPie = overallMax + overallVariancePct;
+    const normalizedOverallPlanned =
+      overallTotalForPie > 0 ? (overallPlannedPct / overallTotalForPie) * 100 : 0;
+    const normalizedOverallActual =
+      overallTotalForPie > 0 ? (overallActualPct / overallTotalForPie) * 100 : 0;
+    const normalizedOverallVariance =
+      overallTotalForPie > 0 ? (overallVariancePct / overallTotalForPie) * 100 : 0;
 
     // Calculate totals for pie chart normalization (installation progress)
     const maxValue = Math.max(avgPlanned, avgActual);
@@ -1671,20 +1722,20 @@ export default function Dashboard() {
                         data={[
                           {
                             name: "Planned",
-                            value: normalizedPlanned,
-                            originalValue: avgPlanned,
+                            value: normalizedOverallPlanned,
+                            originalValue: overallPlannedPct,
                             fill: "#60a5fa",
                           },
                           {
                             name: "Actual",
-                            value: normalizedActual,
-                            originalValue: avgActual,
+                            value: normalizedOverallActual,
+                            originalValue: overallActualPct,
                             fill: "#22c55e",
                           },
                           {
                             name: "Variance",
-                            value: normalizedVariance,
-                            originalValue: absVariance,
+                            value: normalizedOverallVariance,
+                            originalValue: overallVariancePct,
                             fill: "#ef4444",
                           },
                         ]}
@@ -1739,10 +1790,9 @@ export default function Dashboard() {
                         iconSize={8}
                         formatter={(value) => {
                           let itemValue = 0;
-                          if (value === "Planned") itemValue = avgPlanned;
-                          else if (value === "Actual") itemValue = avgActual;
-                          else if (value === "Variance")
-                            itemValue = absVariance;
+                          if (value === "Planned") itemValue = overallPlannedPct;
+                          else if (value === "Actual") itemValue = overallActualPct;
+                          else if (value === "Variance") itemValue = overallVariancePct;
                           return (
                             <span className="text-muted-foreground font-medium">
                               {value}{" "}
@@ -1758,7 +1808,7 @@ export default function Dashboard() {
                   {/* Center label - centered in chart area */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="text-xl sm:text-2xl font-bold font-heading tabular-nums text-foreground">
-                      {avgActual.toFixed(1)}%
+                      {overallActualPct.toFixed(1)}%
                     </span>
                     <span className="text-[9px] sm:text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                       Actual
