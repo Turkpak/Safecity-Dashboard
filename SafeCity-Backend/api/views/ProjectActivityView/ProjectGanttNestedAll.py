@@ -1,6 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from api.models import Project, ProjectActivity, ActivityDelayLog, ProgressImage
+from datetime import datetime
 
 def get_delay_info(activity):
     delay = ActivityDelayLog.objects.filter(activity=activity).order_by('-created_at').first()
@@ -124,14 +125,37 @@ class ProjectGanttAllView(APIView):
                         avg_progress *= 100
 
                     # duration
-                    if act.duration:
-                        duration = act.duration
-                    elif subtasks:
-                        duration = sum(child.get("duration", 0) for child in subtasks)
+                    if subtasks:
+                        start_dates = [t["start_date"] for t in subtasks if t["start_date"]]
+                        end_dates = [t["end_date"] for t in subtasks if t["end_date"]]
+
+                        if start_dates and end_dates:
+                            start = min(start_dates)
+                            end = max(end_dates)
+
+                            start_dt = datetime.fromisoformat(start)
+                            end_dt = datetime.fromisoformat(end)
+
+                            duration = (end_dt - start_dt).days + 1
+                        else:
+                            duration = 0
                     else:
-                        duration = 0
+                        duration = act.duration or 0
 
                     activity_images = get_activity_images(act)
+
+                    # -----------------------------
+                    # ✅ DATE FIX 
+                    # -----------------------------
+                    if subtasks:
+                        start_dates = [t["start_date"] for t in subtasks if t["start_date"]]
+                        end_dates = [t["end_date"] for t in subtasks if t["end_date"]]
+
+                        start_date = min(start_dates) if start_dates else None
+                        end_date = max(end_dates) if end_dates else None
+                    else:
+                        start_date = act.start_date.isoformat() if act.start_date else None
+                        end_date = act.end_date.isoformat() if act.end_date else None
 
                     node = {
                         "_id": new_id,
@@ -139,11 +163,15 @@ class ProjectGanttAllView(APIView):
                         "activity_id": act.activity_id,
                         "name": act.activity_name,
                         "duration": duration,
-                        "duration_display": act.duration_display,
-                        "start_date": act.start_date.isoformat() if act.start_date else None,
-                        "end_date": act.end_date.isoformat() if act.end_date else None,
+                        "duration_display": f"{int(duration)} day" if duration == 1 else f"{int(duration)} days",
+                        "start_date": start_date,
+                        "end_date": end_date,
                         "progress": round(avg_progress, 2),
-                        "progress_status": act.progress_status,
+                        "progress_status": (
+                            "Not Started" if avg_progress <= 0
+                            else "Completed" if avg_progress >= 100
+                            else "In Progress"
+                        ),
                         "actual_start": act.actual_start.isoformat() if act.actual_start else None,
                         "actual_end": act.actual_end.isoformat() if act.actual_end else None,
                         "progress_date": act.progress_date.isoformat() if act.progress_date else None,
