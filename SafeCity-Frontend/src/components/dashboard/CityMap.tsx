@@ -198,6 +198,7 @@ export function CityMap({
   filterZoom,
   showSurveillanceLayers = true,
   legendProjects,
+  onProjectSelect,
 }: {
   city?: string;
   activeLayers?: Set<LayerType>;
@@ -214,6 +215,8 @@ export function CityMap({
   showSurveillanceLayers?: boolean;
   /** When set, legend shows these project names from list-project API instead of surveillance legend */
   legendProjects?: LegendProject[];
+  /** When set, clicking a project boundary selects that project (GIS page). */
+  onProjectSelect?: (projectId: number) => void;
 }) {
   const [isMounted, setIsMounted] = useState(false);
   const [constructionSites, setConstructionSites] = useState(MOCK_DATA.construction);
@@ -484,6 +487,14 @@ export function CityMap({
                       status === "in_progress" ? "In Progress" : status === "in_delay" ? "Delayed" : "Pending";
                     if (name != null && name !== '')
                       layer.bindPopup(`<b>${String(name)}</b><br/>${statusLabel}`);
+
+                    const rawId = feature?.properties?.id;
+                    const idNum = typeof rawId === "number" ? rawId : Number(rawId);
+                    if (onProjectSelect && Number.isFinite(idNum)) {
+                      layer.on("click", () => {
+                        onProjectSelect(idNum);
+                      });
+                    }
                   }}
                 />
 

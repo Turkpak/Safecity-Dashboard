@@ -33,6 +33,8 @@ type FlatGanttRow = {
   label: string;
   /** Duration from nested gantt API (usually in days). */
   duration?: number;
+  /** Human friendly duration from nested gantt API (e.g. "60 days"). */
+  duration_display?: string;
   start: string | null;
   end: string | null;
   progress: number;
@@ -453,9 +455,9 @@ export function ProjectGanttTree({
 
                 <div
                   className="w-28 border-r border-border/60 px-3 py-2 flex items-center justify-center text-xs tabular-nums text-muted-foreground"
-                  title={typeof t.duration === "number" ? `${t.duration}` : "—"}
+                  title={t.duration_display ?? (typeof t.duration === "number" ? `${t.duration}` : "—")}
                 >
-                  {typeof t.duration === "number" ? t.duration : "—"}
+                  {t.duration_display ?? (typeof t.duration === "number" ? t.duration : "—")}
                 </div>
 
                 <div className="shrink-0 bg-background/30" style={{ width: timelineWidthPx }}>

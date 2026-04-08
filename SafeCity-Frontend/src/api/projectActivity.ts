@@ -49,6 +49,8 @@ export interface GanttTask {
   label: string;
   /** Duration from nested gantt API (usually in days). */
   duration?: number;
+  /** Human friendly duration from nested gantt API (e.g. "60 days"). */
+  duration_display?: string;
   start: string | null;
   end: string | null;
   /** Actual start date from backend (YYYY-MM-DD). */
@@ -67,6 +69,49 @@ export interface GanttTask {
 
 export interface GanttResponse {
   tasks: GanttTask[];
+}
+
+export type GanttNestedNode = {
+  _id?: string;
+  id?: number;
+  activity_id?: string;
+  name?: string;
+  duration?: number;
+  duration_display?: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  progress?: number;
+  progress_status?: string | null;
+  actual_start?: string | null;
+  actual_end?: string | null;
+  progress_date?: string | null;
+  has_delay?: boolean;
+  delay_info?: unknown;
+  subtasks?: GanttNestedNode[];
+};
+
+export type ProjectGanttAllSchedule = {
+  _id: string; // project id as string
+  project?: string;
+  project_name?: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  duration?: number;
+  duration_display?: string;
+  tasks?: GanttNestedNode[];
+};
+
+export type ProjectGanttAllResponse = {
+  success?: boolean;
+  has_delay?: boolean;
+  schedules?: ProjectGanttAllSchedule[];
+};
+
+/** GET /api/project-gantt-all/ — schedules for all projects (nested tasks) */
+export async function getProjectGanttAll(): Promise<ProjectGanttAllSchedule[]> {
+  const data = await get<ProjectGanttAllResponse | any>("project-gantt-all/");
+  const schedules = Array.isArray((data as any)?.schedules) ? (data as any).schedules : [];
+  return schedules as ProjectGanttAllSchedule[];
 }
 
 export async function getProjectGanttData(projectId: number): Promise<GanttTask[]> {
@@ -118,6 +163,7 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
       db_id: typeof node?.id === "number" ? node.id : node?.id ? Number(node.id) : undefined,
       label: String(node?.name ?? node?.activity_name ?? `#${id}`),
       duration: typeof node?.duration === "number" && Number.isFinite(node.duration) ? node.duration : undefined,
+      duration_display: typeof node?.duration_display === "string" ? node.duration_display : undefined,
       start: range.start,
       end: range.end,
       actual_start: asDate(node?.actual_start),
@@ -147,6 +193,7 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
     db_id: typeof act.id === "number" ? act.id : Number(act.id),
     label: act.activity_name || `#${act.activity_id}`,
     duration: typeof act.duration === "number" && Number.isFinite(act.duration) ? act.duration : undefined,
+    duration_display: typeof act.duration_display === "string" ? act.duration_display : undefined,
     start: act.start_date || null,
     end: act.end_date || act.start_date || null,
     actual_start: act.actual_start ?? null,

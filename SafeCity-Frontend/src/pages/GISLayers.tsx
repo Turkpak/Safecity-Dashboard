@@ -11,6 +11,7 @@ import {
   listTehsils,
   getProjectById,
   getProjectGanttData,
+  getProjectGanttAll,
 } from "@/api";
 import { Download, FolderKanban, Loader2, AlertTriangle, CalendarCheck, Filter } from "lucide-react";
 import React, { useState, useMemo } from "react";
@@ -20,6 +21,7 @@ import type { Division, District, Tehsil, Project } from "@/api/types";
 import { cn } from "@/lib/utils";
 import { ProjectGanttTree } from "@/components/dashboard/ProjectGanttTree";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRef } from "react";
 
 /** Card config: id, label, icon, and Tailwind classes for bg + left border (situation-based colors) */
 const PROJECT_STAT_CARDS = [
@@ -43,6 +45,47 @@ function normalizeProjectGeom(geom: unknown): object | null {
 }
 
 type ProjectStatus = "pending" | "in_progress" | "in_delay";
+
+function walkNestedTasks(
+  tasks: Array<{ subtasks?: any[]; has_delay?: boolean; progress?: number; progress_status?: string | null }> | undefined,
+  visit: (t: { has_delay?: boolean; progress?: number; progress_status?: string | null }) => void,
+): void {
+  if (!Array.isArray(tasks) || tasks.length === 0) return;
+  for (const t of tasks) {
+    visit(t);
+    if (Array.isArray((t as any).subtasks) && (t as any).subtasks.length > 0) {
+      walkNestedTasks((t as any).subtasks, visit);
+    }
+  }
+}
+
+function deriveProjectStatusFromNestedGantt(
+  tasks: Array<{ subtasks?: any[]; has_delay?: boolean; progress?: number; progress_status?: string | null }> | undefined,
+): ProjectStatus {
+  // Priority:
+  // 1) delayed if any node has_delay === true
+  // 2) in_progress if any node progress > 0
+  // 3) pending if ALL nodes progress_status === "Not Started" (or tasks empty)
+  if (!Array.isArray(tasks) || tasks.length === 0) return "pending";
+
+  let anyDelay = false;
+  let anyProgress = false;
+  let allNotStarted = true;
+
+  walkNestedTasks(tasks, (t) => {
+    if (t?.has_delay === true) anyDelay = true;
+    const p = Number((t as any)?.progress ?? 0);
+    if (Number.isFinite(p) && p > 0) anyProgress = true;
+
+    const ps = String((t as any)?.progress_status ?? "").trim();
+    if (ps !== "Not Started") allNotStarted = false;
+  });
+
+  if (anyDelay) return "in_delay";
+  if (anyProgress) return "in_progress";
+  if (allNotStarted) return "pending";
+  return "pending";
+}
 
 function geometryBboxCenter(geometry: any): [number, number] | null {
   // Returns [lat, lng] (Leaflet order)
@@ -130,6 +173,7 @@ export default function GISLayers() {
   const [selectedCity, setSelectedCity] = useState("lahore");
   const [showLegend, setShowLegend] = useState(true);
   const [mapRef, setMapRef] = useState<any>(null);
+  const ganttSectionRef = useRef<HTMLDivElement | null>(null);
   const [selectedDivisionId, setSelectedDivisionId] = useState<string>("all");
   const [selectedDistrictId, setSelectedDistrictId] = useState<string>("all");
   const [selectedTehsilId, setSelectedTehsilId] = useState<string>("all");
@@ -185,6 +229,14 @@ export default function GISLayers() {
     queryFn: listProjects,
   });
 
+  // NEW: fetch nested gantt for ALL projects in one request; used to derive
+  // delay/pending/in-progress status for map boundaries + cards.
+  const { data: allProjectSchedules = [], isFetching: allGanttLoading } = useQuery({
+    queryKey: ["gis", "project-gantt-all"],
+    queryFn: getProjectGanttAll,
+    staleTime: 30 * 1000,
+  });
+
   // When a project is selected, fetch that specific project via /api/list-project/?id=...
   // (same behavior as Finance page).
   const { data: selectedProjectDetails, isFetching: selectedProjectLoading } =
@@ -231,51 +283,22 @@ export default function GISLayers() {
     return list;
   }, [projects, divisionNumeric, districtNumeric, selectedTehsilId]);
 
-  /**
-   * Delay status is determined by nested gantt `has_delay` (not date math).
-   * We fetch nested gantt for the currently-filtered projects and cache results.
-   */
-  const filteredProjectIdsKey = useMemo(
-    () => filteredProjects.map((p) => p.id).sort((a, b) => a - b).join(","),
-    [filteredProjects],
-  );
-
-  const { data: delayedProjectIds = new Set<number>(), isFetching: delayStatusLoading } =
-    useQuery({
-      queryKey: ["gis", "delay-status", filteredProjectIdsKey],
-      queryFn: async () => {
-        const ids = filteredProjects.map((p) => p.id);
-        const out = new Set<number>();
-        // Fetch nested gantt for each project and mark delayed if any task has_delay === true
-        await Promise.all(
-          ids.map(async (id) => {
-            try {
-              const tasks = await getProjectGanttData(id);
-              if (Array.isArray(tasks) && tasks.some((t: any) => t?.has_delay === true)) {
-                out.add(id);
-              }
-            } catch {
-              // Ignore failures for delay status; project will not be marked delayed.
-            }
-          }),
-        );
-        return out;
-      },
-      enabled: filteredProjects.length > 0,
-      staleTime: 30 * 1000,
-    });
-
   const projectStatusById = useMemo(() => {
+    const statusByProjectId = new Map<number, ProjectStatus>();
+    for (const s of allProjectSchedules as any[]) {
+      const idNum = Number(s?._id);
+      if (!Number.isFinite(idNum)) continue;
+      const status = deriveProjectStatusFromNestedGantt(s?.tasks);
+      statusByProjectId.set(idNum, status);
+    }
+
     const map = new Map<number, ProjectStatus>();
     for (const p of filteredProjects) {
-      const acts = Array.isArray(p.activities) ? p.activities : [];
-      const anyProgress = acts.some((a: any) => Number(a?.percent_complete ?? 0) > 0);
-      const isDelayed = delayedProjectIds.has(p.id);
-      const status: ProjectStatus = isDelayed ? "in_delay" : anyProgress ? "in_progress" : "pending";
+      const status: ProjectStatus = statusByProjectId.get(p.id) ?? "pending";
       map.set(p.id, status);
     }
     return map;
-  }, [filteredProjects, delayedProjectIds]);
+  }, [filteredProjects, allProjectSchedules]);
 
   /**
    * Project status counts (no hardcoding) — SINGLE approach:
@@ -292,27 +315,10 @@ export default function GISLayers() {
     let in_delay = 0;
 
     for (const p of filteredProjects) {
-      const acts = Array.isArray(p.activities) ? p.activities : [];
-      if (acts.length === 0) {
-        pending += 1;
-        continue;
-      }
-
-      // Your exact rule (API-driven):
-      // - pending: all activities progress == 0
-      // - in_progress: any activity progress > 0
-      // - in_delay: any nested gantt task has_delay === true
-      // Priority: if delayed, count as delayed (not also in_progress).
-      const isDelayed = delayedProjectIds.has(p.id);
-      const anyProgress = acts.some((a: any) => Number(a?.percent_complete ?? 0) > 0);
-
-      if (isDelayed) {
-        in_delay += 1;
-      } else if (anyProgress) {
-        in_progress += 1;
-      } else {
-        pending += 1;
-      }
+      const status = projectStatusById.get(p.id) ?? "pending";
+      if (status === "in_delay") in_delay += 1;
+      else if (status === "in_progress") in_progress += 1;
+      else pending += 1;
     }
 
     return {
@@ -321,7 +327,7 @@ export default function GISLayers() {
       in_progress,
       in_delay,
     } as const;
-  }, [filteredProjects, delayedProjectIds]);
+  }, [filteredProjects, projectStatusById]);
 
   const mapView = useMemo(
     () =>
@@ -558,6 +564,13 @@ export default function GISLayers() {
               showStats={false}
               showSurveillanceLayers={false}
               legendProjects={filteredProjects}
+              onProjectSelect={(projectId) => {
+                setSelectedProjectId(String(projectId));
+                // scroll to gantt section (next tick so state renders)
+                setTimeout(() => {
+                  ganttSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 50);
+              }}
               filterCenter={
                 !selectedProjectGeo &&
                 !allFilteredProjectsGeo &&
@@ -578,7 +591,8 @@ export default function GISLayers() {
 
           {/* Selected Project Details (Gantt / WBS) */}
           {selectedProjectId !== "all" && (
-            <Card className="mt-4 border-border/60 shadow-sm overflow-hidden">
+            <div ref={ganttSectionRef}>
+              <Card className="mt-4 border-border/60 shadow-sm overflow-hidden">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base sm:text-lg font-heading font-bold">
                   {(activeSelectedProject?.project_name || `Project ${selectedProjectId}`) +
@@ -604,7 +618,8 @@ export default function GISLayers() {
                   />
                 )}
               </CardContent>
-            </Card>
+              </Card>
+            </div>
           )}
         </div>
       </div>
