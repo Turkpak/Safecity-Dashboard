@@ -35,6 +35,8 @@ type FlatGanttRow = {
   duration?: number;
   /** Human friendly duration from nested gantt API (e.g. "60 days"). */
   duration_display?: string;
+  /** Status label from backend (e.g. "Not Started"). */
+  progress_status?: string | null;
   start: string | null;
   end: string | null;
   progress: number;
@@ -436,32 +438,9 @@ export function ProjectGanttTree({
                       </div>
                     </div>
                     <div className="text-[10px] text-muted-foreground">
-                      {(() => {
-                        const prog = typeof t.progress === "number" && Number.isFinite(t.progress) ? t.progress : 0;
-                        const completed = prog >= 100 || !!t.actual_end;
-                        const started = prog > 0 || !!t.actual_start;
-                        const startT = parseISOToLocalMidnight(t.start)?.getTime() ?? null;
-                        const endT = parseISOToLocalMidnight(t.end)?.getTime() ?? null;
-
-                        let label: "Pending" | "In Progress" | "Behind" | "Completed" = "Pending";
-                        let cls = "text-muted-foreground font-semibold";
-
-                        if (completed) {
-                          label = "Completed";
-                          cls = "text-emerald-600 font-semibold";
-                        } else if (endT != null && endT < todayT) {
-                          label = "Behind";
-                          cls = "text-red-600 font-semibold";
-                        } else if (started) {
-                          label = "In Progress";
-                          cls = "text-blue-600 font-semibold";
-                        } else if (startT != null && startT > todayT) {
-                          label = "Pending";
-                          cls = "text-amber-600 font-semibold";
-                        }
-
-                        return <span className={cls}>• {label}</span>;
-                      })()}
+                      <span className="text-muted-foreground font-semibold">
+                        • {String(t.progress_status ?? "—")}
+                      </span>
                     </div>
                   </div>
                 </div>

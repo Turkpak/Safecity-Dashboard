@@ -51,6 +51,8 @@ export interface GanttTask {
   duration?: number;
   /** Human friendly duration from nested gantt API (e.g. "60 days"). */
   duration_display?: string;
+  /** Status label from backend (e.g. "Not Started"). */
+  progress_status?: string | null;
   start: string | null;
   end: string | null;
   /** Actual start date from backend (YYYY-MM-DD). */
@@ -164,6 +166,7 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
       label: String(node?.name ?? node?.activity_name ?? `#${id}`),
       duration: typeof node?.duration === "number" && Number.isFinite(node.duration) ? node.duration : undefined,
       duration_display: typeof node?.duration_display === "string" ? node.duration_display : undefined,
+      progress_status: typeof node?.progress_status === "string" ? node.progress_status : node?.progress_status ?? null,
       start: range.start,
       end: range.end,
       actual_start: asDate(node?.actual_start),
@@ -194,6 +197,7 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
     label: act.activity_name || `#${act.activity_id}`,
     duration: typeof act.duration === "number" && Number.isFinite(act.duration) ? act.duration : undefined,
     duration_display: typeof act.duration_display === "string" ? act.duration_display : undefined,
+    progress_status: typeof act.progress_status === "string" ? act.progress_status : act?.progress_status ?? null,
     start: act.start_date || null,
     end: act.end_date || act.start_date || null,
     actual_start: act.actual_start ?? null,
