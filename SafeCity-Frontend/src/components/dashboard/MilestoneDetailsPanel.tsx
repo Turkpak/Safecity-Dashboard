@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { PlannedVsActualChart } from "@/components/dashboard/PlannedVsActualChart";
 import type { SubProject } from "@/components/dashboard/SubProjectCard";
@@ -23,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ProjectGanttTree } from "@/components/dashboard/ProjectGanttTree";
 import { listDelayLogs } from "@/api/delayLog";
-import { listProgressImages } from "@/api/progressImage";
+import { listProgressImages, updateProgressImage } from "@/api/progressImage";
 import { mediaUrl } from "@/api/config";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -2068,6 +2069,7 @@ export function MilestoneDetailsPanel({
   onProjectGanttRefresh?: () => void | Promise<void>;
 }) {
   const [tab, setTab] = useState<"gantt" | "wbs" | "photos" | "logs">("gantt");
+  const queryClient = useQueryClient();
 
   // Frontend-only: documents (photos are API-driven via list-progress-image)
   const [progressDocs, setProgressDocs] = useState<ProgressDocItem[]>([]);
@@ -2079,6 +2081,26 @@ export function MilestoneDetailsPanel({
   const [photoDialogForm, setPhotoDialogForm] = useState<{ file: File; objectUrl: string; date: string; caption: string } | null>(null);
   const photoDialogInputRef = React.useRef<HTMLInputElement>(null);
   const docDialogInputRef = React.useRef<HTMLInputElement>(null);
+
+  const [updateImageOpen, setUpdateImageOpen] = useState(false);
+  const [updatingImage, setUpdatingImage] = useState(false);
+  const [updateImageForm, setUpdateImageForm] = useState<{
+    id: number;
+    project: number;
+    activity: number;
+    image_date: string;
+    caption: string;
+    currentImageUrl: string;
+    newImageFile: File | null;
+    previewUrl: string | null;
+  } | null>(null);
+
+  const closeUpdateImageDialog = () => {
+    if (updateImageForm?.previewUrl) URL.revokeObjectURL(updateImageForm.previewUrl);
+    setUpdateImageForm(null);
+    setUpdateImageOpen(false);
+    setUpdatingImage(false);
+  };
 
   const addDocument = (file: File) => {
     const id = `doc-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -2561,10 +2583,24 @@ export function MilestoneDetailsPanel({
                                   type="button"
                                   size="sm"
                                   variant="outline"
-                                  className="h-7 px-2.5 text-[11px] rounded-full"
-                                  title={uploadedLabel}
+                                  className="h-7 px-2.5 text-[11px] rounded-full border-emerald-200 text-emerald-700 hover:text-emerald-800"
+                                  title="Update this image"
+                                  onClick={() => {
+                                    const currentSrc = item.image?.startsWith("http") ? item.image : mediaUrl(item.image || "");
+                                    setUpdateImageForm({
+                                      id: item.id,
+                                      project: item.project,
+                                      activity: item.activity,
+                                      image_date: item.image_date,
+                                      caption: item.caption ?? "",
+                                      currentImageUrl: currentSrc,
+                                      newImageFile: null,
+                                      previewUrl: null,
+                                    });
+                                    setUpdateImageOpen(true);
+                                  }}
                                 >
-                                  Uploaded
+                                  Update
                                 </Button>
                               </div>
                             </CardContent>
@@ -2870,6 +2906,188 @@ export function MilestoneDetailsPanel({
             </Button>
             <p className="text-xs text-muted-foreground mt-2">PDF, Word, Excel or text files. Document will appear in the Photos & Docs tab.</p>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Update Progress Image dialog (from Photos & Docs grid) */}
+      <Dialog open={updateImageOpen} onOpenChange={(open) => { if (!open) closeUpdateImageDialog(); }}>
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-xl font-bold">Update Progress Image</DialogTitle>
+            <DialogDescription className="text-sm">
+              Update caption/date/activity or replace the image file.
+            </DialogDescription>
+          </DialogHeader>
+
+          {updateImageForm ? (
+            <div className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-1.5 sm:col-span-1">
+                  <Label>Project</Label>
+                  <Input value={String(updateImageForm.project)} readOnly />
+                </div>
+                <div className="space-y-1.5 sm:col-span-1">
+                  <Label>Activity</Label>
+                  <Input
+                    type="number"
+                    value={String(updateImageForm.activity)}
+                    onChange={(e) =>
+                      setUpdateImageForm((p) => (p ? { ...p, activity: Number(e.target.value || 0) } : p))
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-1">
+                  <Label>Image date</Label>
+                  <Input
+                    type="date"
+                    value={updateImageForm.image_date}
+                    onChange={(e) => setUpdateImageForm((p) => (p ? { ...p, image_date: e.target.value } : p))}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <Label>Image</Label>
+                  {updateImageForm.newImageFile ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8"
+                      onClick={() => {
+                        setUpdateImageForm((p) => {
+                          if (!p) return p;
+                          if (p.previewUrl) URL.revokeObjectURL(p.previewUrl);
+                          return { ...p, newImageFile: null, previewUrl: null };
+                        });
+                      }}
+                    >
+                      Remove selected
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Optional: replace file</span>
+                  )}
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="rounded-xl border border-border/60 overflow-hidden bg-muted/30">
+                    <div className="px-4 py-2 text-xs font-semibold text-muted-foreground border-b border-border/50 bg-background/50 flex items-center justify-between">
+                      <span>{updateImageForm.newImageFile ? "New preview" : "Current image"}</span>
+                      <span className="text-[11px] font-normal">ID #{updateImageForm.id}</span>
+                    </div>
+                    <div className="p-3">
+                      <div className="rounded-lg overflow-hidden bg-muted">
+                        <img
+                          src={updateImageForm.previewUrl || updateImageForm.currentImageUrl}
+                          alt="Preview"
+                          className="w-full h-56 object-cover"
+                          loading="lazy"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <input
+                      id="update-progress-image-file"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        setUpdateImageForm((p) => {
+                          if (!p) return p;
+                          if (p.previewUrl) URL.revokeObjectURL(p.previewUrl);
+                          return {
+                            ...p,
+                            newImageFile: file,
+                            previewUrl: file ? URL.createObjectURL(file) : null,
+                          };
+                        });
+                        e.target.value = "";
+                      }}
+                    />
+
+                    <div
+                      className={`rounded-xl border-2 border-dashed p-5 transition-colors ${
+                        updateImageForm.newImageFile
+                          ? "border-primary bg-primary/5"
+                          : "border-muted-foreground/25 hover:border-primary/60 bg-muted/10 cursor-pointer"
+                      }`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => document.getElementById("update-progress-image-file")?.click()}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          document.getElementById("update-progress-image-file")?.click();
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="shrink-0 rounded-lg bg-background p-2 border border-border/60">
+                          <Upload className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold">
+                            {updateImageForm.newImageFile ? "Selected file" : "Click to choose a new image"}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {updateImageForm.newImageFile ? updateImageForm.newImageFile.name : "PNG, JPG, JPEG"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <Button type="button" variant="outline" size="sm" className="h-9 w-full">
+                          {updateImageForm.newImageFile ? "Change file" : "Choose file"}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-border/60 p-4 bg-background/40">
+                      <Label>Caption</Label>
+                      <Textarea
+                        className="mt-2"
+                        value={updateImageForm.caption}
+                        onChange={(e) => setUpdateImageForm((p) => (p ? { ...p, caption: e.target.value } : p))}
+                        rows={4}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={closeUpdateImageDialog} disabled={updatingImage}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  disabled={updatingImage || !updateImageForm.image_date || !updateImageForm.project || !updateImageForm.activity}
+                  onClick={async () => {
+                    if (!updateImageForm) return;
+                    try {
+                      setUpdatingImage(true);
+                      await updateProgressImage(updateImageForm.id, {
+                        project: updateImageForm.project,
+                        activity: updateImageForm.activity,
+                        image_date: updateImageForm.image_date,
+                        caption: updateImageForm.caption,
+                        image: updateImageForm.newImageFile,
+                      });
+                      await queryClient.invalidateQueries({ queryKey: ["progress-images", ganttProjectId] });
+                      closeUpdateImageDialog();
+                    } finally {
+                      setUpdatingImage(false);
+                    }
+                  }}
+                >
+                  {updatingImage ? "Updating..." : "Update"}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </Card>
