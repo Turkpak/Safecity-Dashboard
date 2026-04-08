@@ -1,6 +1,8 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { PlannedVsActualChart } from "@/components/dashboard/PlannedVsActualChart";
 import type { SubProject } from "@/components/dashboard/SubProjectCard";
@@ -10,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, X, Plus, Trash2, Edit2, Calendar, AlertTriangle, Clock, Image as ImageIcon, XCircle, MoreVertical, Upload, FileText, Download } from "lucide-react";
+import { AlertCircle, X, Plus, Trash2, Edit2, Calendar, AlertTriangle, Clock, Image as ImageIcon, XCircle, MoreVertical, Upload, FileText, Download, Tag, User, Building2, CalendarRange } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +23,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ProjectGanttTree } from "@/components/dashboard/ProjectGanttTree";
+import { listDelayLogs, updateDelayLog } from "@/api/delayLog";
+import { listProgressImages, updateProgressImage } from "@/api/progressImage";
+import { mediaUrl } from "@/api/config";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type PhaseTimelinePoint = {
   month: string;
@@ -96,14 +102,6 @@ type GanttTask = {
   plannedOverride?: number; // 0..100
 };
 
-// Frontend-only: progress photos and documents (in-memory, no backend)
-type ProgressPhotoItem = {
-  id: string;
-  file: File;
-  objectUrl: string;
-  date: string; // YYYY-MM-DD
-  caption?: string;
-};
 type ProgressDocItem = {
   id: string;
   file: File;
@@ -124,6 +122,9 @@ type DelayLog = {
   monthIndex: number;
   imageUrl?: string;
 };
+
+type ApiDelayLog = Awaited<ReturnType<typeof listDelayLogs>>["data"][number];
+type ApiProgressImage = Awaited<ReturnType<typeof listProgressImages>>[number];
 
 type DelayLogFormData = {
   loggedBy: string;
@@ -2068,9 +2069,9 @@ export function MilestoneDetailsPanel({
   onProjectGanttRefresh?: () => void | Promise<void>;
 }) {
   const [tab, setTab] = useState<"gantt" | "wbs" | "photos" | "logs">("gantt");
+  const queryClient = useQueryClient();
 
-  // Frontend-only: progress photos (with timeline date) and documents
-  const [progressPhotos, setProgressPhotos] = useState<ProgressPhotoItem[]>([]);
+  // Frontend-only: documents (photos are API-driven via list-progress-image)
   const [progressDocs, setProgressDocs] = useState<ProgressDocItem[]>([]);
 
   // Dialogs opened from Gantt activity options (three dots)
@@ -2081,28 +2082,44 @@ export function MilestoneDetailsPanel({
   const photoDialogInputRef = React.useRef<HTMLInputElement>(null);
   const docDialogInputRef = React.useRef<HTMLInputElement>(null);
 
-  const progressPhotosRef = React.useRef(progressPhotos);
-  progressPhotosRef.current = progressPhotos;
-  useEffect(() => {
-    return () => {
-      progressPhotosRef.current.forEach((p) => URL.revokeObjectURL(p.objectUrl));
-    };
-  }, []);
+  const [updateImageOpen, setUpdateImageOpen] = useState(false);
+  const [updatingImage, setUpdatingImage] = useState(false);
+  const [updateImageForm, setUpdateImageForm] = useState<{
+    id: number;
+    project: number;
+    activity: number;
+    image_date: string;
+    caption: string;
+    currentImageUrl: string;
+    newImageFile: File | null;
+    previewUrl: string | null;
+  } | null>(null);
 
-  const removePhoto = (id: string) => {
-    setProgressPhotos((prev) => {
-      const item = prev.find((p) => p.id === id);
-      if (item) URL.revokeObjectURL(item.objectUrl);
-      return prev.filter((p) => p.id !== id);
-    });
+  const closeUpdateImageDialog = () => {
+    if (updateImageForm?.previewUrl) URL.revokeObjectURL(updateImageForm.previewUrl);
+    setUpdateImageForm(null);
+    setUpdateImageOpen(false);
+    setUpdatingImage(false);
   };
-  const downloadPhoto = (item: ProgressPhotoItem) => {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(item.file);
-    a.download = item.file.name || `progress-${item.date}.jpg`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+
+  const [updateDelayOpen, setUpdateDelayOpen] = useState(false);
+  const [updatingDelay, setUpdatingDelay] = useState(false);
+  const [updateDelayForm, setUpdateDelayForm] = useState<{
+    id: number;
+    project: number;
+    activity: number;
+    delay_start_date: string;
+    delay_end_date: string;
+    category: string;
+    issue: string;
+    recommended_action: string;
+  } | null>(null);
+  const closeUpdateDelayDialog = () => {
+    setUpdateDelayForm(null);
+    setUpdateDelayOpen(false);
+    setUpdatingDelay(false);
   };
+
   const addDocument = (file: File) => {
     const id = `doc-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setProgressDocs((prev) => [...prev, { id, file, name: file.name, uploadedAt: new Date().toISOString() }]);
@@ -2130,6 +2147,38 @@ export function MilestoneDetailsPanel({
   // Delay Logs feature removed (was hardcoded); do not adjust progress.
   const delayLogs: DelayLog[] = [];
   const adjustedSubProjects = subProjects;
+
+  const { data: apiDelayLogsData, isFetching: apiDelayLogsLoading } = useQuery({
+    queryKey: ["delay-logs", ganttProjectId],
+    queryFn: async () => {
+      if (ganttProjectId == null) return { count: 0, data: [] as ApiDelayLog[] };
+      return await listDelayLogs({ project: ganttProjectId });
+    },
+    enabled: ganttProjectId != null,
+    staleTime: 30 * 1000,
+  });
+  const apiDelayLogs = (apiDelayLogsData?.data ?? []) as ApiDelayLog[];
+
+  const { data: apiProgressImagesData, isFetching: apiProgressImagesLoading } = useQuery({
+    queryKey: ["progress-images", ganttProjectId],
+    queryFn: async () => {
+      if (ganttProjectId == null) return [] as ApiProgressImage[];
+      return await listProgressImages({ project: ganttProjectId });
+    },
+    enabled: ganttProjectId != null,
+    staleTime: 30 * 1000,
+  });
+  const apiProgressImages = (apiProgressImagesData ?? []) as ApiProgressImage[];
+  const DELAY_LOGS_PAGE_SIZE = 3;
+  const [delayLogsPage, setDelayLogsPage] = useState(0);
+  const delayLogsTotalPages = Math.max(1, Math.ceil(apiDelayLogs.length / DELAY_LOGS_PAGE_SIZE));
+  useEffect(() => {
+    setDelayLogsPage(0);
+  }, [ganttProjectId, apiDelayLogs.length]);
+  const pagedDelayLogs = useMemo(() => {
+    const start = delayLogsPage * DELAY_LOGS_PAGE_SIZE;
+    return apiDelayLogs.slice(start, start + DELAY_LOGS_PAGE_SIZE);
+  }, [apiDelayLogs, delayLogsPage]);
 
   // Calculate overall project progress considering delays
   const overallProgress = useMemo(() => {
@@ -2163,14 +2212,6 @@ export function MilestoneDetailsPanel({
   const openAddDocumentFromGantt = (taskId: string, taskName: string) => {
     setSelectedTaskForMedia({ taskId, taskName });
     setAddDocumentDialogOpen(true);
-  };
-  const savePhotoFromDialog = () => {
-    if (!photoDialogForm) return;
-    const id = `photo-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    setProgressPhotos((prev) => [...prev, { id, file: photoDialogForm.file, objectUrl: photoDialogForm.objectUrl, date: photoDialogForm.date, caption: photoDialogForm.caption || undefined }]);
-    setPhotoDialogForm(null);
-    setAddPhotoDialogOpen(false);
-    setSelectedTaskForMedia(null);
   };
   const closePhotoDialog = () => {
     if (photoDialogForm) URL.revokeObjectURL(photoDialogForm.objectUrl);
@@ -2338,6 +2379,9 @@ export function MilestoneDetailsPanel({
               <TabsTrigger value="gantt" className={isMobile ? 'text-xs shrink-0 px-3' : ''}>Gantt</TabsTrigger>
               <TabsTrigger value="wbs" className={isMobile ? 'text-xs shrink-0 px-3' : ''}>WBS Breakdown</TabsTrigger>
               <TabsTrigger value="photos" className={isMobile ? 'text-xs shrink-0 px-3' : ''}>Photos & Docs</TabsTrigger>
+              <TabsTrigger value="logs" className={isMobile ? 'text-xs shrink-0 px-3' : ''}>
+                Delay Logs
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="gantt" className="mt-4">
@@ -2475,30 +2519,114 @@ export function MilestoneDetailsPanel({
               {/* Progress Photos — display only; upload via Gantt activity options (⋮) */}
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold">Progress Photos</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  {progressPhotos.length === 0 ? (
-                    <p className="col-span-full text-sm text-muted-foreground">No photos yet. Use the options menu (⋮) on an activity in the Gantt chart to add a photo.</p>
-                  ) : null}
-                  {[...progressPhotos].sort((a, b) => b.date.localeCompare(a.date)).map((item) => (
-                    <Card key={item.id} className="overflow-hidden border border-border/60">
-                      <div className="aspect-square relative bg-muted">
-                        <img src={item.objectUrl} alt={item.caption || item.date} className="w-full h-full object-cover" />
-                        <Badge className="absolute bottom-1 left-1 text-[10px] bg-black/70">{item.date}</Badge>
-                        <div className="absolute top-1 right-1 flex gap-1">
-                          <Button type="button" size="icon" variant="secondary" className="h-7 w-7" onClick={() => downloadPhoto(item)} title="Download">
-                            <Download className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button type="button" size="icon" variant="destructive" className="h-7 w-7" onClick={() => removePhoto(item.id)} title="Remove">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                      <CardContent className="p-2">
-                        <p className="text-xs text-muted-foreground truncate" title={item.caption}>{item.caption || "—"}</p>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                {apiProgressImagesLoading ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <Skeleton className="h-56 w-full" />
+                    <Skeleton className="h-56 w-full" />
+                    <Skeleton className="h-56 w-full" />
+                  </div>
+                ) : apiProgressImages.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No photos yet. Use the options menu (⋮) on an activity in the Gantt chart to add a photo.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {[...apiProgressImages]
+                      .sort((a, b) => String(b.uploaded_at).localeCompare(String(a.uploaded_at)))
+                      .map((item) => {
+                        const src = item.image?.startsWith("http") ? item.image : mediaUrl(item.image || "");
+                        const uploaded = new Date(item.uploaded_at);
+                        const uploadedLabel = Number.isFinite(uploaded.getTime())
+                          ? uploaded.toLocaleString()
+                          : String(item.uploaded_at);
+                        return (
+                          <Card key={item.id} className="overflow-hidden border border-border/60">
+                            <div className="h-40 sm:h-44 relative bg-muted">
+                              <img
+                                src={src}
+                                alt={item.caption || item.image_date}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                              />
+                              <div className="absolute top-1 right-1 flex gap-1">
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="secondary"
+                                  className="h-7 w-7"
+                                  onClick={() => window.open(src, "_blank")}
+                                  title="Open"
+                                >
+                                  <ImageIcon className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="secondary"
+                                  className="h-7 w-7"
+                                  onClick={() => {
+                                    const a = document.createElement("a");
+                                    a.href = src;
+                                    a.download = `progress-${item.image_date || item.id}.png`;
+                                    a.click();
+                                  }}
+                                  title="Download"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                            <CardContent className="p-3 space-y-2">
+                              <div className="text-sm font-semibold leading-snug line-clamp-2" title={item.caption ?? ""}>
+                                {item.caption || "—"}
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="default"
+                                  className="h-7 px-2.5 text-[11px] rounded-full bg-blue-600 text-white hover:bg-blue-600/90"
+                                >
+                                  {item.image_date}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2.5 text-[11px] rounded-full border-sky-200 text-sky-700 hover:text-sky-800"
+                                >
+                                  Activity #{item.activity}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2.5 text-[11px] rounded-full border-emerald-200 text-emerald-700 hover:text-emerald-800"
+                                  title="Update this image"
+                                  onClick={() => {
+                                    const currentSrc = item.image?.startsWith("http") ? item.image : mediaUrl(item.image || "");
+                                    setUpdateImageForm({
+                                      id: item.id,
+                                      project: item.project,
+                                      activity: item.activity,
+                                      image_date: item.image_date,
+                                      caption: item.caption ?? "",
+                                      currentImageUrl: currentSrc,
+                                      newImageFile: null,
+                                      previewUrl: null,
+                                    });
+                                    setUpdateImageOpen(true);
+                                  }}
+                                >
+                                  Update
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
 
               {/* Documents — display only; upload via Gantt activity options (⋮) */}
@@ -2531,7 +2659,199 @@ export function MilestoneDetailsPanel({
               </div>
             </TabsContent>
 
-            {/* Delay Logs tab removed (was hardcoded) */}
+            <TabsContent value="logs" className="mt-4">
+              {apiDelayLogsLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-5 w-56" />
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                </div>
+              ) : apiDelayLogs.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground border border-border rounded-lg">
+                  <AlertCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm font-medium">No delay logs recorded yet</p>
+                  <p className="text-xs mt-1">Delay logs will appear here when you log delays in the Gantt chart.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm text-muted-foreground">
+                      {apiDelayLogs.length} delay log{apiDelayLogs.length !== 1 ? "s" : ""} recorded
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        onClick={() => setDelayLogsPage((p) => Math.max(0, p - 1))}
+                        disabled={delayLogsPage <= 0}
+                      >
+                        Prev
+                      </Button>
+                      <div className="text-xs text-muted-foreground tabular-nums min-w-[84px] text-center">
+                        Page {delayLogsPage + 1} / {delayLogsTotalPages}
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        onClick={() => setDelayLogsPage((p) => Math.min(delayLogsTotalPages - 1, p + 1))}
+                        disabled={delayLogsPage >= delayLogsTotalPages - 1}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+                    {pagedDelayLogs.map((log) => {
+                      const created = new Date(log.created_at);
+                      const createdLabel = Number.isFinite(created.getTime())
+                        ? created.toLocaleString()
+                        : String(log.created_at);
+                      const actionByLabel = log.action_by_info
+                        ? `${log.action_by_info.stakeholder_title} (${log.action_by_info.stakeholder_type})`
+                        : log.action_by != null
+                          ? `#${log.action_by}`
+                          : "—";
+                      const severity: "low" | "medium" | "high" =
+                        log.delay_days >= 10 ? "high" : log.delay_days >= 5 ? "medium" : "low";
+                      const severityStyles =
+                        severity === "high"
+                          ? {
+                              accent: "bg-rose-600",
+                              badge: "bg-rose-600 hover:bg-rose-600 text-white",
+                              icon: "text-rose-600",
+                            }
+                          : severity === "medium"
+                            ? {
+                                accent: "bg-amber-500",
+                                badge: "bg-amber-500 hover:bg-amber-500 text-white",
+                                icon: "text-amber-600",
+                              }
+                            : {
+                                accent: "bg-slate-400",
+                                badge: "bg-slate-700 hover:bg-slate-700 text-white",
+                                icon: "text-slate-600",
+                              };
+
+                      return (
+                        <Card
+                          key={log.id}
+                          className="overflow-hidden border border-border/60 bg-card shadow-sm hover:shadow-md transition-shadow"
+                        >
+                          <CardContent className="p-0">
+                            <div className="flex">
+                              <div className={`w-1.5 ${severityStyles.accent}`} aria-hidden />
+                              <div className="flex-1">
+                                <div className="p-4 border-b border-border/60 bg-muted/15">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <AlertTriangle className={`h-4 w-4 ${severityStyles.icon} shrink-0`} aria-hidden />
+                                        <div className="text-sm font-semibold truncate" title={`Activity #${log.activity}`}>
+                                          Activity #{log.activity}
+                                        </div>
+                                      </div>
+                                      <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                        <Calendar className="h-3.5 w-3.5" aria-hidden />
+                                        {createdLabel}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8"
+                                        onClick={() => {
+                                          setUpdateDelayForm({
+                                            id: log.id,
+                                            project: log.project,
+                                            activity: log.activity,
+                                            delay_start_date: log.delay_start_date,
+                                            delay_end_date: log.delay_end_date,
+                                            category: log.category ?? "",
+                                            issue: log.issue ?? "",
+                                            recommended_action: log.recommended_action ?? "",
+                                          });
+                                          setUpdateDelayOpen(true);
+                                        }}
+                                      >
+                                        Update
+                                      </Button>
+                                      <Badge className={`shrink-0 ${severityStyles.badge}`}>
+                                        {log.delay_days} day{log.delay_days !== 1 ? "s" : ""} delay
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="p-4 space-y-3">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="rounded-lg border border-border/60 bg-background p-2">
+                                  <div className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground uppercase">
+                                    <CalendarRange className="h-3.5 w-3.5" aria-hidden />
+                                    Start
+                                  </div>
+                                  <div className="text-xs font-medium mt-0.5">{log.delay_start_date}</div>
+                                </div>
+                                <div className="rounded-lg border border-border/60 bg-background p-2">
+                                  <div className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground uppercase">
+                                    <CalendarRange className="h-3.5 w-3.5" aria-hidden />
+                                    End
+                                  </div>
+                                  <div className="text-xs font-medium mt-0.5">{log.delay_end_date}</div>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap gap-2 text-xs">
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/30 px-3 py-1">
+                                  <Tag className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                                  <span className="text-muted-foreground">Category</span>
+                                  <span className="font-semibold text-foreground">{log.category ?? "—"}</span>
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/30 px-3 py-1">
+                                  <User className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                                  <span className="text-muted-foreground">Originator</span>
+                                  <span className="font-semibold text-foreground">{log.originator ?? "—"}</span>
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/30 px-3 py-1">
+                                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                                  <span className="text-muted-foreground">Action by</span>
+                                  <span className="font-semibold text-foreground">{actionByLabel}</span>
+                                </span>
+                              </div>
+
+                              <div className="grid gap-2">
+                                <div className="rounded-lg border border-border/60 bg-background p-3">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="text-[10px] font-semibold text-muted-foreground uppercase">Issue</div>
+                                  </div>
+                                  <div className="text-xs text-foreground/90 whitespace-pre-wrap mt-1 leading-relaxed">
+                                    {log.issue ?? "—"}
+                                  </div>
+                                </div>
+                                <div className="rounded-lg border border-border/60 bg-background p-3">
+                                  <div className="text-[10px] font-semibold text-muted-foreground uppercase">Recommended action</div>
+                                  <div className="text-xs text-foreground/90 whitespace-pre-wrap mt-1 leading-relaxed">
+                                    {log.recommended_action ?? "—"}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
         )}
       </CardContent>
@@ -2585,7 +2905,7 @@ export function MilestoneDetailsPanel({
               </div>
               <DialogFooter>
                 <Button type="button" variant="ghost" onClick={closePhotoDialog}>Cancel</Button>
-                <Button type="button" onClick={savePhotoFromDialog}>Save photo</Button>
+                <Button type="button" onClick={closePhotoDialog}>Close</Button>
               </DialogFooter>
             </div>
           ) : (
@@ -2627,6 +2947,298 @@ export function MilestoneDetailsPanel({
             </Button>
             <p className="text-xs text-muted-foreground mt-2">PDF, Word, Excel or text files. Document will appear in the Photos & Docs tab.</p>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Update Progress Image dialog (from Photos & Docs grid) */}
+      <Dialog open={updateImageOpen} onOpenChange={(open) => { if (!open) closeUpdateImageDialog(); }}>
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-xl font-bold">Update Progress Image</DialogTitle>
+            <DialogDescription className="text-sm">
+              Update caption/date/activity or replace the image file.
+            </DialogDescription>
+          </DialogHeader>
+
+          {updateImageForm ? (
+            <div className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-1.5 sm:col-span-1">
+                  <Label>Project</Label>
+                  <Input value={String(updateImageForm.project)} readOnly />
+                </div>
+                <div className="space-y-1.5 sm:col-span-1">
+                  <Label>Activity</Label>
+                  <Input
+                    type="number"
+                    value={String(updateImageForm.activity)}
+                    onChange={(e) =>
+                      setUpdateImageForm((p) => (p ? { ...p, activity: Number(e.target.value || 0) } : p))
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-1">
+                  <Label>Image date</Label>
+                  <Input
+                    type="date"
+                    value={updateImageForm.image_date}
+                    onChange={(e) => setUpdateImageForm((p) => (p ? { ...p, image_date: e.target.value } : p))}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <Label>Image</Label>
+                  {updateImageForm.newImageFile ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8"
+                      onClick={() => {
+                        setUpdateImageForm((p) => {
+                          if (!p) return p;
+                          if (p.previewUrl) URL.revokeObjectURL(p.previewUrl);
+                          return { ...p, newImageFile: null, previewUrl: null };
+                        });
+                      }}
+                    >
+                      Remove selected
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Optional: replace file</span>
+                  )}
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="rounded-xl border border-border/60 overflow-hidden bg-muted/30">
+                    <div className="px-4 py-2 text-xs font-semibold text-muted-foreground border-b border-border/50 bg-background/50 flex items-center justify-between">
+                      <span>{updateImageForm.newImageFile ? "New preview" : "Current image"}</span>
+                      <span className="text-[11px] font-normal">ID #{updateImageForm.id}</span>
+                    </div>
+                    <div className="p-3">
+                      <div className="rounded-lg overflow-hidden bg-muted">
+                        <img
+                          src={updateImageForm.previewUrl || updateImageForm.currentImageUrl}
+                          alt="Preview"
+                          className="w-full h-56 object-cover"
+                          loading="lazy"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <input
+                      id="update-progress-image-file"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        setUpdateImageForm((p) => {
+                          if (!p) return p;
+                          if (p.previewUrl) URL.revokeObjectURL(p.previewUrl);
+                          return {
+                            ...p,
+                            newImageFile: file,
+                            previewUrl: file ? URL.createObjectURL(file) : null,
+                          };
+                        });
+                        e.target.value = "";
+                      }}
+                    />
+
+                    <div
+                      className={`rounded-xl border-2 border-dashed p-5 transition-colors ${
+                        updateImageForm.newImageFile
+                          ? "border-primary bg-primary/5"
+                          : "border-muted-foreground/25 hover:border-primary/60 bg-muted/10 cursor-pointer"
+                      }`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => document.getElementById("update-progress-image-file")?.click()}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          document.getElementById("update-progress-image-file")?.click();
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="shrink-0 rounded-lg bg-background p-2 border border-border/60">
+                          <Upload className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold">
+                            {updateImageForm.newImageFile ? "Selected file" : "Click to choose a new image"}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {updateImageForm.newImageFile ? updateImageForm.newImageFile.name : "PNG, JPG, JPEG"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <Button type="button" variant="outline" size="sm" className="h-9 w-full">
+                          {updateImageForm.newImageFile ? "Change file" : "Choose file"}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-border/60 p-4 bg-background/40">
+                      <Label>Caption</Label>
+                      <Textarea
+                        className="mt-2"
+                        value={updateImageForm.caption}
+                        onChange={(e) => setUpdateImageForm((p) => (p ? { ...p, caption: e.target.value } : p))}
+                        rows={4}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={closeUpdateImageDialog} disabled={updatingImage}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  disabled={updatingImage || !updateImageForm.image_date || !updateImageForm.project || !updateImageForm.activity}
+                  onClick={async () => {
+                    if (!updateImageForm) return;
+                    try {
+                      setUpdatingImage(true);
+                      await updateProgressImage(updateImageForm.id, {
+                        project: updateImageForm.project,
+                        activity: updateImageForm.activity,
+                        image_date: updateImageForm.image_date,
+                        caption: updateImageForm.caption,
+                        image: updateImageForm.newImageFile,
+                      });
+                      await queryClient.invalidateQueries({ queryKey: ["progress-images", ganttProjectId] });
+                      closeUpdateImageDialog();
+                    } finally {
+                      setUpdatingImage(false);
+                    }
+                  }}
+                >
+                  {updatingImage ? "Updating..." : "Update"}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Update Delay Log dialog (from Delay Logs cards) */}
+      <Dialog open={updateDelayOpen} onOpenChange={(open) => { if (!open) closeUpdateDelayDialog(); }}>
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-xl font-bold">Update Delay Log</DialogTitle>
+            <DialogDescription className="text-sm">
+              Update the delay details for this activity.
+            </DialogDescription>
+          </DialogHeader>
+
+          {updateDelayForm ? (
+            <div className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label>Project</Label>
+                  <Input value={String(updateDelayForm.project)} readOnly />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Activity</Label>
+                  <Input value={String(updateDelayForm.activity)} readOnly />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Category</Label>
+                  <Input
+                    value={updateDelayForm.category}
+                    onChange={(e) => setUpdateDelayForm((p) => (p ? { ...p, category: e.target.value } : p))}
+                    placeholder="e.g. Utility shifting"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Delay start date</Label>
+                  <Input
+                    type="date"
+                    value={updateDelayForm.delay_start_date}
+                    onChange={(e) => setUpdateDelayForm((p) => (p ? { ...p, delay_start_date: e.target.value } : p))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Delay end date</Label>
+                  <Input
+                    type="date"
+                    value={updateDelayForm.delay_end_date}
+                    onChange={(e) => setUpdateDelayForm((p) => (p ? { ...p, delay_end_date: e.target.value } : p))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Issue</Label>
+                  <Textarea
+                    value={updateDelayForm.issue}
+                    onChange={(e) => setUpdateDelayForm((p) => (p ? { ...p, issue: e.target.value } : p))}
+                    rows={4}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Recommended action</Label>
+                  <Textarea
+                    value={updateDelayForm.recommended_action}
+                    onChange={(e) => setUpdateDelayForm((p) => (p ? { ...p, recommended_action: e.target.value } : p))}
+                    rows={4}
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={closeUpdateDelayDialog} disabled={updatingDelay}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  disabled={
+                    updatingDelay ||
+                    !updateDelayForm.delay_start_date ||
+                    !updateDelayForm.delay_end_date ||
+                    !updateDelayForm.category
+                  }
+                  onClick={async () => {
+                    if (!updateDelayForm) return;
+                    try {
+                      setUpdatingDelay(true);
+                      await updateDelayLog(updateDelayForm.id, {
+                        project: updateDelayForm.project,
+                        activity: updateDelayForm.activity,
+                        delay_start_date: updateDelayForm.delay_start_date,
+                        delay_end_date: updateDelayForm.delay_end_date,
+                        category: updateDelayForm.category,
+                        issue: updateDelayForm.issue,
+                        recommended_action: updateDelayForm.recommended_action,
+                      });
+                      await queryClient.invalidateQueries({ queryKey: ["delay-logs", ganttProjectId] });
+                      await onProjectGanttRefresh?.();
+                      closeUpdateDelayDialog();
+                    } finally {
+                      setUpdatingDelay(false);
+                    }
+                  }}
+                >
+                  {updatingDelay ? "Updating..." : "Update"}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </Card>
