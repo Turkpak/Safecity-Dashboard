@@ -61,6 +61,51 @@ async function parseResponse<T>(res: Response): Promise<T> {
   return json as T;
 }
 
+/**
+ * Raw API call that returns the full JSON body (no `{data: ...}` unwrapping).
+ * Use this for endpoints like `list-delay-log/` that already return `{count, data}`.
+ */
+export async function requestRaw<T = unknown>(
+  path: string,
+  options: RequestOptions = {}
+): Promise<T> {
+  const { method = "GET", body, headers = {}, formData } = options;
+  const url = apiUrl(path);
+  const authHeaders = getAuthHeaders();
+
+  const isJson = !formData && body !== undefined;
+  const requestHeaders: Record<string, string> = {
+    ...authHeaders,
+    ...headers,
+  };
+  if (isJson) {
+    requestHeaders["Content-Type"] = "application/json";
+  }
+
+  let requestBody: string | FormData | undefined;
+  if (formData) requestBody = formData;
+  else if (body !== undefined) requestBody = JSON.stringify(body);
+
+  const res = await fetch(url, {
+    method,
+    headers: requestHeaders,
+    body: requestBody,
+    credentials: "include",
+  });
+
+  const text = await res.text();
+  let json: any;
+  try {
+    json = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(res.statusText || `Request failed: ${res.status}`);
+  }
+  if (res.status >= 400) {
+    throw new Error(json?.message || `Request failed: ${res.status}`);
+  }
+  return json as T;
+}
+
 export interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;

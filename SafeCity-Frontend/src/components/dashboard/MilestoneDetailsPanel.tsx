@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useQuery } from "@tanstack/react-query";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { PlannedVsActualChart } from "@/components/dashboard/PlannedVsActualChart";
 import type { SubProject } from "@/components/dashboard/SubProjectCard";
@@ -21,6 +22,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ProjectGanttTree } from "@/components/dashboard/ProjectGanttTree";
+import { listDelayLogs } from "@/api/delayLog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type PhaseTimelinePoint = {
   month: string;
@@ -124,6 +127,8 @@ type DelayLog = {
   monthIndex: number;
   imageUrl?: string;
 };
+
+type ApiDelayLog = Awaited<ReturnType<typeof listDelayLogs>>["data"][number];
 
 type DelayLogFormData = {
   loggedBy: string;
@@ -2131,6 +2136,17 @@ export function MilestoneDetailsPanel({
   const delayLogs: DelayLog[] = [];
   const adjustedSubProjects = subProjects;
 
+  const { data: apiDelayLogsData, isFetching: apiDelayLogsLoading } = useQuery({
+    queryKey: ["delay-logs", ganttProjectId],
+    queryFn: async () => {
+      if (ganttProjectId == null) return { count: 0, data: [] as ApiDelayLog[] };
+      return await listDelayLogs({ project: ganttProjectId });
+    },
+    enabled: ganttProjectId != null,
+    staleTime: 30 * 1000,
+  });
+  const apiDelayLogs = (apiDelayLogsData?.data ?? []) as ApiDelayLog[];
+
   // Calculate overall project progress considering delays
   const overallProgress = useMemo(() => {
     if (adjustedSubProjects.length === 0) return { actual: 0, planned: 0, impact: 0 };
@@ -2338,6 +2354,9 @@ export function MilestoneDetailsPanel({
               <TabsTrigger value="gantt" className={isMobile ? 'text-xs shrink-0 px-3' : ''}>Gantt</TabsTrigger>
               <TabsTrigger value="wbs" className={isMobile ? 'text-xs shrink-0 px-3' : ''}>WBS Breakdown</TabsTrigger>
               <TabsTrigger value="photos" className={isMobile ? 'text-xs shrink-0 px-3' : ''}>Photos & Docs</TabsTrigger>
+              <TabsTrigger value="logs" className={isMobile ? 'text-xs shrink-0 px-3' : ''}>
+                Delay Logs
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="gantt" className="mt-4">
@@ -2531,7 +2550,111 @@ export function MilestoneDetailsPanel({
               </div>
             </TabsContent>
 
-            {/* Delay Logs tab removed (was hardcoded) */}
+            <TabsContent value="logs" className="mt-4">
+              {apiDelayLogsLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-5 w-56" />
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                </div>
+              ) : apiDelayLogs.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground border border-border rounded-lg">
+                  <AlertCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm font-medium">No delay logs recorded yet</p>
+                  <p className="text-xs mt-1">Delay logs will appear here when you log delays in the Gantt chart.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm text-muted-foreground">
+                      {apiDelayLogs.length} delay log{apiDelayLogs.length !== 1 ? "s" : ""} recorded
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+                    {apiDelayLogs.map((log) => {
+                      const created = new Date(log.created_at);
+                      const createdLabel = Number.isFinite(created.getTime())
+                        ? created.toLocaleString()
+                        : String(log.created_at);
+                      const actionByLabel = log.action_by_info
+                        ? `${log.action_by_info.stakeholder_title} (${log.action_by_info.stakeholder_type})`
+                        : log.action_by != null
+                          ? `#${log.action_by}`
+                          : "—";
+
+                      return (
+                        <Card
+                          key={log.id}
+                          className="overflow-hidden border border-border/60 bg-card shadow-sm hover:shadow-md transition-shadow"
+                        >
+                          <CardContent className="p-0">
+                            <div className="p-4 border-b border-border/60 bg-muted/20">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold truncate" title={`Activity #${log.activity}`}>
+                                    Activity #{log.activity}
+                                  </div>
+                                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                                    {createdLabel}
+                                  </div>
+                                </div>
+                                <Badge className="shrink-0 bg-rose-600 hover:bg-rose-600 text-white">
+                                  {log.delay_days} day{log.delay_days !== 1 ? "s" : ""} delay
+                                </Badge>
+                              </div>
+                            </div>
+
+                            <div className="p-4 space-y-3">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="rounded-lg border border-border/60 bg-background p-2">
+                                  <div className="text-[10px] font-semibold text-muted-foreground uppercase">Start</div>
+                                  <div className="text-xs font-medium">{log.delay_start_date}</div>
+                                </div>
+                                <div className="rounded-lg border border-border/60 bg-background p-2">
+                                  <div className="text-[10px] font-semibold text-muted-foreground uppercase">End</div>
+                                  <div className="text-xs font-medium">{log.delay_end_date}</div>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap gap-2 text-xs">
+                                <Badge variant="secondary" className="gap-1">
+                                  <span className="text-muted-foreground">Category</span>
+                                  <span className="font-semibold text-foreground">{log.category ?? "—"}</span>
+                                </Badge>
+                                <Badge variant="secondary" className="gap-1">
+                                  <span className="text-muted-foreground">Originator</span>
+                                  <span className="font-semibold text-foreground">{log.originator ?? "—"}</span>
+                                </Badge>
+                                <Badge variant="secondary" className="gap-1">
+                                  <span className="text-muted-foreground">Action by</span>
+                                  <span className="font-semibold text-foreground">{actionByLabel}</span>
+                                </Badge>
+                              </div>
+
+                              <div className="grid gap-2">
+                                <div className="rounded-lg border border-border/60 bg-background p-3">
+                                  <div className="text-[10px] font-semibold text-muted-foreground uppercase">Issue</div>
+                                  <div className="text-xs text-foreground/90 whitespace-pre-wrap mt-1">
+                                    {log.issue ?? "—"}
+                                  </div>
+                                </div>
+                                <div className="rounded-lg border border-border/60 bg-background p-3">
+                                  <div className="text-[10px] font-semibold text-muted-foreground uppercase">Recommended action</div>
+                                  <div className="text-xs text-foreground/90 whitespace-pre-wrap mt-1">
+                                    {log.recommended_action ?? "—"}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
         )}
       </CardContent>
