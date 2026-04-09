@@ -10,3 +10,4 @@ from .ProjectActivityView import *
 from .PictorialArchiveView import *
 from .ProgressImageView import *
 from .ActivityDelayLogView import *
+from .ProjectDocumentView import *

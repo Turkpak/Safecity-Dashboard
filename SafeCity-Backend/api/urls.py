@@ -68,6 +68,12 @@ router.register(r'list-pictorial-archive', ListPictorialArchiveView, basename='l
 router.register(r'update-pictorial-archive', PictorialArchiveUpdateView, basename='update-pictorial-archive')
 router.register(r'delete-pictorial-archive', PictorialArchiveDeleteView, basename='delete-pictorial-archive')
 
+# ---------------------------------- Project Document View ----------------------------------
+
+router.register(r'create-project-document', ProjectDocumentCreateView, basename='create-project-document')
+router.register(r'list-project-document', ListProjectDocumentView, basename='list-project-document')
+router.register(r'update-project-document', UpdateProjectDocumentView, basename='update-project-document')
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),

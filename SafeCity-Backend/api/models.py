@@ -399,6 +399,35 @@ class ProgressImage(models.Model):
     def __str__(self):
         return f"{self.activity.activity_name} - {self.image_date}"
 
+class ProjectDocument(models.Model):
+    project = models.ForeignKey(
+        'Project',
+        on_delete=models.CASCADE,
+        related_name='documents'
+    )
+
+    activity = models.ForeignKey(
+        'ProjectActivity',
+        on_delete=models.CASCADE,
+        related_name='documents',
+        null=True,
+        blank=True
+    )
+
+    file = models.FileField(
+        upload_to='project_documents/',
+        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'docx', 'doc', 'xlsx'])],
+        max_length=500,
+        null=True,   
+        blank=True  
+    )
+
+    title = models.CharField(max_length=255, null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title or f"Document {self.id}"
+    
 class TaskDependency(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
     task = models.ForeignKey(ProjectActivity, related_name="successors", on_delete=models.CASCADE)

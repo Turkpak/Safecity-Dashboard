@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from api.models import Project, ProjectActivity, ActivityDelayLog, ProgressImage
+from api.models import Project, ProjectActivity, ActivityDelayLog, ProgressImage, ProjectDocument
 from datetime import datetime
 
 def get_activity_images(activity):
@@ -21,6 +21,23 @@ def get_activity_images(activity):
     return {
         "has_images": bool(image_list),
         "images": image_list
+    }
+
+# ---------- helper to get project documents ----------
+def get_activity_documents(activity):
+    documents = ProjectDocument.objects.filter(activity=activity)
+    doc_list = [
+        {
+            "id": doc.id,
+            "title": doc.title,
+            "file": doc.file.url if doc.file else None,
+            "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+        }
+        for doc in documents
+    ]
+    return {
+        "has_documents": bool(doc_list),
+        "documents": doc_list
     }
 
 # ---------- helper to get delay info ----------
@@ -162,7 +179,7 @@ class ProjectGanttNestedView(APIView):
                     end_date = act.end_date.isoformat() if act.end_date else None
 
                 activity_images = get_activity_images(act)
-
+                activity_docs = get_activity_documents(act)
                 # -----------------------------
                 # NODE
                 # -----------------------------
@@ -185,7 +202,9 @@ class ProjectGanttNestedView(APIView):
                     "actual_end": act.actual_end.isoformat() if act.actual_end else None,
                     "progress_date": act.progress_date.isoformat() if act.progress_date else None,
                     "has_images": activity_images["has_images"], 
-                    "images": activity_images["images"],                    
+                    "images": activity_images["images"],    
+                    "has_documents": activity_docs["has_documents"],
+                    "documents": activity_docs["documents"],                
                     "has_delay": has_delay_flag,
                     "delay_info": delay_info,
                     "subtasks": subtasks
