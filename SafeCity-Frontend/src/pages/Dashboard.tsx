@@ -980,11 +980,13 @@ export default function Dashboard() {
   // Auto-collapse sidebar while project details (Gantt) are open, and restore prior state on close.
   useEffect(() => {
     const detailsOpen = !!selectedProjectForDetails?.id;
+    // Only auto-collapse once on open. Do NOT keep forcing it closed,
+    // so the user can expand/collapse via the sidebar icon while Gantt is open.
     if (detailsOpen) {
       if (sidebarPrevCollapsedRef.current == null) {
         sidebarPrevCollapsedRef.current = isCollapsed;
+        setCollapsed(true);
       }
-      setCollapsed(true);
       return;
     }
     if (sidebarPrevCollapsedRef.current != null) {
