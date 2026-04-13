@@ -114,7 +114,8 @@ export function ProjectGanttTree({
   tasks: FlatGanttRow[];
   projectName?: string;
   projectId?: number;
-  onOpenAddDocument?: (taskId: string, taskName: string) => void;
+  /** `activityDbId` is the backend ProjectActivity PK (`db_id` from nested gantt), same as delay log `activity`. */
+  onOpenAddDocument?: (taskId: string, taskName: string, activityDbId: number) => void;
   /** Called after a delay log is saved so the parent can refetch `project-gantt-nested` (updates `has_delay`). */
   onDelayLogSaved?: () => void | Promise<void>;
   /** Called after progress is saved so the parent can refetch gantt (updates `progress`/actual dates). */
@@ -523,15 +524,24 @@ export function ProjectGanttTree({
                           <DropdownMenuItem
                             onSelect={(e) => {
                               e.preventDefault();
-                              if (onOpenAddDocument) {
-                                onOpenAddDocument(t.id, t.label);
+                              if (!onOpenAddDocument) {
+                                toast({
+                                  title: "Documents not available here",
+                                  description:
+                                    "Open the Photos & Docs tab to add documents for this project.",
+                                });
                                 return;
                               }
-                              toast({
-                                title: "Documents not available here",
-                                description:
-                                  "Open the Photos & Docs tab to add documents for this project.",
-                              });
+                              if (!t.db_id || !Number.isFinite(t.db_id)) {
+                                toast({
+                                  title: "Cannot attach document",
+                                  description:
+                                    "Missing activity id from API. Please refresh and try again.",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              onOpenAddDocument(t.id, t.label, t.db_id);
                             }}
                           >
                             <FileText className="h-4 w-4 mr-2" />

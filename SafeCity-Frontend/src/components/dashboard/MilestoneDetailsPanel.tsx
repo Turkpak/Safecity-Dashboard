@@ -25,8 +25,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ProjectGanttTree } from "@/components/dashboard/ProjectGanttTree";
 import { listDelayLogs, updateDelayLog } from "@/api/delayLog";
 import { listProgressImages, updateProgressImage } from "@/api/progressImage";
+import { createProjectDocument, listProjectDocuments } from "@/api/projectDocument";
 import { mediaUrl } from "@/api/config";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 
 type PhaseTimelinePoint = {
   month: string;
@@ -102,13 +104,6 @@ type GanttTask = {
   plannedOverride?: number; // 0..100
 };
 
-type ProgressDocItem = {
-  id: string;
-  file: File;
-  name: string;
-  uploadedAt?: string; // ISO string for sort order
-};
-
 // Delay logs were previously hardcoded in the UI. We keep the types as no-op
 // placeholders so the rest of the component compiles, but the feature is disabled.
 type DelayLog = {
@@ -125,6 +120,7 @@ type DelayLog = {
 
 type ApiDelayLog = Awaited<ReturnType<typeof listDelayLogs>>["data"][number];
 type ApiProgressImage = Awaited<ReturnType<typeof listProgressImages>>[number];
+type ApiProjectDocument = Awaited<ReturnType<typeof listProjectDocuments>>[number];
 
 type DelayLogFormData = {
   loggedBy: string;
@@ -1195,7 +1191,6 @@ function GanttMini({
   onAddDelayLog,
   onDeleteDelayLog,
   onOpenAddPhoto,
-  onOpenAddDocument,
 }: {
   tasks: GanttTask[];
   months: string[];
@@ -1205,7 +1200,6 @@ function GanttMini({
   onAddDelayLog?: (log: DelayLog) => void;
   onDeleteDelayLog?: (logId: string) => void;
   onOpenAddPhoto?: (taskId: string, taskName: string) => void;
-  onOpenAddDocument?: (taskId: string, taskName: string) => void;
 }) {
   const n = months.length || 1;
   // Initialize all tasks as expanded by default
@@ -2003,17 +1997,6 @@ function GanttMini({
                                     Add Photo
                                   </DropdownMenuItem>
                                 )}
-                                {onOpenAddDocument && (
-                                  <DropdownMenuItem
-                                    onSelect={(e) => {
-                                      e.preventDefault();
-                                      onOpenAddDocument(c.id, c.name);
-                                    }}
-                                  >
-                                    <FileText className="h-4 w-4 mr-2" />
-                                    Add Documents
-                                  </DropdownMenuItem>
-                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
@@ -2070,14 +2053,19 @@ export function MilestoneDetailsPanel({
 }) {
   const [tab, setTab] = useState<"gantt" | "wbs" | "photos" | "logs">("gantt");
   const queryClient = useQueryClient();
-
-  // Frontend-only: documents (photos are API-driven via list-progress-image)
-  const [progressDocs, setProgressDocs] = useState<ProgressDocItem[]>([]);
+  const { toast } = useToast();
 
   // Dialogs opened from Gantt activity options (three dots)
   const [addPhotoDialogOpen, setAddPhotoDialogOpen] = useState(false);
   const [addDocumentDialogOpen, setAddDocumentDialogOpen] = useState(false);
-  const [selectedTaskForMedia, setSelectedTaskForMedia] = useState<{ taskId: string; taskName: string } | null>(null);
+  const [selectedTaskForMedia, setSelectedTaskForMedia] = useState<{
+    taskId: string;
+    taskName: string;
+    /** Backend ProjectActivity PK when attaching documents from API Gantt. */
+    activityDbId?: number;
+  } | null>(null);
+  const [documentTitle, setDocumentTitle] = useState("");
+  const [documentUploading, setDocumentUploading] = useState(false);
   const [photoDialogForm, setPhotoDialogForm] = useState<{ file: File; objectUrl: string; date: string; caption: string } | null>(null);
   const photoDialogInputRef = React.useRef<HTMLInputElement>(null);
   const docDialogInputRef = React.useRef<HTMLInputElement>(null);
@@ -2120,19 +2108,6 @@ export function MilestoneDetailsPanel({
     setUpdatingDelay(false);
   };
 
-  const addDocument = (file: File) => {
-    const id = `doc-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    setProgressDocs((prev) => [...prev, { id, file, name: file.name, uploadedAt: new Date().toISOString() }]);
-  };
-  const removeDoc = (id: string) => setProgressDocs((prev) => prev.filter((d) => d.id !== id));
-  const downloadDoc = (item: ProgressDocItem) => {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(item.file);
-    a.download = item.name;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
-
   // State for editing delay log from table
   const [editingLogFromTable, setEditingLogFromTable] = useState<DelayLog | undefined>(undefined);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -2169,6 +2144,28 @@ export function MilestoneDetailsPanel({
     staleTime: 30 * 1000,
   });
   const apiProgressImages = (apiProgressImagesData ?? []) as ApiProgressImage[];
+
+  const { data: apiProjectDocumentsData, isFetching: apiProjectDocumentsLoading } = useQuery({
+    queryKey: ["project-documents", ganttProjectId],
+    queryFn: async () => {
+      if (ganttProjectId == null) return [] as ApiProjectDocument[];
+      return await listProjectDocuments({ project: ganttProjectId });
+    },
+    enabled: ganttProjectId != null,
+    staleTime: 30 * 1000,
+  });
+  const apiProjectDocuments = (apiProjectDocumentsData ?? []) as ApiProjectDocument[];
+
+  const activityLabelByDbId = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const row of flatGanttTasks ?? []) {
+      if (typeof row.db_id === "number" && Number.isFinite(row.db_id)) {
+        m.set(row.db_id, row.label || `Activity #${row.db_id}`);
+      }
+    }
+    return m;
+  }, [flatGanttTasks]);
+
   const DELAY_LOGS_PAGE_SIZE = 3;
   const [delayLogsPage, setDelayLogsPage] = useState(0);
   const delayLogsTotalPages = Math.max(1, Math.ceil(apiDelayLogs.length / DELAY_LOGS_PAGE_SIZE));
@@ -2209,8 +2206,17 @@ export function MilestoneDetailsPanel({
     setPhotoDialogForm(null);
     setAddPhotoDialogOpen(true);
   };
-  const openAddDocumentFromGantt = (taskId: string, taskName: string) => {
-    setSelectedTaskForMedia({ taskId, taskName });
+  const openAddDocumentFromGantt = (taskId: string, taskName: string, activityDbId: number) => {
+    if (!Number.isFinite(activityDbId)) {
+      toast({
+        title: "Cannot attach document",
+        description: "Missing activity id. Open the project from the schedule and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSelectedTaskForMedia({ taskId, taskName, activityDbId });
+    setDocumentTitle("");
     setAddDocumentDialogOpen(true);
   };
   const closePhotoDialog = () => {
@@ -2222,6 +2228,8 @@ export function MilestoneDetailsPanel({
   const closeDocumentDialog = () => {
     setAddDocumentDialogOpen(false);
     setSelectedTaskForMedia(null);
+    setDocumentTitle("");
+    setDocumentUploading(false);
   };
 
   const wbsPieData = useMemo(
@@ -2261,7 +2269,6 @@ export function MilestoneDetailsPanel({
                   onAddDelayLog={handleAddDelayLog}
                   onDeleteDelayLog={handleDeleteDelayLog}
                   onOpenAddPhoto={openAddPhotoFromGantt}
-                  onOpenAddDocument={openAddDocumentFromGantt}
                 />
                 {/* Overall Progress Summary with Delay Impact - beneath Gantt chart */}
                 {/* Delay Logs removed (were hardcoded) */}
@@ -2405,7 +2412,6 @@ export function MilestoneDetailsPanel({
                     onAddDelayLog={handleAddDelayLog}
                     onDeleteDelayLog={handleDeleteDelayLog}
                     onOpenAddPhoto={openAddPhotoFromGantt}
-                    onOpenAddDocument={openAddDocumentFromGantt}
                   />
                   {/* Delay Logs removed (were hardcoded) */}
                 </>
@@ -2629,31 +2635,64 @@ export function MilestoneDetailsPanel({
                 )}
               </div>
 
-              {/* Documents — display only; upload via Gantt activity options (⋮) */}
+              {/* Documents — GET list-project-document (by project; each row shows activity id / Gantt label) */}
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold">Documents</h3>
-                {progressDocs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No documents yet. Use the options menu (⋮) on an activity in the Gantt chart to add a document.</p>
+                {apiProjectDocumentsLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                ) : apiProjectDocuments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No documents yet. Use the options menu (⋮) on an activity in the Gantt chart to upload a file.
+                  </p>
                 ) : (
                   <div className="rounded-lg border border-border/60 divide-y divide-border/60">
-                    {[...progressDocs]
-                      .sort((a, b) => (b.uploadedAt || b.id).localeCompare(a.uploadedAt || a.id))
-                      .map((item) => (
-                      <div key={item.id} className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/30">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="text-sm font-medium truncate">{item.name}</span>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <Button type="button" size="sm" variant="ghost" className="h-8 gap-1" onClick={() => downloadDoc(item)}>
-                            <Download className="h-3.5 w-3.5" /> Download
-                          </Button>
-                          <Button type="button" size="sm" variant="ghost" className="h-8 text-destructive hover:text-destructive" onClick={() => removeDoc(item.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                    {[...apiProjectDocuments]
+                      .sort((a, b) => String(b.uploaded_at ?? "").localeCompare(String(a.uploaded_at ?? "")))
+                      .map((item) => {
+                        const aid = item.activity;
+                        const activityLabel =
+                          aid != null && activityLabelByDbId.has(aid)
+                            ? activityLabelByDbId.get(aid)!
+                            : aid != null
+                              ? `Activity #${aid}`
+                              : "—";
+                        const href =
+                          item.file_url && String(item.file_url).startsWith("http")
+                            ? item.file_url
+                            : item.file
+                              ? mediaUrl(item.file)
+                              : "";
+                        return (
+                          <div key={item.id} className="flex flex-col gap-1 px-3 py-2.5 hover:bg-muted/30 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                            <div className="flex items-start gap-2 min-w-0">
+                              <FileText className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium truncate" title={item.title ?? undefined}>
+                                  {item.title || "—"}
+                                </div>
+                                <div className="text-[11px] text-muted-foreground truncate">
+                                  {activityLabel}
+                                  {item.uploaded_at
+                                    ? ` · ${new Date(item.uploaded_at).toLocaleString()}`
+                                    : ""}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0 pl-6 sm:pl-0">
+                              {href ? (
+                                <Button type="button" size="sm" variant="ghost" className="h-8 gap-1" asChild>
+                                  <a href={href} target="_blank" rel="noreferrer">
+                                    <Download className="h-3.5 w-3.5" /> Open
+                                  </a>
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })}
                   </div>
                 )}
               </div>
@@ -2918,34 +2957,83 @@ export function MilestoneDetailsPanel({
         </DialogContent>
       </Dialog>
 
-      {/* Add Documents dialog (opened from Gantt activity options) */}
+      {/* Add Documents dialog (opened from Gantt activity options) — POST create-project-document */}
       <Dialog open={addDocumentDialogOpen} onOpenChange={(open) => { if (!open) closeDocumentDialog(); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Documents</DialogTitle>
+            <DialogTitle>Add document</DialogTitle>
             <DialogDescription>
-              {selectedTaskForMedia ? `Upload a document for: ${selectedTaskForMedia.taskName}` : "Upload PDF, Word, Excel or text files."}
+              {selectedTaskForMedia
+                ? `Attach a file to: ${selectedTaskForMedia.taskName}`
+                : "Upload a project document."}
             </DialogDescription>
           </DialogHeader>
           <input
             ref={docDialogInputRef}
             type="file"
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
+            accept=".pdf,.doc,.docx,.xlsx"
             className="hidden"
-            onChange={(e) => {
+            onChange={async (e) => {
               const file = e.target.files?.[0];
-              if (file) {
-                addDocument(file);
-                closeDocumentDialog();
-              }
               e.target.value = "";
+              if (!file) return;
+              const aid = selectedTaskForMedia?.activityDbId;
+              if (ganttProjectId == null || aid == null || !Number.isFinite(aid)) {
+                toast({
+                  title: "Cannot upload",
+                  description: "Missing project or activity context.",
+                  variant: "destructive",
+                });
+                return;
+              }
+              const title =
+                documentTitle.trim() ||
+                (file.name.includes(".") ? file.name.replace(/\.[^.]+$/, "") : file.name) ||
+                file.name;
+              try {
+                setDocumentUploading(true);
+                await createProjectDocument({
+                  project: ganttProjectId,
+                  activity: aid,
+                  file,
+                  title,
+                });
+                toast({ title: "Document uploaded", description: "The file was saved for this activity." });
+                await queryClient.invalidateQueries({ queryKey: ["project-documents", ganttProjectId] });
+                closeDocumentDialog();
+              } catch (err) {
+                toast({
+                  title: "Upload failed",
+                  description: err instanceof Error ? err.message : "Please try again.",
+                  variant: "destructive",
+                });
+              } finally {
+                setDocumentUploading(false);
+              }
             }}
           />
-          <div className="py-4">
-            <Button type="button" variant="outline" className="w-full gap-2" onClick={() => docDialogInputRef.current?.click()}>
-              <Upload className="h-4 w-4" /> Choose file
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Title</Label>
+              <Input
+                placeholder="e.g. Site handover checklist"
+                value={documentTitle}
+                onChange={(e) => setDocumentTitle(e.target.value)}
+                disabled={documentUploading}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2"
+              disabled={documentUploading}
+              onClick={() => docDialogInputRef.current?.click()}
+            >
+              <Upload className="h-4 w-4" /> {documentUploading ? "Uploading…" : "Choose file & upload"}
             </Button>
-            <p className="text-xs text-muted-foreground mt-2">PDF, Word, Excel or text files. Document will appear in the Photos & Docs tab.</p>
+            <p className="text-xs text-muted-foreground">
+              Allowed types: PDF, Word (.doc/.docx), Excel (.xlsx). The server saves the file against this activity.
+            </p>
           </div>
         </DialogContent>
       </Dialog>

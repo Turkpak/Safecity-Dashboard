@@ -545,6 +545,10 @@ export default function ProjectManagement() {
   };
 
   const validateStep3 = () => {
+    // Updating project details should not be blocked by optional financial sections.
+    // `openEditDialog` may auto-enable toggles from partial API data; users may skip step 3 fields.
+    if (editingProject) return true;
+
     const requireAll = (enabled: boolean, fields: Array<{ label: string; value: any }>) => {
   if (!enabled) return true;
   for (const f of fields) {

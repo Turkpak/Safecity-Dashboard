@@ -20,3 +20,4 @@ export * from "./finance";
 export * from "./user";
 export * from "./projectActivity";
 export * from "./delayLog";
+export * from "./projectDocument";
