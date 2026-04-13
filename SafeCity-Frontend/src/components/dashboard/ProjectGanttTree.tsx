@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   MoreVertical,
   Plus,
@@ -339,16 +339,31 @@ export function ProjectGanttTree({
     return stakeholders.find((s) => s.id === idNum) ?? null;
   }, [delayActionBy, stakeholders]);
 
-  // Frontend-only derived weight: share of overall schedule duration (rough, but gives the UI a meaningful number).
-  const overallMs = Math.max(1, dateRange.end.getTime() - dateRange.start.getTime());
   const todayT = useMemo(() => {
     const t = new Date();
     t.setHours(0, 0, 0, 0);
     return t.getTime();
   }, []);
 
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
   return (
-    <div className="overflow-x-auto">
+    <div
+      ref={scrollRef}
+      className="overflow-x-auto focus:outline-none focus:ring-2 focus:ring-primary/40 rounded-lg"
+      tabIndex={0}
+      role="region"
+      aria-label="Gantt chart timeline (use left/right arrow keys to scroll)"
+      onKeyDown={(e) => {
+        if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+        const el = scrollRef.current;
+        if (!el) return;
+        e.preventDefault();
+        const base = 120; // ~1 month column
+        const step = (e.shiftKey ? base * 4 : base) * (e.key === "ArrowRight" ? 1 : -1);
+        el.scrollBy({ left: step, behavior: "smooth" });
+      }}
+    >
       <div style={{ minWidth: Math.max(1200, tableMinWidthPx) }}>
         {/* Header */}
         <div className="flex border-b mb-3">
@@ -381,12 +396,6 @@ export function ProjectGanttTree({
             const leftPx = getTaskLeftPx(t.start);
             const widthPx = getTaskWidthPx(t.start, t.end);
             const actualWidthPx = widthPx * (clamp(t.progress ?? 0, 0, 100) / 100);
-            const s = parseDate(t.start);
-            const e = parseDate(t.end);
-            const w =
-              s && e
-                ? Math.max(0, Math.min(100, ((e.getTime() - s.getTime()) / overallMs) * 100))
-                : 0;
             const depthFont =
               t.depth === 0
                 ? "text-sm font-bold"
@@ -481,7 +490,7 @@ export function ProjectGanttTree({
                           cls = "text-amber-600 font-semibold";
                         }
 
-                        return <span className={cls}>{label}</span>;
+                        return <span className={cls}>• {label}</span>;
                       })()}
                     </div>
                   </div>
