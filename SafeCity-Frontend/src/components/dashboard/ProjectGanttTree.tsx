@@ -122,9 +122,43 @@ export function ProjectGanttTree({
   onProgressSaved?: () => void | Promise<void>;
   readOnly?: boolean;
 }) {
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const expandedStorageKey = useMemo(() => `safecity:ganttExpanded:${projectId ?? "unknown"}`, [projectId]);
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    try {
+      const raw = sessionStorage.getItem(`safecity:ganttExpanded:${projectId ?? "unknown"}`);
+      const ids = raw ? (JSON.parse(raw) as unknown) : null;
+      if (Array.isArray(ids)) return new Set(ids.map(String));
+    } catch {
+      // ignore
+    }
+    return new Set();
+  });
   const { toast } = useToast();
   const { user } = useAuth();
+
+  // Restore expanded state when project changes (tab switching can remount the component).
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(expandedStorageKey);
+      const ids = raw ? (JSON.parse(raw) as unknown) : null;
+      if (Array.isArray(ids)) {
+        setExpanded(new Set(ids.map(String)));
+        return;
+      }
+    } catch {
+      // ignore
+    }
+    setExpanded(new Set());
+  }, [expandedStorageKey]);
+
+  // Persist expanded state so switching tabs doesn't collapse WBS.
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(expandedStorageKey, JSON.stringify(Array.from(expanded)));
+    } catch {
+      // ignore
+    }
+  }, [expanded, expandedStorageKey]);
 
   const [progressOpen, setProgressOpen] = useState(false);
   const [activeRow, setActiveRow] = useState<FlatGanttRow | null>(null);
