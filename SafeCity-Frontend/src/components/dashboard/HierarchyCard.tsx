@@ -11,6 +11,9 @@ interface HierarchyCardProps {
 }
 
 export function HierarchyCard({ title, overallProgress, onClick, className, color }: HierarchyCardProps) {
+  const clampPct = (n: number) => Math.max(0, Math.min(100, n));
+  const progress = clampPct(Number.isFinite(overallProgress) ? overallProgress : 0);
+  const progressLabel = progress.toFixed(2);
   const status = overallProgress === 100 
     ? "Completed" 
     : overallProgress >= 80 
@@ -142,7 +145,7 @@ export function HierarchyCard({ title, overallProgress, onClick, className, colo
           <div className="space-y-2">
             <div className="flex items-baseline justify-between">
               <span className={cn("text-2xl font-bold font-heading tabular-nums", colors.text)}>
-                {overallProgress}
+                {progressLabel}
                 <span className="text-base ml-1">%</span>
               </span>
               <ArrowRight className={cn("h-4 w-4 text-muted-foreground group-hover:translate-x-1 transition-all", colors.text)} />
@@ -155,7 +158,7 @@ export function HierarchyCard({ title, overallProgress, onClick, className, colo
                   "h-full transition-all duration-1000 ease-out rounded-full shadow-lg relative overflow-hidden",
                   colors.progress
                 )}
-                style={{ width: `${overallProgress}%` }}
+                style={{ width: `${progress}%` }}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
               </div>
