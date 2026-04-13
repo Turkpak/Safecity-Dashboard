@@ -1482,7 +1482,6 @@ function GanttMini({
                     <div className="min-w-0 flex-1">
                       <div className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold text-foreground truncate`}>{t.name}</div>
                       <div className={`${isMobile ? 'text-[9px]' : 'text-[10px]'} text-muted-foreground`}>
-                        Weight {(t.weight * 100).toFixed(0)}% •{" "}
                         <span
                           className={
                             t.status === "ahead"
@@ -1744,9 +1743,7 @@ function GanttMini({
                           {/* Left label column */}
                           <div className="p-1.5 border-r-2 border-border min-w-0 relative z-10 bg-muted/10">
                             <div className={`${isMobile ? 'text-[11px]' : 'text-xs'} font-medium text-foreground/90 truncate`}>{c.name}</div>
-                            <div className={`${isMobile ? 'text-[8px]' : 'text-[9px]'} text-muted-foreground`}>
-                              Weight {(c.weight * 100).toFixed(0)}%
-                            </div>
+                            <div className={`${isMobile ? 'text-[8px]' : 'text-[9px]'} text-muted-foreground`} />
                           </div>
 
                           {/* Timeline container - month columns only */}
@@ -2375,7 +2372,7 @@ export function MilestoneDetailsPanel({
                           <div key={s.id} className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'} rounded-lg border border-border/50 ${isMobile ? 'p-2' : 'p-3'} bg-card/50`}>
                             <div className="min-w-0 flex-1">
                               <div className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold truncate`}>{s.name}</div>
-                              <div className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-muted-foreground`}>Weight {(s.weight * 100).toFixed(0)}%</div>
+                              <div className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-muted-foreground`} />
                             </div>
                             <div className={`${isMobile ? 'text-left' : 'text-right'}`}>
                               <div className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-muted-foreground`}>Actual / Planned</div>
@@ -2517,7 +2514,7 @@ export function MilestoneDetailsPanel({
                         <div key={s.id} className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'} rounded-lg border border-border/50 ${isMobile ? 'p-2' : 'p-3'} bg-card/50`}>
                           <div className="min-w-0 flex-1">
                             <div className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold truncate`}>{s.name}</div>
-                            <div className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-muted-foreground`}>Weight {(s.weight * 100).toFixed(0)}%</div>
+                            <div className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-muted-foreground`} />
                           </div>
                           <div className={`${isMobile ? 'text-left' : 'text-right'}`}>
                             <div className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-muted-foreground`}>Actual / Planned</div>

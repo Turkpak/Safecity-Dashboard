@@ -457,7 +457,6 @@ export function ProjectGanttTree({
                       </div>
                     </div>
                     <div className="text-[10px] text-muted-foreground">
-                      Weight {w.toFixed(0)}%{" "}
                       {(() => {
                         const prog = typeof t.progress === "number" && Number.isFinite(t.progress) ? t.progress : 0;
                         const completed = prog >= 100 || !!t.actual_end;
@@ -482,7 +481,7 @@ export function ProjectGanttTree({
                           cls = "text-amber-600 font-semibold";
                         }
 
-                        return <span className={cls}>• {label}</span>;
+                        return <span className={cls}>{label}</span>;
                       })()}
                     </div>
                   </div>
