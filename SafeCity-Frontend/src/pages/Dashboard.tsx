@@ -19,7 +19,13 @@ import {
 import { useWindowSize } from "@/hooks/use-window-size";
 import { CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
-import { getProjectGanttData, listDivisions, listDistricts, listTehsils } from "@/api";
+import {
+  getProjectGanttAll,
+  getProjectGanttData,
+  listDivisions,
+  listDistricts,
+  listTehsils,
+} from "@/api";
 import type { Division, District, Tehsil, Project } from "@/api/types";
 import {
   ClipboardCheck,
@@ -417,8 +423,9 @@ function buildPhaseFromProjectGantt(
 
 // Helper function to get progress value (backward compatible)
 const getProgressValue = (progress: number | PhaseProgress): number => {
-  // Backend progress logic not implemented yet — show 0% everywhere.
-  return 0;
+  const clampPct = (n: number) => Math.max(0, Math.min(100, n));
+  if (typeof progress === "number") return clampPct(Number(progress) || 0);
+  return clampPct(Number(progress.actual) || 0);
 };
 
 // Helper function to check if progress has detailed data
@@ -565,8 +572,22 @@ const convertToPhaseProgress = (
 
 /** Calculate overall financial progress % from a list of projects */
 const calcOverallProgress = (projects: Project[]): number => {
-  // Backend progress logic not implemented yet — show 0% everywhere.
-  return 0;
+  const num = (v: unknown): number => {
+    if (v === null || v === undefined) return 0;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const clampPct = (n: number) => Math.max(0, Math.min(100, n));
+
+  const allocated = projects.reduce(
+    (acc, p) => acc + num((p as any)?.total_budget_allocated),
+    0,
+  );
+  const utilized = projects.reduce(
+    (acc, p) => acc + num((p as any)?.budget_utilized),
+    0,
+  );
+  return allocated > 0 ? clampPct((utilized / allocated) * 100) : 0;
 };
 
 /** Build CityInstallationData from an overall financial progress number (API-only; no synthetic phase or timeline data). */
@@ -700,6 +721,57 @@ export default function Dashboard() {
     queryKey: ["projects"],
     queryFn: () => listProjects(),
   });
+
+  // Fetch all gantt schedules once and use root task progress for each project card.
+  const { data: apiProjectGanttAll = [] } = useQuery({
+    queryKey: ["project-gantt-all"],
+    queryFn: () => getProjectGanttAll(),
+  });
+
+  const ganttProgressByProjectId = useMemo(() => {
+    const findNodeById = (
+      nodes: any[],
+      targetId: string,
+    ): { progress?: number } | null => {
+      for (const n of nodes) {
+        if (String(n?._id ?? n?.id ?? "") === targetId) return n;
+        const children: any[] = Array.isArray(n?.subtasks) ? n.subtasks : [];
+        const hit = children.length ? findNodeById(children, targetId) : null;
+        if (hit) return hit;
+      }
+      return null;
+    };
+
+    const clampPct = (n: number) => Math.max(0, Math.min(100, n));
+    const toPct = (v: unknown): number => {
+      const n = Number(v);
+      return Number.isFinite(n) ? clampPct(n) : 0;
+    };
+
+    const map = new Map<number, number>();
+    for (const s of apiProjectGanttAll as any[]) {
+      const pid = Number(s?._id);
+      if (!Number.isFinite(pid)) continue;
+      const tasks: any[] = Array.isArray(s?.tasks) ? s.tasks : [];
+      const root = findNodeById(tasks, "1") ?? tasks[0] ?? null;
+      map.set(pid, toPct(root?.progress));
+    }
+    return map;
+  }, [apiProjectGanttAll]);
+
+  // All Projects overall % (average of root task `_id:"1"` progress across projects)
+  const allProjectsOverallFromGantt = useMemo(() => {
+    if (apiProjects.length === 0) return 0;
+    let sum = 0;
+    let count = 0;
+    for (const p of apiProjects) {
+      const v = ganttProgressByProjectId.get(p.id);
+      if (v === undefined) continue;
+      sum += v;
+      count++;
+    }
+    return count > 0 ? sum / count : 0;
+  }, [apiProjects, ganttProgressByProjectId]);
 
   const toSlug = (value: string) =>
     value
@@ -1028,8 +1100,40 @@ export default function Dashboard() {
 
   // Helper: calculate overall financial progress from a set of projects
   const calcProjectsOverall = (projects: Project[]): number => {
-    // Backend progress logic not implemented yet — show 0% everywhere.
-    return 0;
+    const clampPct = (n: number) => Math.max(0, Math.min(100, n));
+    const num = (v: unknown): number => {
+      if (v === null || v === undefined) return 0;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+    const getActivityProgress = (a: any): number =>
+      clampPct(num(a?.progress ?? a?.percent_complete ?? 0));
+
+    // Prefer physical progress if activities exist; otherwise fall back to financial utilization.
+    let physicalSum = 0;
+    let physicalCount = 0;
+    for (const p of projects) {
+      const acts: any[] = Array.isArray((p as any)?.activities)
+        ? (p as any).activities
+        : [];
+      if (acts.length === 0) continue;
+      const projAvg =
+        acts.reduce((acc, a) => acc + getActivityProgress(a), 0) /
+        Math.max(1, acts.length);
+      physicalSum += projAvg;
+      physicalCount++;
+    }
+    if (physicalCount > 0) return clampPct(physicalSum / physicalCount);
+
+    const allocated = projects.reduce(
+      (acc, p) => acc + num((p as any)?.total_budget_allocated),
+      0,
+    );
+    const utilized = projects.reduce(
+      (acc, p) => acc + num((p as any)?.budget_utilized),
+      0,
+    );
+    return allocated > 0 ? clampPct((utilized / allocated) * 100) : 0;
   };
 
   // Calculate aggregated data from a list of projects
@@ -1100,8 +1204,19 @@ export default function Dashboard() {
   // Context theme: follow the currently visible/selected area overall %
   const contextOverall = useMemo(() => {
     if (selectedItemName && singleItemData) return singleItemData.overall ?? 0;
+    if (viewType === "projects" && !selectedItemName && !selectedItemType)
+      return allProjectsOverallFromGantt;
+    if (viewType === "tehsils" && !selectedItemName && !selectedItemType)
+      return allProjectsOverallFromGantt;
     return aggregatedData?.overall ?? 0;
-  }, [selectedItemName, singleItemData, aggregatedData]);
+  }, [
+    selectedItemName,
+    singleItemData,
+    aggregatedData,
+    viewType,
+    selectedItemType,
+    allProjectsOverallFromGantt,
+  ]);
 
   const contextTheme = useMemo(() => {
     const meta = getProgressRangeMeta(contextOverall);
@@ -1496,15 +1611,9 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
             {useProjectCards
               ? projectsInGeography!.map((project, index) => {
-                  const total = parseFloat(
-                    project.total_budget_allocated || "0",
-                  ) || 0;
-                  const utilized =
-                    parseFloat(project.budget_utilized || "0") || 0;
-                  const rawPct =
-                    total > 0 ? Math.round((utilized / total) * 100) : 0;
-                  // Backend progress logic not implemented yet — show 0% everywhere.
-                  const percentage = 0;
+                  const percentage = Math.round(
+                    ganttProgressByProjectId.get(project.id) ?? 0,
+                  );
                   const displayName =
                     project.project_name || `Project ${project.id}`;
                   return (
@@ -1537,8 +1646,10 @@ export default function Dashboard() {
                 })
               : installationPhases.map((phase) => {
                   const progress = data[phase.key];
-                  const progressValue = 0;
-                  const hasDetails = false;
+                  const hasDetails = hasDetailedProgress(progress);
+                  const progressValue = hasDetails
+                    ? Math.round(progress.actual)
+                    : Math.round(getProgressValue(progress));
 
                   return (
                     <InstallationCard
@@ -1547,8 +1658,8 @@ export default function Dashboard() {
                       percentage={progressValue}
                       icon={phase.icon}
                       color={phase.color as unknown as "green"}
-                      actualProgress={undefined}
-                      plannedProgress={undefined}
+                      actualProgress={hasDetails ? progress.actual : undefined}
+                      plannedProgress={hasDetails ? progress.planned : undefined}
                       selected={selectedMilestoneKey === phase.key}
                       onClick={() => {
                         setSelectedMilestoneKey((prev) =>
@@ -2300,8 +2411,22 @@ export default function Dashboard() {
                   const overall =
                     selectedItemName && singleItemData
                       ? singleItemData.overall
-                      : aggregatedData?.overall || 0;
+                      : viewType === "projects" &&
+                          !selectedItemName &&
+                          !selectedItemType
+                        ? allProjectsOverallFromGantt
+                        : viewType === "tehsils" &&
+                            !selectedItemName &&
+                            !selectedItemType
+                          ? allProjectsOverallFromGantt
+                        : aggregatedData?.overall || 0;
                   const meta = getProgressRangeMeta(overall);
+                  const overallLabel =
+                    viewType === "projects" && !selectedItemName && !selectedItemType
+                      ? `${overall.toFixed(2)}`
+                      : viewType === "tehsils" && !selectedItemName && !selectedItemType
+                        ? `${overall.toFixed(2)}`
+                      : `${Math.round(overall)}`;
 
                   // Map color to Tailwind classes
                   const getBadgeClasses = (color: string) => {
@@ -2338,7 +2463,7 @@ export default function Dashboard() {
                       <div className="flex items-center gap-3">
                         <Badge className={getBadgeClasses(meta.color)}>
                           <TrendingUp className={getIconClasses(meta.color)} />
-                          Overall: {overall}%
+                          Overall: {overallLabel}%
                         </Badge>
                       </div>
                       {/* Legend for progress ranges */}
@@ -2806,19 +2931,9 @@ export default function Dashboard() {
                     {tehsilProjects.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {tehsilProjects.map((project, index) => {
-                          const budget = parseFloat(
-                            project.total_budget_allocated ?? "0",
+                          const progress = Math.round(
+                            ganttProgressByProjectId.get(project.id) ?? 0,
                           );
-                          const utilized = parseFloat(
-                            project.budget_utilized ?? "0",
-                          );
-                          const progress =
-                            budget > 0
-                              ? Math.min(
-                                  100,
-                                  Math.round((utilized / budget) * 100),
-                                )
-                              : 0;
                           return (
                             <HierarchyCard
                               key={project.id}
@@ -3345,9 +3460,9 @@ export default function Dashboard() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {apiProjects.map((project, index) => {
-                  const budget = parseFloat(project.total_budget_allocated ?? "0");
-                  const utilized = parseFloat(project.budget_utilized ?? "0");
-                  const progress = budget > 0 ? Math.min(100, Math.round((utilized / budget) * 100)) : 0;
+                  const progress = Math.round(
+                    ganttProgressByProjectId.get(project.id) ?? 0,
+                  );
                   return (
                     <HierarchyCard
                       key={project.id}
