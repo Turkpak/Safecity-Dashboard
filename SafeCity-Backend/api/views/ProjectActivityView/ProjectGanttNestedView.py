@@ -1,7 +1,8 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from api.models import Project, ProjectActivity, ActivityDelayLog, ProgressImage
+from api.models import Project, ProjectActivity, ActivityDelayLog, ProgressImage, ProjectDocument
+from datetime import datetime
 
 def get_activity_images(activity):
     images = ProgressImage.objects.filter(activity=activity)
@@ -20,6 +21,23 @@ def get_activity_images(activity):
     return {
         "has_images": bool(image_list),
         "images": image_list
+    }
+
+# ---------- helper to get project documents ----------
+def get_activity_documents(activity):
+    documents = ProjectDocument.objects.filter(activity=activity)
+    doc_list = [
+        {
+            "id": doc.id,
+            "title": doc.title,
+            "file": doc.file.url if doc.file else None,
+            "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+        }
+        for doc in documents
+    ]
+    return {
+        "has_documents": bool(doc_list),
+        "documents": doc_list
     }
 
 # ---------- helper to get delay info ----------
@@ -132,9 +150,36 @@ class ProjectGanttNestedView(APIView):
                 # -----------------------------
                 # ✅ DURATION 
                 # -----------------------------
-                duration = act.duration or 0
+                if subtasks:
+                    start_dates = [t["start_date"] for t in subtasks if t["start_date"]]
+                    end_dates = [t["end_date"] for t in subtasks if t["end_date"]]
+
+                    if start_dates and end_dates:
+                        start = min(start_dates)
+                        end = max(end_dates)
+
+                        start_dt = datetime.fromisoformat(start)
+                        end_dt = datetime.fromisoformat(end)
+
+                        duration = (end_dt - start_dt).days + 1
+                    else:
+                        duration = 0
+                else:
+                    duration = act.duration or 0
+
+
+                if subtasks:
+                    start_dates = [t["start_date"] for t in subtasks if t["start_date"]]
+                    end_dates = [t["end_date"] for t in subtasks if t["end_date"]]
+
+                    start_date = min(start_dates) if start_dates else None
+                    end_date = max(end_dates) if end_dates else None
+                else:
+                    start_date = act.start_date.isoformat() if act.start_date else None
+                    end_date = act.end_date.isoformat() if act.end_date else None
 
                 activity_images = get_activity_images(act)
+                activity_docs = get_activity_documents(act)
                 # -----------------------------
                 # NODE
                 # -----------------------------
@@ -144,16 +189,22 @@ class ProjectGanttNestedView(APIView):
                     "activity_id": act.activity_id,
                     "name": act.activity_name,
                     "duration": duration,
-                    "duration_display": act.duration_display,
-                    "start_date": act.start_date.isoformat() if act.start_date else None,
-                    "end_date": act.end_date.isoformat() if act.end_date else None,
+                    "duration_display": f"{int(duration)} day" if duration == 1 else f"{int(duration)} days",
+                    "start_date": start_date,
+                    "end_date": end_date,
                     "progress": round(avg_progress, 2),
-                    "progress_status": act.progress_status,
+                    "progress_status": (
+                        "Not Started" if avg_progress <= 0
+                        else "Completed" if avg_progress >= 100
+                        else "In Progress"
+                    ),
                     "actual_start": act.actual_start.isoformat() if act.actual_start else None,
                     "actual_end": act.actual_end.isoformat() if act.actual_end else None,
                     "progress_date": act.progress_date.isoformat() if act.progress_date else None,
                     "has_images": activity_images["has_images"], 
-                    "images": activity_images["images"],                    
+                    "images": activity_images["images"],    
+                    "has_documents": activity_docs["has_documents"],
+                    "documents": activity_docs["documents"],                
                     "has_delay": has_delay_flag,
                     "delay_info": delay_info,
                     "subtasks": subtasks
@@ -191,7 +242,7 @@ class ProjectGanttNestedView(APIView):
             "start_date": start_date,
             "end_date": end_date,
             "duration": duration,
-            "duration_display": act.duration_display,
+            "duration_display": f"{int(duration)} day" if duration == 1 else f"{int(duration)} days",
             "schedulePercentageComplete": 0,
             "performancePercentageComplete": 0,
             "tasks": root_tasks

@@ -35,8 +35,6 @@ type FlatGanttRow = {
   duration?: number;
   /** Human friendly duration from nested gantt API (e.g. "60 days"). */
   duration_display?: string;
-  /** Status label from backend (e.g. "Not Started"). */
-  progress_status?: string | null;
   start: string | null;
   end: string | null;
   progress: number;
@@ -91,12 +89,6 @@ function parseISOToLocalMidnight(s: string | null): Date | null {
   if (!p) return null;
   // Local midnight (avoids timezone shifting that happens with new Date("YYYY-MM-DD"))
   return new Date(p.y, p.m - 1, p.d, 0, 0, 0, 0);
-}
-
-function formatISODateForCell(s: string | null | undefined): string {
-  const v = typeof s === "string" ? s.trim() : "";
-  // Keep the same "YYYY-MM-DD" format that backend provides / tooltip shows.
-  return v || "—";
 }
 
 function buildMonthsArray(rangeStart: Date, rangeEnd: Date) {
@@ -253,10 +245,8 @@ export function ProjectGanttTree({
   const tableMinWidthPx = useMemo(() => {
     const wbsCol = 320; // w-80
     const durationCol = 112; // w-28
-    const startDateCol = 128; // w-32
-    const endDateCol = 128; // w-32
     const optionsCol = readOnly ? 0 : 80; // w-20
-    return wbsCol + durationCol + startDateCol + endDateCol + timelineWidthPx + optionsCol;
+    return wbsCol + durationCol + timelineWidthPx + optionsCol;
   }, [timelineWidthPx, readOnly]);
 
   const monthScalePx = useMemo(() => {
@@ -332,12 +322,6 @@ export function ProjectGanttTree({
           </div>
           <div className="w-28 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2 text-center">
             Duration
-          </div>
-          <div className="w-32 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2 text-center">
-            Start_Date
-          </div>
-          <div className="w-32 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2 text-center">
-            End_Date
           </div>
           <div className="shrink-0">
             <div className="grid grid-flow-col auto-cols-[120px] text-xs text-center" style={{ width: timelineWidthPx }}>
@@ -438,9 +422,33 @@ export function ProjectGanttTree({
                       </div>
                     </div>
                     <div className="text-[10px] text-muted-foreground">
-                      <span className="text-muted-foreground font-semibold">
-                        • {String(t.progress_status ?? "—")}
-                      </span>
+                      Weight {w.toFixed(0)}%{" "}
+                      {(() => {
+                        const prog = typeof t.progress === "number" && Number.isFinite(t.progress) ? t.progress : 0;
+                        const completed = prog >= 100 || !!t.actual_end;
+                        const started = prog > 0 || !!t.actual_start;
+                        const startT = parseISOToLocalMidnight(t.start)?.getTime() ?? null;
+                        const endT = parseISOToLocalMidnight(t.end)?.getTime() ?? null;
+
+                        let label: "Pending" | "In Progress" | "Behind" | "Completed" = "Pending";
+                        let cls = "text-muted-foreground font-semibold";
+
+                        if (completed) {
+                          label = "Completed";
+                          cls = "text-emerald-600 font-semibold";
+                        } else if (endT != null && endT < todayT) {
+                          label = "Behind";
+                          cls = "text-red-600 font-semibold";
+                        } else if (started) {
+                          label = "In Progress";
+                          cls = "text-blue-600 font-semibold";
+                        } else if (startT != null && startT > todayT) {
+                          label = "Pending";
+                          cls = "text-amber-600 font-semibold";
+                        }
+
+                        return <span className={cls}>• {label}</span>;
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -450,20 +458,6 @@ export function ProjectGanttTree({
                   title={t.duration_display ?? (typeof t.duration === "number" ? `${t.duration}` : "—")}
                 >
                   {t.duration_display ?? (typeof t.duration === "number" ? t.duration : "—")}
-                </div>
-
-                <div
-                  className="w-32 border-r border-border/60 px-3 py-2 flex items-center justify-center text-xs tabular-nums text-muted-foreground"
-                  title={t.start ?? "—"}
-                >
-                  {formatISODateForCell(t.start)}
-                </div>
-
-                <div
-                  className="w-32 border-r border-border/60 px-3 py-2 flex items-center justify-center text-xs tabular-nums text-muted-foreground"
-                  title={t.end ?? "—"}
-                >
-                  {formatISODateForCell(t.end)}
                 </div>
 
                 <div className="shrink-0 bg-background/30" style={{ width: timelineWidthPx }}>
