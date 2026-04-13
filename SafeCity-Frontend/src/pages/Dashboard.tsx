@@ -1101,39 +1101,17 @@ export default function Dashboard() {
   // Helper: calculate overall financial progress from a set of projects
   const calcProjectsOverall = (projects: Project[]): number => {
     const clampPct = (n: number) => Math.max(0, Math.min(100, n));
-    const num = (v: unknown): number => {
-      if (v === null || v === undefined) return 0;
-      const n = Number(v);
-      return Number.isFinite(n) ? n : 0;
-    };
-    const getActivityProgress = (a: any): number =>
-      clampPct(num(a?.progress ?? a?.percent_complete ?? 0));
 
-    // Prefer physical progress if activities exist; otherwise fall back to financial utilization.
-    let physicalSum = 0;
-    let physicalCount = 0;
+    // Required source of truth: nested gantt root task `_id:"1"` progress per project.
+    let sum = 0;
+    let count = 0;
     for (const p of projects) {
-      const acts: any[] = Array.isArray((p as any)?.activities)
-        ? (p as any).activities
-        : [];
-      if (acts.length === 0) continue;
-      const projAvg =
-        acts.reduce((acc, a) => acc + getActivityProgress(a), 0) /
-        Math.max(1, acts.length);
-      physicalSum += projAvg;
-      physicalCount++;
+      const v = ganttProgressByProjectId.get(p.id);
+      if (v === undefined) continue;
+      sum += v;
+      count++;
     }
-    if (physicalCount > 0) return clampPct(physicalSum / physicalCount);
-
-    const allocated = projects.reduce(
-      (acc, p) => acc + num((p as any)?.total_budget_allocated),
-      0,
-    );
-    const utilized = projects.reduce(
-      (acc, p) => acc + num((p as any)?.budget_utilized),
-      0,
-    );
-    return allocated > 0 ? clampPct((utilized / allocated) * 100) : 0;
+    return count > 0 ? clampPct(sum / count) : 0;
   };
 
   // Calculate aggregated data from a list of projects
@@ -1201,6 +1179,32 @@ export default function Dashboard() {
       .slice(0, 6);
   }, [apiProjects]);
 
+  // Overall for All Punjab Divisions (average of division overalls)
+  const allDivisionsOverall = useMemo(() => {
+    if (apiDivisions.length === 0) return 0;
+    let sum = 0;
+    let count = 0;
+    for (const div of apiDivisions) {
+      const projects = apiProjects.filter((p) => p.division === div.id);
+      sum += calcProjectsOverall(projects);
+      count++;
+    }
+    return count > 0 ? sum / count : 0;
+  }, [apiDivisions, apiProjects]);
+
+  // Overall for All Punjab Districts (average of district overalls)
+  const allDistrictsOverall = useMemo(() => {
+    if (apiDistricts.length === 0) return 0;
+    let sum = 0;
+    let count = 0;
+    for (const dist of apiDistricts) {
+      const projects = apiProjects.filter((p) => p.district === dist.id);
+      sum += calcProjectsOverall(projects);
+      count++;
+    }
+    return count > 0 ? sum / count : 0;
+  }, [apiDistricts, apiProjects]);
+
   // Context theme: follow the currently visible/selected area overall %
   const contextOverall = useMemo(() => {
     if (selectedItemName && singleItemData) return singleItemData.overall ?? 0;
@@ -1208,6 +1212,10 @@ export default function Dashboard() {
       return allProjectsOverallFromGantt;
     if (viewType === "tehsils" && !selectedItemName && !selectedItemType)
       return allProjectsOverallFromGantt;
+    if (viewType === "divisions" && !selectedItemName && !selectedItemType)
+      return allDivisionsOverall;
+    if (viewType === "districts" && !selectedItemName && !selectedItemType)
+      return allDistrictsOverall;
     return aggregatedData?.overall ?? 0;
   }, [
     selectedItemName,
@@ -1216,6 +1224,8 @@ export default function Dashboard() {
     viewType,
     selectedItemType,
     allProjectsOverallFromGantt,
+    allDivisionsOverall,
+    allDistrictsOverall,
   ]);
 
   const contextTheme = useMemo(() => {
@@ -1265,6 +1275,7 @@ export default function Dashboard() {
       })
       .sort((a, b) => b.overall - a.overall);
   }, [apiDistricts, apiProjects]);
+
 
   // Tehsils data grouped by district name (API-driven)
   const tehsilsDataByDistrict = useMemo(() => {
@@ -2419,6 +2430,14 @@ export default function Dashboard() {
                             !selectedItemName &&
                             !selectedItemType
                           ? allProjectsOverallFromGantt
+                          : viewType === "divisions" &&
+                              !selectedItemName &&
+                              !selectedItemType
+                            ? allDivisionsOverall
+                          : viewType === "districts" &&
+                              !selectedItemName &&
+                              !selectedItemType
+                            ? allDistrictsOverall
                         : aggregatedData?.overall || 0;
                   const meta = getProgressRangeMeta(overall);
                   const overallLabel =
@@ -2426,6 +2445,10 @@ export default function Dashboard() {
                       ? `${overall.toFixed(2)}`
                       : viewType === "tehsils" && !selectedItemName && !selectedItemType
                         ? `${overall.toFixed(2)}`
+                        : viewType === "divisions" && !selectedItemName && !selectedItemType
+                          ? `${overall.toFixed(2)}`
+                        : viewType === "districts" && !selectedItemName && !selectedItemType
+                          ? `${overall.toFixed(2)}`
                       : `${Math.round(overall)}`;
 
                   // Map color to Tailwind classes
