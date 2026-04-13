@@ -2,6 +2,7 @@ import { request, requestRaw } from "./client";
 
 const CREATE = "create-project-document/";
 const LIST = "list-project-document/";
+const UPDATE = "update-project-document/";
 
 export type CreateProjectDocumentInput = {
   project: number;
@@ -59,4 +60,26 @@ export async function listProjectDocuments(params?: {
   const path = search ? `${LIST}?${search}` : LIST;
   const raw = await requestRaw<unknown>(path, { method: "GET" });
   return extractListPayload(raw);
+}
+
+export type UpdateProjectDocumentInput = {
+  project?: number;
+  activity?: number | null;
+  title?: string | null;
+  file?: File | null;
+};
+
+export async function updateProjectDocument(
+  id: number,
+  payload: UpdateProjectDocumentInput
+): Promise<unknown> {
+  const form = new FormData();
+  if (payload.project != null) form.append("project", String(payload.project));
+  if (payload.activity !== undefined) {
+    if (payload.activity == null) form.append("activity", "");
+    else form.append("activity", String(payload.activity));
+  }
+  if (payload.title !== undefined) form.append("title", payload.title ?? "");
+  if (payload.file != null) form.append("file", payload.file);
+  return requestRaw(`${UPDATE}${id}/`, { method: "PUT", formData: form });
 }

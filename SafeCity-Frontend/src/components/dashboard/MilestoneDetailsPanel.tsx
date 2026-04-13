@@ -25,7 +25,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ProjectGanttTree } from "@/components/dashboard/ProjectGanttTree";
 import { listDelayLogs, updateDelayLog } from "@/api/delayLog";
 import { listProgressImages, updateProgressImage } from "@/api/progressImage";
-import { createProjectDocument, listProjectDocuments } from "@/api/projectDocument";
+import { createProjectDocument, listProjectDocuments, updateProjectDocument } from "@/api/projectDocument";
 import { mediaUrl } from "@/api/config";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -2108,6 +2108,22 @@ export function MilestoneDetailsPanel({
     setUpdatingDelay(false);
   };
 
+  const [updateDocOpen, setUpdateDocOpen] = useState(false);
+  const [updatingDoc, setUpdatingDoc] = useState(false);
+  const [updateDocForm, setUpdateDocForm] = useState<{
+    id: number;
+    project: number;
+    activity: number | null;
+    title: string;
+    currentUrl: string;
+    newFile: File | null;
+  } | null>(null);
+  const closeUpdateDocDialog = () => {
+    setUpdateDocForm(null);
+    setUpdateDocOpen(false);
+    setUpdatingDoc(false);
+  };
+
   // State for editing delay log from table
   const [editingLogFromTable, setEditingLogFromTable] = useState<DelayLog | undefined>(undefined);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -2689,6 +2705,25 @@ export function MilestoneDetailsPanel({
                                   </a>
                                 </Button>
                               ) : null}
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-8"
+                                onClick={() => {
+                                  setUpdateDocForm({
+                                    id: item.id,
+                                    project: item.project,
+                                    activity: item.activity ?? null,
+                                    title: item.title ?? "",
+                                    currentUrl: href,
+                                    newFile: null,
+                                  });
+                                  setUpdateDocOpen(true);
+                                }}
+                              >
+                                Update
+                              </Button>
                             </div>
                           </div>
                         );
@@ -3323,6 +3358,165 @@ export function MilestoneDetailsPanel({
                   }}
                 >
                   {updatingDelay ? "Updating..." : "Update"}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Update Project Document dialog (from Documents list) */}
+      <Dialog open={updateDocOpen} onOpenChange={(open) => { if (!open) closeUpdateDocDialog(); }}>
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-xl font-bold">Update Document</DialogTitle>
+            <DialogDescription className="text-sm">
+              Update the document title or replace the file.
+            </DialogDescription>
+          </DialogHeader>
+
+          {updateDocForm ? (
+            <div className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label>Project</Label>
+                  <Input value={String(updateDocForm.project)} readOnly />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Activity</Label>
+                  <Input value={updateDocForm.activity != null ? String(updateDocForm.activity) : "—"} readOnly />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Title</Label>
+                  <Input
+                    value={updateDocForm.title}
+                    onChange={(e) => setUpdateDocForm((p) => (p ? { ...p, title: e.target.value } : p))}
+                    placeholder="e.g. Site Book"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border/60 p-4 bg-background/40 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold">File</div>
+                  {updateDocForm.currentUrl ? (
+                    <Button type="button" size="sm" variant="outline" className="h-8" asChild>
+                      <a href={updateDocForm.currentUrl} target="_blank" rel="noreferrer">
+                        <Download className="h-3.5 w-3.5 mr-1" /> Open current
+                      </a>
+                    </Button>
+                  ) : null}
+                </div>
+                <div className="space-y-2">
+                  <div className="text-xs text-muted-foreground">
+                    {(() => {
+                      const u = updateDocForm.currentUrl || "";
+                      const name = u ? u.split("/").pop() : "";
+                      const label = name ? decodeURIComponent(name) : "—";
+                      return (
+                        <span className="inline-flex items-center gap-2 min-w-0">
+                          <span className="shrink-0">Current:</span>
+                          <span className="font-medium text-foreground truncate max-w-[520px]" title={label}>
+                            {label}
+                          </span>
+                        </span>
+                      );
+                    })()}
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    {updateDocForm.newFile ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        disabled={updatingDoc}
+                        onClick={() => setUpdateDocForm((p) => (p ? { ...p, newFile: null } : p))}
+                      >
+                        Remove selected
+                      </Button>
+                    ) : null}
+                  </div>
+
+                  <input
+                    id="update-project-document-file"
+                    type="file"
+                    accept=".pdf,.doc,.docx,.xlsx"
+                    className="hidden"
+                    disabled={updatingDoc}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null;
+                      setUpdateDocForm((p) => (p ? { ...p, newFile: file } : p));
+                      e.target.value = "";
+                    }}
+                  />
+
+                  <div
+                    className={`rounded-lg border border-dashed p-4 transition-colors ${
+                      updateDocForm.newFile
+                        ? "border-primary bg-primary/5"
+                        : "border-muted-foreground/25 hover:border-primary/60 bg-muted/10 cursor-pointer"
+                    }`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => document.getElementById("update-project-document-file")?.click()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        document.getElementById("update-project-document-file")?.click();
+                      }
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold">
+                          {updateDocForm.newFile ? "New file selected" : "Choose a new file (optional)"}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {updateDocForm.newFile ? updateDocForm.newFile.name : "PDF, DOC/DOCX, XLSX"}
+                        </div>
+                      </div>
+                      <Button type="button" variant="outline" size="sm" className="h-9 px-4" disabled={updatingDoc}>
+                        {updateDocForm.newFile ? "Change" : "Choose"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-muted-foreground">
+                    Allowed: PDF, DOC/DOCX, XLSX
+                  </p>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={closeUpdateDocDialog} disabled={updatingDoc}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  disabled={updatingDoc || !updateDocForm.title.trim()}
+                  onClick={async () => {
+                    if (!updateDocForm) return;
+                    try {
+                      setUpdatingDoc(true);
+                      await updateProjectDocument(updateDocForm.id, {
+                        title: updateDocForm.title.trim(),
+                        file: updateDocForm.newFile,
+                      });
+                      await queryClient.invalidateQueries({ queryKey: ["project-documents", ganttProjectId] });
+                      closeUpdateDocDialog();
+                    } catch (err) {
+                      toast({
+                        title: "Update failed",
+                        description: err instanceof Error ? err.message : "Please try again.",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setUpdatingDoc(false);
+                    }
+                  }}
+                >
+                  {updatingDoc ? "Updating..." : "Update"}
                 </Button>
               </DialogFooter>
             </div>
