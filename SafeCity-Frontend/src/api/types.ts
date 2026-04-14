@@ -11,6 +11,18 @@ export interface ApiEnvelope<T = unknown> {
 }
 
 // ---------------------------------------------------------------------------
+// Dashboard aggregates
+// ---------------------------------------------------------------------------
+
+export interface TopProject {
+  id: number;
+  project_name: string;
+  division_name?: string | null;
+  /** percent 0..100 (backend may return null while computing) */
+  progress: number | null;
+}
+
+// ---------------------------------------------------------------------------
 // Auth & User
 // ---------------------------------------------------------------------------
 

@@ -1,5 +1,11 @@
 import { get, post, put, del, request } from "./client";
-import type { Project, ProjectCreateInput, ProjectUpdateInput, ListProjectResponse } from "./types";
+import type {
+  Project,
+  ProjectCreateInput,
+  ProjectUpdateInput,
+  ListProjectResponse,
+  TopProject,
+} from "./types";
 import { boundaryFileToGeojson } from "@/utils/boundaryToGeojson";
 
 /** POST /api/create-project/ — multipart: stakeholder, project_name, ..., xer_file, boundary_file */
@@ -8,6 +14,7 @@ const CREATE = "create-project/";
 const LIST = "list-project/";
 const UPDATE = "update-project/";
 const DELETE_PATH = "delete-project/";
+const TOP_PROJECTS = "top-projects/";
 
 function normalizeProjectFeature(f: {
   id?: number;
@@ -46,6 +53,12 @@ export async function listProjects(): Promise<Project[]> {
     return data.map((f) => normalizeProjectFeature(f as { id?: number; properties?: Record<string, unknown> }));
   }
   return [];
+}
+
+/** GET /api/top-projects/ — returns list of top projects with progress % */
+export async function listTopProjects(): Promise<TopProject[]> {
+  const data = await get<TopProject[]>(TOP_PROJECTS);
+  return Array.isArray(data) ? data : [];
 }
 
 export async function getProjectById(id: number): Promise<Project | null> {

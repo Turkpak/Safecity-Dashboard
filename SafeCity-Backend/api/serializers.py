@@ -299,8 +299,9 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         project.stakeholder.set(stakeholders)
 
         if xer_file:
-            # project.xer_file = xer_file
-            project.xer_file = self._generate_xer_path(project, xer_file.name)
+            # Save uploaded file content to storage under a stable generated path.
+            path = self._generate_xer_path(project, xer_file.name)
+            project.xer_file.save(path, xer_file, save=False)
         # Handle GeoJSON
         if boundary_file:
             project.geom = self._parse_boundary_file(boundary_file)
@@ -329,7 +330,8 @@ class ProjectSerializer(GeoFeatureModelSerializer):
             instance.stakeholder.set(stakeholders)
 
         if xer_file:
-            instance.xer_file = self._generate_xer_path(instance, xer_file.name)
+            path = self._generate_xer_path(instance, xer_file.name)
+            instance.xer_file.save(path, xer_file, save=False)
             if not instance.activities.exists():
                 try:
                     self._save_activities(instance, xer_file)

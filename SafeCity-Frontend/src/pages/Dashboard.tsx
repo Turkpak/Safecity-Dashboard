@@ -26,7 +26,7 @@ import {
   listDistricts,
   listTehsils,
 } from "@/api";
-import type { Division, District, Tehsil, Project } from "@/api/types";
+import type { Division, District, Tehsil, Project, TopProject } from "@/api/types";
 import {
   ClipboardCheck,
   Building2,
@@ -72,7 +72,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { listProjects, getProjectById } from "@/api/project";
+import { listProjects, listTopProjects, getProjectById } from "@/api/project";
 import { useSidebar } from "@/contexts/SidebarContext";
 
 // Enhanced installation progress data with sub-projects and planned vs actual
@@ -722,6 +722,11 @@ export default function Dashboard() {
     queryFn: () => listProjects(),
   });
 
+  const { data: apiTopProjects = [] } = useQuery({
+    queryKey: ["top-projects"],
+    queryFn: () => listTopProjects(),
+  });
+
   // Fetch all gantt schedules once and use root task progress for each project card.
   const { data: apiProjectGanttAll = [] } = useQuery({
     queryKey: ["project-gantt-all"],
@@ -1226,20 +1231,18 @@ export default function Dashboard() {
     return getAggregatedDataFromProjects(apiProjects);
   }, [apiProjects]);
 
-  /** Top projects by budget utilization for root "All Punjab *" views (real API data, not duplicate phase placeholders). */
-  const topProjectsForAggregateViews = useMemo((): Project[] => {
-    if (apiProjects.length === 0) return [];
-    return [...apiProjects]
-      .map((p) => {
-        const total = parseFloat(p.total_budget_allocated || "0") || 0;
-        const utilized = parseFloat(p.budget_utilized || "0") || 0;
-        const ratio = total > 0 ? utilized / total : 0;
-        return { p, ratio };
-      })
-      .sort((a, b) => b.ratio - a.ratio)
-      .map((x) => x.p)
-      .slice(0, 6);
-  }, [apiProjects]);
+  /** Top projects for root "All Punjab *" views from backend: GET /api/top-projects/ */
+  const topProjectsForAggregateViews = useMemo((): TopProject[] => {
+    if (!Array.isArray(apiTopProjects) || apiTopProjects.length === 0) return [];
+    const toPct = (v: unknown): number => {
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0;
+    };
+    // Sort defensively (backend may already sort).
+    return [...apiTopProjects].sort(
+      (a, b) => toPct(b.progress) - toPct(a.progress),
+    );
+  }, [apiTopProjects]);
 
   // Overall for All Punjab Divisions (average of division overalls)
   const allDivisionsOverall = useMemo(() => {
@@ -1500,6 +1503,8 @@ export default function Dashboard() {
     "blue" | "green" | "orange" | "purple" | "red" | "yellow"
   > = ["blue", "green", "orange", "purple", "red", "yellow"];
 
+  type ProjectCardItem = Project | TopProject;
+
   // Only show this section on the main (no-filter) All Divisions view.
   const showBestPerformingSection =
     viewType === "divisions" && !selectedItemType && !selectedItemName;
@@ -1508,17 +1513,15 @@ export default function Dashboard() {
   const renderAggregatedCharts = (
     title: string,
     data: CityInstallationData,
-    projectsInGeography?: Project[],
+    projectsInGeography?: ProjectCardItem[],
     /** When false (division/district drill-down), project cards are display-only — no Gantt fetch. */
     projectCardsInteractive: boolean = true,
   ) => {
     const isAggregatedView = title.startsWith("All Punjab");
     const useProjectCards =
       Array.isArray(projectsInGeography) && projectsInGeography.length > 0;
-    const scopeProjects: Project[] =
-      Array.isArray(projectsInGeography) && projectsInGeography.length > 0
-        ? projectsInGeography
-        : apiProjects;
+    // Aggregations (financial/physical) should always use full project objects from listProjects().
+    const scopeProjects: Project[] = apiProjects;
 
     const clamp01 = (n: number) => Math.max(0, Math.min(100, n));
     const num = (v: unknown): number => {
@@ -1683,9 +1686,12 @@ export default function Dashboard() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
             {useProjectCards
-              ? projectsInGeography!.map((project, index) => {
+              ? (projectsInGeography as ProjectCardItem[]).map((project, index) => {
+                  const isTop = "progress" in project;
                   const percentage = Math.round(
-                    ganttProgressByProjectId.get(project.id) ?? 0,
+                    isTop
+                      ? Number(project.progress ?? 0) || 0
+                      : ganttProgressByProjectId.get(project.id) ?? 0,
                   );
                   const displayName =
                     project.project_name || `Project ${project.id}`;
@@ -1701,12 +1707,14 @@ export default function Dashboard() {
                       plannedProgress={undefined}
                       selected={
                         projectCardsInteractive &&
+                        !isTop &&
                         selectedProjectForDetails?.id === project.id
                       }
                       nonInteractive={!projectCardsInteractive}
                       onClick={
                         projectCardsInteractive
                           ? () => {
+                              if (isTop) return;
                               setSelectedMilestoneKey(null);
                               setSelectedProjectForDetails((prev) =>
                                 prev?.id === project.id ? null : project,
@@ -1871,9 +1879,14 @@ export default function Dashboard() {
                       />
                     </PieChart>
                   </ResponsiveContainer>
-                  {/* Center label - centered in chart area */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-xl sm:text-2xl font-bold font-heading tabular-nums text-foreground">
+                  {/* Center label - visually centered above the legend */}
+                  <div
+                    className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
+                    // Legend lives at the bottom; pad the overlay so the center label doesn't
+                    // get pushed into / touch the arc or legend area on smaller screens.
+                    style={{ paddingBottom: isMobile ? 42 : isTablet ? 46 : 50 }}
+                  >
+                    <span className="text-lg sm:text-2xl font-bold font-heading tabular-nums text-foreground">
                       {financialActual.toFixed(1)}%
                     </span>
                     <span className="text-[9px] sm:text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -1989,9 +2002,12 @@ export default function Dashboard() {
                       />
                     </PieChart>
                   </ResponsiveContainer>
-                  {/* Center label - centered in chart area */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-xl sm:text-2xl font-bold font-heading tabular-nums text-foreground">
+                  {/* Center label - visually centered above the legend */}
+                  <div
+                    className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
+                    style={{ paddingBottom: isMobile ? 42 : isTablet ? 46 : 50 }}
+                  >
+                    <span className="text-lg sm:text-2xl font-bold font-heading tabular-nums text-foreground">
                       {overallActualPct.toFixed(1)}%
                     </span>
                     <span className="text-[9px] sm:text-[10px] font-medium uppercase tracking-wider text-muted-foreground">

@@ -573,7 +573,31 @@ export default function ProjectManagement() {
 
   // Validate step 1
   const validateStep1 = () => {
-    // Frontend validation intentionally disabled (temporary).
+    const missing: string[] = [];
+    if (!projectName.trim()) missing.push("Project Name");
+    if (!projectDescription.trim()) missing.push("Project Description");
+    if (!startingDate.trim()) missing.push("Project Starting Date");
+    if (!referenceNumber.trim()) missing.push("Project Reference No");
+    if (stakeholderIds.length === 0) missing.push("Stakeholder(s)");
+
+    if (!selectedProvinceId) missing.push("Province");
+    if (!selectedDivisionId) missing.push("Division");
+    if (!selectedDistrictId) missing.push("District");
+    if (!selectedTehsilId) missing.push("Tehsil");
+
+    // XER is required for NEW projects; optional for updates if existing file remains.
+    const hasExistingXer = Boolean(editingProject?.xer_file);
+    if (!editingProject && !xerFile) missing.push("XER File");
+    if (editingProject && !xerFile && !hasExistingXer) missing.push("XER File");
+
+    if (missing.length > 0) {
+      toast({
+        title: "Validation Error",
+        description: `Please provide: ${missing.join(", ")}.`,
+        variant: "destructive",
+      });
+      return false;
+    }
     return true;
   };
 
@@ -1046,6 +1070,81 @@ export default function ProjectManagement() {
                             placeholder="Enter reference number"
                             value={referenceNumber}
                             onChange={(e) => setReferenceNumber(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      {/* XER File Upload */}
+                      <div className="space-y-2">
+                        <Label>XER File {editingProject ? "(optional)" : "*"}</Label>
+                        {editingProject && editingProject.xer_file && !xerFile && (
+                          <div className="rounded-lg border bg-muted/50 p-3 flex items-center gap-3 mb-2">
+                            <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">
+                                Current file: {editingProject.xer_file.split("/").pop() ?? editingProject.xer_file}
+                              </p>
+                              <a
+                                href={editingProject.xer_file.startsWith("http") ? editingProject.xer_file : `${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"}${editingProject.xer_file.startsWith("/") ? "" : "/"}${editingProject.xer_file}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-primary hover:underline"
+                              >
+                                Open / download
+                              </a>
+                            </div>
+                          </div>
+                        )}
+                        <div
+                          className={`relative border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center transition-all ${
+                            xerFile
+                              ? "border-primary bg-primary/5"
+                              : "border-muted-foreground/20 hover:border-primary/50 cursor-pointer"
+                          }`}
+                          onClick={() =>
+                            document
+                              .getElementById("xer-file-input-inline-page")
+                              ?.click()
+                          }
+                        >
+                          {xerFile ? (
+                            <div className="flex items-center gap-3 w-full">
+                              <FileText className="h-8 w-8 text-primary" />
+                              <div className="flex-1">
+                                <p className="font-medium">{xerFile.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {(xerFile.size / 1024).toFixed(2)} KB
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setXerFile(null);
+                                }}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <>
+                              <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                              <p className="text-sm font-medium">
+                                {editingProject
+                                  ? "Click to upload a new XER file (optional)"
+                                  : "Click to upload XER file"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">.xer format</p>
+                            </>
+                          )}
+                          <Input
+                            id="xer-file-input-inline-page"
+                            type="file"
+                            accept=".xer"
+                            onChange={handleXERFileChange}
+                            className="hidden"
                           />
                         </div>
                       </div>
@@ -2276,6 +2375,81 @@ export default function ProjectManagement() {
                   </div>
                 </div>
 
+                {/* XER File Upload */}
+                <div className="space-y-2">
+                  <Label>XER File {editingProject ? "(optional)" : "*"}</Label>
+                  {editingProject && editingProject.xer_file && !xerFile && (
+                    <div className="rounded-lg border bg-muted/50 p-3 flex items-center gap-3 mb-2">
+                      <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          Current file: {editingProject.xer_file.split("/").pop() ?? editingProject.xer_file}
+                        </p>
+                        <a
+                          href={editingProject.xer_file.startsWith("http") ? editingProject.xer_file : `${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"}${editingProject.xer_file.startsWith("/") ? "" : "/"}${editingProject.xer_file}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Open / download
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                  <div
+                    className={`relative border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center transition-all ${
+                      xerFile
+                        ? "border-primary bg-primary/5"
+                        : "border-muted-foreground/20 hover:border-primary/50 cursor-pointer"
+                    }`}
+                          onClick={() =>
+                            document
+                              .getElementById("xer-file-input-inline-modal")
+                              ?.click()
+                          }
+                  >
+                    {xerFile ? (
+                      <div className="flex items-center gap-3 w-full">
+                        <FileText className="h-8 w-8 text-primary" />
+                        <div className="flex-1">
+                          <p className="font-medium">{xerFile.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {(xerFile.size / 1024).toFixed(2)} KB
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setXerFile(null);
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                        <p className="text-sm font-medium">
+                          {editingProject
+                            ? "Click to upload a new XER file (optional)"
+                            : "Click to upload XER file"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">.xer format</p>
+                      </>
+                    )}
+                          <Input
+                            id="xer-file-input-inline-modal"
+                            type="file"
+                            accept=".xer"
+                            onChange={handleXERFileChange}
+                            className="hidden"
+                          />
+                  </div>
+                </div>
+
                 {/* Stakeholder (multi-select) */}
                 <div className="space-y-2">
                   <Label htmlFor="stakeholderIds">Stakeholder(s) *</Label>
@@ -2541,68 +2715,6 @@ export default function ProjectManagement() {
                       </Command>
                     </PopoverContent>
                   </Popover>
-                </div>
-
-                {/* XER File Upload */}
-                <div className="space-y-2">
-                  <Label>XER File *</Label>
-                  {editingProject && editingProject.xer_file && !xerFile && (
-                    <div className="rounded-lg border bg-muted/50 p-3 flex items-center gap-3 mb-2">
-                      <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          Current file: {editingProject.xer_file.split("/").pop() ?? editingProject.xer_file}
-                        </p>
-                        <a
-                          href={editingProject.xer_file.startsWith("http") ? editingProject.xer_file : `${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"}${editingProject.xer_file.startsWith("/") ? "" : "/"}${editingProject.xer_file}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-primary hover:underline"
-                        >
-                          Open / download
-                        </a>
-                      </div>
-                    </div>
-                  )}
-                  <div
-                    className={`relative border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center transition-all ${
-                      xerFile
-                        ? "border-primary bg-primary/5"
-                        : "border-muted-foreground/20 hover:border-primary/50 cursor-pointer"
-                    }`}
-                    onClick={() => !xerFile && setShowXERDialog(true)}
-                  >
-                    {xerFile ? (
-                      <div className="flex items-center gap-3 w-full">
-                        <FileText className="h-8 w-8 text-primary" />
-                        <div className="flex-1">
-                          <p className="font-medium">{xerFile.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {(xerFile.size / 1024).toFixed(2)} KB
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setXerFile(null);
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <>
-                        <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                        <p className="text-sm font-medium">
-                          {editingProject ? "Click to upload a new XER file (optional)" : "Click to upload XER file"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">.xer format</p>
-                      </>
-                    )}
-                  </div>
                 </div>
               </div>
             )}
