@@ -1,10 +1,8 @@
-import { Bell, Sun, Moon, Menu } from "lucide-react";
+import { Bell, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useTheme } from "@/hooks/use-theme.ts";
 import { useSidebar } from "@/contexts/SidebarContext";
 
 export function Header({ title }: { title: string }) {
-  const { theme, toggleTheme } = useTheme();
   const { setMobileSidebarOpen } = useSidebar();
 
   return (
@@ -30,19 +28,6 @@ export function Header({ title }: { title: string }) {
         </h1>
 
         <div className="col-start-3 justify-self-end hidden md:flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleTheme}
-            className="relative"
-          >
-            {theme === "dark" ? (
-              <Sun className="h-5 w-5" />
-            ) : (
-              <Moon className="h-5 w-5" />
-            )}
-          </Button>
-
           <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-5 w-5" />
             <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive animate-pulse" />

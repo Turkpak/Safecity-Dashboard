@@ -42,6 +42,7 @@ import {
   Search,
   DollarSign,
   FolderKanban,
+  Info,
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -59,7 +60,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { useTheme } from "@/hooks/use-theme";
 import { CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
@@ -670,6 +670,7 @@ export default function Dashboard() {
   const [allTehsilGroupsExpanded, setAllTehsilGroupsExpanded] = useState(false);
   const [isFilterBarExpanded, setIsFilterBarExpanded] = useState(true);
   const [showFilters, setShowFilters] = useState(true);
+  const [progressLegendOpen, setProgressLegendOpen] = useState(false);
   const [selectedMilestoneKey, setSelectedMilestoneKey] =
     useState<PhaseKey | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -687,7 +688,6 @@ export default function Dashboard() {
     [selectedProjectGanttTasks, selectedItemType, selectedItemName],
   );
 
-  const { theme, toggleTheme } = useTheme();
   const { width } = useWindowSize();
   const isMobile = width < 640;
   const isTablet = width >= 640 && width < 1024;
@@ -2550,32 +2550,67 @@ export default function Dashboard() {
 
                   return (
                     <div className="flex flex-col gap-3">
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Badge className={getBadgeClasses(meta.color)}>
                           <TrendingUp className={getIconClasses(meta.color)} />
                           Overall: {overallLabel}%
                         </Badge>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 border-0 bg-transparent p-0 shadow-none ring-offset-background hover:bg-muted/40 focus-visible:ring-1 focus-visible:ring-ring"
+                          aria-expanded={progressLegendOpen}
+                          aria-controls="dashboard-progress-color-legend"
+                          aria-label={
+                            progressLegendOpen
+                              ? "Hide progress color guide"
+                              : "Show progress color guide"
+                          }
+                          onClick={() =>
+                            setProgressLegendOpen((open) => !open)
+                          }
+                        >
+                          <Info
+                            className="h-4 w-4"
+                            style={{ color: meta.color }}
+                            aria-hidden
+                          />
+                        </Button>
                       </div>
-                      {/* Legend for progress ranges */}
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        {[
-                          { label: "0–25% Low", color: "#ef4444" },
-                          { label: "25–50% Moderate", color: "#f59e0b" },
-                          { label: "50–75% Good", color: "#3b82f6" },
-                          { label: "75–100% High", color: "#22c55e" },
-                        ].map((it) => (
-                          <div
-                            key={it.label}
-                            className="flex items-center gap-2"
+                      <AnimatePresence initial={false}>
+                        {progressLegendOpen ? (
+                          <motion.div
+                            id="dashboard-progress-color-legend"
+                            key="legend"
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden"
                           >
-                            <span
-                              className="inline-block h-2.5 w-2.5 rounded-sm"
-                              style={{ backgroundColor: it.color }}
-                            />
-                            <span>{it.label}</span>
-                          </div>
-                        ))}
-                      </div>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
+                              {[
+                                { label: "0–25% Low", color: "#ef4444" },
+                                { label: "25–50% Moderate", color: "#f59e0b" },
+                                { label: "50–75% Good", color: "#3b82f6" },
+                                { label: "75–100% High", color: "#22c55e" },
+                              ].map((it) => (
+                                <div
+                                  key={it.label}
+                                  className="flex items-center gap-2"
+                                >
+                                  <span
+                                    className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                                    style={{ backgroundColor: it.color }}
+                                  />
+                                  <span>{it.label}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </motion.div>
+                        ) : null}
+                      </AnimatePresence>
                     </div>
                   );
                 })()
