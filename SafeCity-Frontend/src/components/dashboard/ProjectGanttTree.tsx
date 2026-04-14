@@ -278,7 +278,7 @@ export function ProjectGanttTree({
   const MONTH_COL_PX = 120;
   const timelineWidthPx = useMemo(() => Math.max(1, monthsArray.length) * MONTH_COL_PX, [monthsArray.length]);
   const tableMinWidthPx = useMemo(() => {
-    const wbsCol = 320; // w-80
+    const wbsCol = 520; // wide enough to show full project names
     const durationCol = 112; // w-28
     const startCol = 144; // w-36
     const endCol = 144; // w-36
@@ -369,7 +369,7 @@ export function ProjectGanttTree({
       <div style={{ minWidth: Math.max(1200, tableMinWidthPx) }}>
         {/* Header */}
         <div className="flex border-b mb-3">
-          <div className="w-80 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2">
+          <div className="w-[520px] font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2">
             WBS Subprocess
           </div>
           <div className="w-28 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2 text-center">
@@ -430,7 +430,7 @@ export function ProjectGanttTree({
             return (
               <div key={t.id} className="flex items-stretch gap-0 rounded-lg border border-border/60 bg-card/50">
                 <div
-                  className="w-80 min-w-[20rem] border-r border-border/60 px-3 py-2 truncate flex items-center gap-2"
+                  className="w-[520px] min-w-[520px] border-r border-border/60 px-3 py-2 flex items-start gap-2"
                   style={{ paddingLeft: `${12 + t.depth * 18}px` }}
                   title={t.label}
                 >
@@ -461,7 +461,7 @@ export function ProjectGanttTree({
                   <div className="min-w-0 flex-1">
                     <div className={depthFont}>
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="truncate block">{t.label}</span>
+                        <span className="whitespace-normal break-words leading-snug">{t.label}</span>
                         {t.has_delay ? (
                           <span
                             className="inline-flex items-center gap-0.5 shrink-0 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-200"
@@ -526,7 +526,7 @@ export function ProjectGanttTree({
                 </div>
 
                 <div className="shrink-0 bg-background/30" style={{ width: timelineWidthPx }}>
-                  <div className="relative h-12 overflow-visible">
+                  <div className="relative min-h-12 overflow-visible">
                     {/* Planned bar (top row) */}
                     <div
                       className="absolute h-4 rounded-md top-2 bg-emerald-600"
