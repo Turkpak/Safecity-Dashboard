@@ -49,20 +49,38 @@ function isSuperAdminRole(role: string | undefined): boolean {
   return r === "super_admin" || r === "super admin";
 }
 
+type PermissionRow = {
+  sidebar_label: string;
+  sub_label: string | null;
+  displayLabel: string;
+  /** Visual indent to mimic sidebar tree structure */
+  indent?: number; // 0..n
+  /** Tree grouping */
+  kind?: "group" | "item";
+  groupId?: "area" | "projects";
+};
+
 /** Rows for Step 2 (Add New User): match backend sidebar_label + sub_label. Used with POST /api/user-permissions/ */
-const ADD_USER_PERMISSION_ROWS: { sidebar_label: string; sub_label: string | null; displayLabel: string }[] = [
-  { sidebar_label: "Area Management", sub_label: "Province", displayLabel: "Area Management (Province)" },
-  { sidebar_label: "Area Management", sub_label: "Division", displayLabel: "Area Management (Division)" },
-  { sidebar_label: "Area Management", sub_label: "District", displayLabel: "Area Management (District)" },
-  { sidebar_label: "Area Management", sub_label: "Tehsil", displayLabel: "Area Management (Tehsil)" },
+const ADD_USER_PERMISSION_ROWS: PermissionRow[] = [
+  { sidebar_label: "Citywise Progress", sub_label: null, displayLabel: "Dashboard" },
   { sidebar_label: "Stakeholders", sub_label: null, displayLabel: "Stakeholders" },
-  { sidebar_label: "Project Management", sub_label: null, displayLabel: "Project Management" },
-  { sidebar_label: "Citywise Progress", sub_label: null, displayLabel: "Citywise Progress" },
-  { sidebar_label: "City Comparison", sub_label: null, displayLabel: "City Comparison" },
+
+  // Area Management (tree)
+  { sidebar_label: "Area Management", sub_label: null, displayLabel: "Area Management", kind: "group", groupId: "area" },
+  { sidebar_label: "Area Management", sub_label: "Province", displayLabel: "Province", indent: 1, kind: "item", groupId: "area" },
+  { sidebar_label: "Area Management", sub_label: "Division", displayLabel: "Division", indent: 1, kind: "item", groupId: "area" },
+  { sidebar_label: "Area Management", sub_label: "District", displayLabel: "District", indent: 1, kind: "item", groupId: "area" },
+  { sidebar_label: "Area Management", sub_label: "Tehsil", displayLabel: "Tehsil", indent: 1, kind: "item", groupId: "area" },
+
+  // Projects (tree)
+  { sidebar_label: "Project Management", sub_label: null, displayLabel: "Projects", kind: "group", groupId: "projects" },
+  { sidebar_label: "Project Management", sub_label: "Create", displayLabel: "Create New Project", indent: 1, kind: "item", groupId: "projects" },
+  { sidebar_label: "Project Management", sub_label: "View", displayLabel: "View All Projects", indent: 1, kind: "item", groupId: "projects" },
+
   { sidebar_label: "Finance & Budget", sub_label: null, displayLabel: "Finance & Budget" },
   { sidebar_label: "GIS Layers", sub_label: null, displayLabel: "GIS Layers" },
+  { sidebar_label: "City Comparison", sub_label: null, displayLabel: "Citywise Comparison" },
   { sidebar_label: "User Management", sub_label: null, displayLabel: "User Management" },
-  { sidebar_label: "Settings", sub_label: null, displayLabel: "Settings" },
 ];
 
 export default function UserManagement() {
@@ -88,6 +106,21 @@ export default function UserManagement() {
   const [usersPage, setUsersPage] = useState(1);
   const USERS_PER_PAGE = 6;
   const [nameComboboxOpen, setNameComboboxOpen] = useState(false);
+
+  // Expand/collapse groups in permission tables
+  const [expandedGroups, setExpandedGroups] = useState<{ area: boolean; projects: boolean }>({
+    area: true,
+    projects: true,
+  });
+
+  const visiblePermissionRows = useMemo(() => {
+    return ADD_USER_PERMISSION_ROWS.filter((r) => {
+      if (r.kind === "group") return true;
+      if (r.groupId === "area") return expandedGroups.area;
+      if (r.groupId === "projects") return expandedGroups.projects;
+      return true;
+    });
+  }, [expandedGroups]);
 
   const { data: stakeholders = [] } = useQuery({
     queryKey: ["stakeholders"],
@@ -482,42 +515,72 @@ export default function UserManagement() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {ADD_USER_PERMISSION_ROWS.map((row) => {
+                      {visiblePermissionRows.map((row) => {
                         const p = getNewUserPerm(row.sidebar_label, row.sub_label);
+                        const isGroup = row.kind === "group";
+                        const groupId = row.groupId;
                         return (
                           <TableRow key={permissionRowKey(row.sidebar_label, row.sub_label)}>
-                            <TableCell className="font-medium">{row.displayLabel}</TableCell>
-                            <TableCell className="text-center">
-                              <Checkbox
-                                checked={p.read ?? false}
-                                onCheckedChange={(c) =>
-                                  setNewUserPerm(row.sidebar_label, row.sub_label, "read", !!c)
-                                }
-                              />
+                            <TableCell className="font-medium">
+                              {isGroup && groupId ? (
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-2 font-semibold"
+                                  onClick={() =>
+                                    setExpandedGroups((prev) => ({
+                                      ...prev,
+                                      [groupId]: !prev[groupId],
+                                    }))
+                                  }
+                                >
+                                  <span className="text-base leading-none">{expandedGroups[groupId] ? "▾" : "▸"}</span>
+                                  <span>{row.displayLabel}</span>
+                                </button>
+                              ) : (
+                                <span style={{ paddingLeft: `${(row.indent ?? 0) * 16}px` }}>
+                                  {row.displayLabel}
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell className="text-center">
-                              <Checkbox
-                                checked={p.create ?? false}
-                                onCheckedChange={(c) =>
-                                  setNewUserPerm(row.sidebar_label, row.sub_label, "create", !!c)
-                                }
-                              />
+                              {!isGroup ? (
+                                <Checkbox
+                                  checked={p.read ?? false}
+                                  onCheckedChange={(c) =>
+                                    setNewUserPerm(row.sidebar_label, row.sub_label, "read", !!c)
+                                  }
+                                />
+                              ) : null}
                             </TableCell>
                             <TableCell className="text-center">
-                              <Checkbox
-                                checked={p.update ?? false}
-                                onCheckedChange={(c) =>
-                                  setNewUserPerm(row.sidebar_label, row.sub_label, "update", !!c)
-                                }
-                              />
+                              {!isGroup ? (
+                                <Checkbox
+                                  checked={p.create ?? false}
+                                  onCheckedChange={(c) =>
+                                    setNewUserPerm(row.sidebar_label, row.sub_label, "create", !!c)
+                                  }
+                                />
+                              ) : null}
                             </TableCell>
                             <TableCell className="text-center">
-                              <Checkbox
-                                checked={p.delete ?? false}
-                                onCheckedChange={(c) =>
-                                  setNewUserPerm(row.sidebar_label, row.sub_label, "delete", !!c)
-                                }
-                              />
+                              {!isGroup ? (
+                                <Checkbox
+                                  checked={p.update ?? false}
+                                  onCheckedChange={(c) =>
+                                    setNewUserPerm(row.sidebar_label, row.sub_label, "update", !!c)
+                                  }
+                                />
+                              ) : null}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {!isGroup ? (
+                                <Checkbox
+                                  checked={p.delete ?? false}
+                                  onCheckedChange={(c) =>
+                                    setNewUserPerm(row.sidebar_label, row.sub_label, "delete", !!c)
+                                  }
+                                />
+                              ) : null}
                             </TableCell>
                           </TableRow>
                         );
@@ -766,7 +829,7 @@ export default function UserManagement() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {ADD_USER_PERMISSION_ROWS.map((row) => {
+                    {visiblePermissionRows.map((row) => {
                       const perm = getPermissionForRow(
                         selectedUserWithPermissions.permissions,
                         row.sidebar_label,
@@ -777,51 +840,81 @@ export default function UserManagement() {
                       const canUpdate = perm?.can_update ?? false;
                       const canDelete = perm?.can_delete ?? false;
                       const disabled = isUpdatingPermission;
+                      const isGroup = row.kind === "group";
+                      const groupId = row.groupId;
                       return (
                         <TableRow key={`${row.sidebar_label}|${row.sub_label ?? ""}`}>
-                          <TableCell className="font-medium">{row.displayLabel}</TableCell>
+                          <TableCell className="font-medium">
+                            {isGroup && groupId ? (
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-2 font-semibold"
+                                onClick={() =>
+                                  setExpandedGroups((prev) => ({
+                                    ...prev,
+                                    [groupId]: !prev[groupId],
+                                  }))
+                                }
+                              >
+                                <span className="text-base leading-none">{expandedGroups[groupId] ? "▾" : "▸"}</span>
+                                <span>{row.displayLabel}</span>
+                              </button>
+                            ) : (
+                              <span style={{ paddingLeft: `${(row.indent ?? 0) * 16}px` }}>
+                                {row.displayLabel}
+                              </span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-center">
                             <div className="flex justify-center">
-                              <Checkbox
-                                checked={canView}
-                                disabled={disabled}
-                                onCheckedChange={(c) =>
-                                  handlePermissionToggle(row.sidebar_label, row.sub_label, "can_view", !!c)
-                                }
-                              />
+                              {!isGroup ? (
+                                <Checkbox
+                                  checked={canView}
+                                  disabled={disabled}
+                                  onCheckedChange={(c) =>
+                                    handlePermissionToggle(row.sidebar_label, row.sub_label, "can_view", !!c)
+                                  }
+                                />
+                              ) : null}
                             </div>
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex justify-center">
-                              <Checkbox
-                                checked={canCreate}
-                                disabled={disabled}
-                                onCheckedChange={(c) =>
-                                  handlePermissionToggle(row.sidebar_label, row.sub_label, "can_create", !!c)
-                                }
-                              />
+                              {!isGroup ? (
+                                <Checkbox
+                                  checked={canCreate}
+                                  disabled={disabled}
+                                  onCheckedChange={(c) =>
+                                    handlePermissionToggle(row.sidebar_label, row.sub_label, "can_create", !!c)
+                                  }
+                                />
+                              ) : null}
                             </div>
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex justify-center">
-                              <Checkbox
-                                checked={canUpdate}
-                                disabled={disabled}
-                                onCheckedChange={(c) =>
-                                  handlePermissionToggle(row.sidebar_label, row.sub_label, "can_update", !!c)
-                                }
-                              />
+                              {!isGroup ? (
+                                <Checkbox
+                                  checked={canUpdate}
+                                  disabled={disabled}
+                                  onCheckedChange={(c) =>
+                                    handlePermissionToggle(row.sidebar_label, row.sub_label, "can_update", !!c)
+                                  }
+                                />
+                              ) : null}
                             </div>
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex justify-center">
-                              <Checkbox
-                                checked={canDelete}
-                                disabled={disabled}
-                                onCheckedChange={(c) =>
-                                  handlePermissionToggle(row.sidebar_label, row.sub_label, "can_delete", !!c)
-                                }
-                              />
+                              {!isGroup ? (
+                                <Checkbox
+                                  checked={canDelete}
+                                  disabled={disabled}
+                                  onCheckedChange={(c) =>
+                                    handlePermissionToggle(row.sidebar_label, row.sub_label, "can_delete", !!c)
+                                  }
+                                />
+                              ) : null}
                             </div>
                           </TableCell>
                         </TableRow>

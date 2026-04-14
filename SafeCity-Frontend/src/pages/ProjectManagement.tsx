@@ -890,7 +890,726 @@ export default function ProjectManagement() {
   const isCreatePath =
     typeof window !== "undefined" &&
     window.location?.pathname === "/project-management/create";
-  const dialogOpen = showAddProjectDialog || isCreatePath;
+  const isViewPath =
+    typeof window !== "undefined" &&
+    window.location?.pathname === "/project-management/view";
+  const dialogOpen = showAddProjectDialog;
+
+  // Full-page create flow: keep all existing API/mutation/state logic intact,
+  // but render the exact same wizard as a normal page (not a dialog/overlay).
+  if (isCreatePath) {
+    return (
+      <Layout title="Create New Project">
+        <div className="flex flex-col min-h-[calc(100vh-8rem)] w-full min-w-0">
+          <div className="max-w-5xl mx-auto w-full">
+            <Card>
+              <CardHeader>
+                <CardTitle>{editingProject ? "Update Project" : "Add New Project"}</CardTitle>
+                <CardDescription>
+                  {editingProject
+                    ? "Edit the project details below. Leave file fields unchanged unless you want to replace them."
+                    : "Fill in the project details and upload required files"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* Reuse the same wizard (step indicator + all 3 steps + footer) */}
+                {/* Step Indicator */}
+                <div className="flex flex-col items-center justify-center mb-6">
+                  <div className="flex items-center gap-3 w-fit">
+                    {/* Step 1 */}
+                    <div className="flex flex-col items-center">
+                      <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all ${
+                        currentStep >= 1 ? "bg-primary text-primary-foreground border-primary" : "border-muted-foreground bg-background"
+                      }`}>
+                        {currentStep > 1 ? (
+                          <CheckCircle2 className="h-4 w-4" />
+                        ) : (
+                          <span className="text-sm font-semibold">1</span>
+                        )}
+                      </div>
+                      <p className={`text-xs font-medium mt-2 ${currentStep === 1 ? "text-primary" : "text-muted-foreground"}`}>
+                        Project Details
+                      </p>
+                    </div>
+
+                    <div className="relative w-24 h-1 bg-muted rounded-full overflow-hidden mt-4">
+                      {currentStep >= 2 && (
+                        <>
+                          <div className="absolute inset-0 bg-primary" />
+                          <div
+                            className="absolute inset-0"
+                            style={{
+                              background: "linear-gradient(90deg, transparent 30%, #ef4444 50%, transparent 70%)",
+                              backgroundSize: "200% 100%",
+                              animation: "shimmer 1.5s linear infinite",
+                            }}
+                          />
+                        </>
+                      )}
+                    </div>
+
+                    {/* Step 2 */}
+                    <div className="flex flex-col items-center">
+                      <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all ${
+                        currentStep >= 2 ? "bg-primary text-primary-foreground border-primary" : "border-muted-foreground bg-background"
+                      }`}>
+                        {currentStep > 2 ? <CheckCircle2 className="h-4 w-4" /> : <span className="text-sm font-semibold">2</span>}
+                      </div>
+                      <p className={`text-xs font-medium mt-2 ${currentStep === 2 ? "text-primary" : "text-muted-foreground"}`}>
+                        Project Area
+                      </p>
+                    </div>
+
+                    <div className="relative w-24 h-1 bg-muted rounded-full overflow-hidden mt-4">
+                      {currentStep >= 3 && (
+                        <>
+                          <div className="absolute inset-0 bg-primary" />
+                          <div
+                            className="absolute inset-0"
+                            style={{
+                              background: "linear-gradient(90deg, transparent 30%, #ef4444 50%, transparent 70%)",
+                              backgroundSize: "200% 100%",
+                              animation: "shimmer 1.5s linear infinite",
+                            }}
+                          />
+                        </>
+                      )}
+                    </div>
+
+                    {/* Step 3 */}
+                    <div className="flex flex-col items-center">
+                      <div
+                        className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all ${
+                          currentStep >= 3
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "border-muted-foreground bg-background"
+                        }`}
+                      >
+                        <span className="text-sm font-semibold">3</span>
+                      </div>
+                      <p className={`text-xs font-medium mt-2 ${currentStep === 3 ? "text-primary" : "text-muted-foreground"}`}>
+                        Add Financial Details
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <style
+                  dangerouslySetInnerHTML={{
+                    __html: `
+                      @keyframes shimmer {
+                        0% { background-position: -200% 0; }
+                        100% { background-position: 200% 0; }
+                      }
+                    `,
+                  }}
+                />
+
+                {/* Full wizard form (same handlers/mutations as modal) */}
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Step 1: Project Details */}
+                  {currentStep === 1 && (
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="projectName">Project Name *</Label>
+                        <Input
+                          id="projectName"
+                          placeholder="Enter project name"
+                          value={projectName}
+                          onChange={(e) => setProjectName(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="projectDescription">Project Description *</Label>
+                        <Textarea
+                          id="projectDescription"
+                          placeholder="Enter project description..."
+                          value={projectDescription}
+                          onChange={(e) => setProjectDescription(e.target.value)}
+                          rows={4}
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="startingDate">Project Starting Date *</Label>
+                          <Input
+                            id="startingDate"
+                            type="date"
+                            value={startingDate}
+                            onChange={(e) => setStartingDate(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="referenceNumber">Project Reference No *</Label>
+                          <Input
+                            id="referenceNumber"
+                            placeholder="Enter reference number"
+                            value={referenceNumber}
+                            onChange={(e) => setReferenceNumber(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="stakeholderIds">Stakeholder(s) *</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              id="stakeholderIds"
+                              variant="outline"
+                              className="w-full justify-between"
+                              type="button"
+                            >
+                              {stakeholderIds.length > 0
+                                ? `${stakeholderIds.length} stakeholder(s) selected`
+                                : "Select stakeholders"}
+                              <ChevronDown className="h-4 w-4 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="p-0 w-[var(--radix-popover-trigger-width)]" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search stakeholders..." />
+                              <CommandList>
+                                <CommandEmpty>No stakeholders found.</CommandEmpty>
+                                <CommandGroup>
+                                  {stakeholdersList.map((s: any) => {
+                                    const id = String(s.id);
+                                    const selected = stakeholderIds.includes(id);
+                                    return (
+                                      <CommandItem
+                                        key={id}
+                                        onSelect={() => {
+                                          setStakeholderIds((prev) =>
+                                            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+                                          );
+                                        }}
+                                      >
+                                        <Checkbox checked={selected} className="mr-2" />
+                                        {s.stakeholder_title} ({s.stakeholder_type})
+                                      </CommandItem>
+                                    );
+                                  })}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      {/* Province / Division / District / Tehsil (Area Management) */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Province — searchable */}
+                        <div className="space-y-2">
+                          <Label htmlFor="province">Province *</Label>
+                          <Popover open={provinceComboboxOpen} onOpenChange={setProvinceComboboxOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                id="province"
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={provinceComboboxOpen}
+                                className="w-full justify-between font-normal h-9 px-3 text-sm"
+                                type="button"
+                              >
+                                <span className="truncate">
+                                  {selectedProvinceId
+                                    ? (provincesList.find((p) => String(p.id) === selectedProvinceId)?.province_name ??
+                                      "Select province")
+                                    : "Select province"}
+                                </span>
+                                <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                              <Command
+                                filter={(value, search) => {
+                                  const q = (search || "").toLowerCase();
+                                  if (!q) return 1;
+                                  return (value || "").toLowerCase().includes(q) ? 1 : 0;
+                                }}
+                              >
+                                <CommandInput placeholder="Type to search province…" />
+                                <CommandList>
+                                  <CommandEmpty>No province found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {provincesList.map((p) => (
+                                      <CommandItem
+                                        key={p.id}
+                                        value={p.province_name}
+                                        onSelect={() => {
+                                          skipGeographyClearRef.current = false;
+                                          setSelectedProvinceId(String(p.id));
+                                          setProvinceComboboxOpen(false);
+                                        }}
+                                      >
+                                        {p.province_name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+
+                        {/* Division — searchable */}
+                        <div className="space-y-2">
+                          <Label htmlFor="division">Division *</Label>
+                          <Popover open={divisionComboboxOpen} onOpenChange={setDivisionComboboxOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                id="division"
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={divisionComboboxOpen}
+                                disabled={!selectedProvinceId}
+                                className="w-full justify-between font-normal h-9 px-3 text-sm"
+                                type="button"
+                              >
+                                <span className="truncate">
+                                  {selectedDivisionId
+                                    ? (divisionsList.find((d) => String(d.id) === selectedDivisionId)?.division_name ??
+                                      "Select division")
+                                    : selectedProvinceId
+                                      ? "Select division"
+                                      : "Select province first"}
+                                </span>
+                                <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                              <Command
+                                filter={(value, search) => {
+                                  const q = (search || "").toLowerCase();
+                                  if (!q) return 1;
+                                  return (value || "").toLowerCase().includes(q) ? 1 : 0;
+                                }}
+                              >
+                                <CommandInput placeholder="Type to search division…" />
+                                <CommandList>
+                                  <CommandEmpty>No division found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {divisionsList.map((d) => (
+                                      <CommandItem
+                                        key={d.id}
+                                        value={d.division_name}
+                                        onSelect={() => {
+                                          skipGeographyClearRef.current = false;
+                                          setSelectedDivisionId(String(d.id));
+                                          setDivisionComboboxOpen(false);
+                                        }}
+                                      >
+                                        {d.division_name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+
+                        {/* District — searchable */}
+                        <div className="space-y-2">
+                          <Label htmlFor="district">District *</Label>
+                          <Popover open={districtComboboxOpen} onOpenChange={setDistrictComboboxOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                id="district"
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={districtComboboxOpen}
+                                disabled={!selectedDivisionId}
+                                className="w-full justify-between font-normal h-9 px-3 text-sm"
+                                type="button"
+                              >
+                                <span className="truncate">
+                                  {selectedDistrictId
+                                    ? (districtsList.find((d) => String(d.id) === selectedDistrictId)?.district_name ??
+                                      "Select district")
+                                    : selectedDivisionId
+                                      ? "Select district"
+                                      : "Select division first"}
+                                </span>
+                                <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                              <Command
+                                filter={(value, search) => {
+                                  const q = (search || "").toLowerCase();
+                                  if (!q) return 1;
+                                  return (value || "").toLowerCase().includes(q) ? 1 : 0;
+                                }}
+                              >
+                                <CommandInput placeholder="Type to search district…" />
+                                <CommandList>
+                                  <CommandEmpty>No district found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {districtsList.map((d) => (
+                                      <CommandItem
+                                        key={d.id}
+                                        value={d.district_name}
+                                        onSelect={() => {
+                                          skipGeographyClearRef.current = false;
+                                          setSelectedDistrictId(String(d.id));
+                                          setDistrictComboboxOpen(false);
+                                        }}
+                                      >
+                                        {d.district_name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+
+                        {/* Tehsil — searchable */}
+                        <div className="space-y-2">
+                          <Label htmlFor="tehsil">Tehsil *</Label>
+                          <Popover open={tehsilComboboxOpen} onOpenChange={setTehsilComboboxOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                id="tehsil"
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={tehsilComboboxOpen}
+                                disabled={!selectedDistrictId}
+                                className="w-full justify-between font-normal h-9 px-3 text-sm"
+                                type="button"
+                              >
+                                <span className="truncate">
+                                  {selectedTehsilId
+                                    ? (tehsilsList.find((t) => String(t.id) === selectedTehsilId)?.tehsil_name ??
+                                      "Select tehsil")
+                                    : selectedDistrictId
+                                      ? "Select tehsil"
+                                      : "Select district first"}
+                                </span>
+                                <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                              <Command
+                                filter={(value, search) => {
+                                  const q = (search || "").toLowerCase();
+                                  if (!q) return 1;
+                                  return (value || "").toLowerCase().includes(q) ? 1 : 0;
+                                }}
+                              >
+                                <CommandInput placeholder="Type to search tehsil…" />
+                                <CommandList>
+                                  <CommandEmpty>No tehsil found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {tehsilsList.map((t) => (
+                                      <CommandItem
+                                        key={t.id}
+                                        value={t.tehsil_name}
+                                        onSelect={() => {
+                                          skipGeographyClearRef.current = false;
+                                          setSelectedTehsilId(String(t.id));
+                                          setTehsilComboboxOpen(false);
+                                        }}
+                                      >
+                                        {t.tehsil_name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 2: Project Area */}
+                  {currentStep === 2 && (
+                    <div className="space-y-6">
+                      {/* When editing: show current boundary file name & format first, then map once */}
+                      {editingProject && (editingProject.boundary_file || geoData) && (
+                        <div className="space-y-2">
+                          <Label>Current project boundary</Label>
+                          {editingProject.boundary_file && (
+                            <div className="rounded-lg border bg-muted/50 p-3 flex items-center gap-3">
+                              <MapPin className="h-5 w-5 text-muted-foreground shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">
+                                  File: {editingProject.boundary_file.split("/").pop() ?? editingProject.boundary_file}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Format: {(() => {
+                                    const name = (editingProject.boundary_file.split("/").pop() ?? "").toLowerCase();
+                                    if (name.endsWith(".geojson") || name.endsWith(".json")) return "GeoJSON";
+                                    if (name.endsWith(".kml")) return "KML";
+                                    if (name.endsWith(".kmz")) return "KMZ";
+                                    if (name.endsWith(".shp") || name.endsWith(".zip")) return "Shapefile";
+                                    return "GeoJSON";
+                                  })()}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                          {geoData && (
+                            <div className="rounded-md border overflow-hidden">
+                              <ProjectAreaMap geoData={geoData} />
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        <Label>
+                          Project Area (GeoJSON, Shapefile, KMZ, KML){" "}
+                          {editingProject ? "(optional – upload to replace)" : "*"}
+                        </Label>
+                        <div
+                          className={`relative border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center transition-all ${
+                            areaFile
+                              ? "border-primary bg-primary/5"
+                              : "border-muted-foreground/20 hover:border-primary/50 cursor-pointer"
+                          }`}
+                          onClick={() => document.getElementById("area-file-input")?.click()}
+                        >
+                          {areaFile ? (
+                            <div className="flex items-center gap-3 w-full">
+                              <MapPin className="h-8 w-8 text-primary" />
+                              <div className="flex-1">
+                                <p className="font-medium">{areaFile.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {(areaFile.size / 1024).toFixed(2)} KB
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAreaFile(null);
+                                  setGeoData(null);
+                                }}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <>
+                              <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                              <p className="text-sm font-medium">Click to upload area file</p>
+                              <p className="text-xs text-muted-foreground">GeoJSON, Shapefile, KMZ, or KML</p>
+                            </>
+                          )}
+                          <Input
+                            id="area-file-input"
+                            type="file"
+                            accept=".geojson,.json,.kml,.kmz,.zip,.shp"
+                            onChange={handleAreaFileChange}
+                            className="hidden"
+                          />
+                        </div>
+                      </div>
+
+                      {isLoadingGeoData && (
+                        <div className="text-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                          <p className="text-sm text-muted-foreground mt-2">Loading geographic data...</p>
+                        </div>
+                      )}
+
+                      {/* Map preview only when NOT editing (new upload) – avoid showing boundary twice */}
+                      {!editingProject && geoData && (
+                        <div className="space-y-2">
+                          <Label>Map Preview</Label>
+                          <div className="rounded-md border overflow-hidden">
+                            <ProjectAreaMap geoData={geoData} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Step 3: Add Financial Details (Frontend only) */}
+                  {currentStep === 3 && (
+                    <div className="space-y-6">
+                      {/* Allocation */}
+                      <div className="space-y-3 rounded-lg border p-4">
+                        <label className="flex items-center gap-2 text-sm font-medium">
+                          <Checkbox checked={enableAllocation} onCheckedChange={(v) => setEnableAllocation(Boolean(v))} />
+                          Allocation (M)
+                        </label>
+                        {enableAllocation && (
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <Label>Capital Cost (M)</Label>
+                              <Input value={allocationCapital} onChange={(e) => setAllocationCapital(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 0" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Revenue Cost (M)</Label>
+                              <Input value={allocationRevenue} onChange={(e) => setAllocationRevenue(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 643.615" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Total Cost (M)</Label>
+                              <Input value={allocationTotal} onChange={(e) => setAllocationTotal(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 643.615" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* P&D Release */}
+                      <div className="space-y-3 rounded-lg border p-4">
+                        <label className="flex items-center gap-2 text-sm font-medium">
+                          <Checkbox checked={enablePdRelease} onCheckedChange={(v) => setEnablePdRelease(Boolean(v))} />
+                          P&amp;D Release (M)
+                        </label>
+                        {enablePdRelease && (
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <Label>Capital Cost (M)</Label>
+                              <Input value={pdReleaseCapital} onChange={(e) => setPdReleaseCapital(e.target.value)} type="number" min={0} step="any" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Revenue Cost (M)</Label>
+                              <Input value={pdReleaseRevenue} onChange={(e) => setPdReleaseRevenue(e.target.value)} type="number" min={0} step="any" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Total Cost (M)</Label>
+                              <Input value={pdReleaseTotal} onChange={(e) => setPdReleaseTotal(e.target.value)} type="number" min={0} step="any" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Spending Release */}
+                      <div className="space-y-3 rounded-lg border p-4">
+                        <label className="flex items-center gap-2 text-sm font-medium">
+                          <Checkbox checked={enableSpendingRelease} onCheckedChange={(v) => setEnableSpendingRelease(Boolean(v))} />
+                          Spending Release (M)
+                        </label>
+                        {enableSpendingRelease && (
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <Label>Capital Cost (M)</Label>
+                              <Input value={spendingReleaseCapital} onChange={(e) => setSpendingReleaseCapital(e.target.value)} type="number" min={0} step="any" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Revenue Cost (M)</Label>
+                              <Input value={spendingReleaseRevenue} onChange={(e) => setSpendingReleaseRevenue(e.target.value)} type="number" min={0} step="any" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Total Cost (M)</Label>
+                              <Input value={spendingReleaseTotal} onChange={(e) => setSpendingReleaseTotal(e.target.value)} type="number" min={0} step="any" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* PIFRA Utilization */}
+                      <div className="space-y-3 rounded-lg border p-4">
+                        <label className="flex items-center gap-2 text-sm font-medium">
+                          <Checkbox checked={enablePifraUtilization} onCheckedChange={(v) => setEnablePifraUtilization(Boolean(v))} />
+                          Pifra Utilization (M)
+                        </label>
+                        {enablePifraUtilization && (
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="space-y-2">
+                              <Label>Capital Cost (M)</Label>
+                              <Input value={pifraCapital} onChange={(e) => setPifraCapital(e.target.value)} type="number" min={0} step="any" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Revenue Cost (M)</Label>
+                              <Input value={pifraRevenue} onChange={(e) => setPifraRevenue(e.target.value)} type="number" min={0} step="any" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Total Cost (M)</Label>
+                              <Input value={pifraTotal} onChange={(e) => setPifraTotal(e.target.value)} type="number" min={0} step="any" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Date</Label>
+                              <Input value={pifraDate} onChange={(e) => setPifraDate(e.target.value)} type="date" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* % Utilization against Spending Release */}
+                      <div className="space-y-3 rounded-lg border p-4">
+                        <label className="flex items-center gap-2 text-sm font-medium">
+                          <Checkbox checked={enableUtilPct} onCheckedChange={(v) => setEnableUtilPct(Boolean(v))} />
+                          %age Utilization against Spending Release
+                        </label>
+                        {enableUtilPct && (
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <Label>Capital %</Label>
+                              <Input value={utilPctCapital} onChange={(e) => setUtilPctCapital(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 0.0" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Revenue %</Label>
+                              <Input value={utilPctRevenue} onChange={(e) => setUtilPctRevenue(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 38.53" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Total Cost %</Label>
+                              <Input value={utilPctTotal} onChange={(e) => setUtilPctTotal(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 38.53" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setEditingProject(null);
+                        resetForm();
+                        setLocation("/project-management/view");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    {currentStep === 1 && (
+                      <Button type="button" onClick={handleNext} className="gap-2">
+                        Next
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {currentStep === 2 && (
+                      <>
+                        <Button type="button" variant="outline" onClick={handlePrevious} className="gap-2">
+                          <ChevronLeft className="h-4 w-4" />
+                          Previous
+                        </Button>
+                        <Button type="button" onClick={handleNext} className="gap-2">
+                          Next
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                    {currentStep === 3 && (
+                      <>
+                        <Button type="button" variant="outline" onClick={handlePrevious} className="gap-2">
+                          <ChevronLeft className="h-4 w-4" />
+                          Previous
+                        </Button>
+                        <Button type="submit" disabled={updateProjectMutation.isPending}>
+                          {editingProject ? "Update Project" : "Create Project"}
+                        </Button>
+                      </>
+                    )}
+                  </DialogFooter>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout title="Project Management">
@@ -922,18 +1641,20 @@ export default function ProjectManagement() {
                 />
               </div>
             )}
-            <Button
-              onClick={() => {
-                setEditingProject(null);
-                resetForm();
-                setShowAddProjectDialog(true);
-              }}
-              className="gap-2 shrink-0 px-3 sm:px-4"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add New Project</span>
-              <span className="sm:hidden">Add</span>
-            </Button>
+            {!isViewPath && (
+              <Button
+                onClick={() => {
+                  setEditingProject(null);
+                  resetForm();
+                  setShowAddProjectDialog(true);
+                }}
+                className="gap-2 shrink-0 px-3 sm:px-4"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Add New Project</span>
+                <span className="sm:hidden">Add</span>
+              </Button>
+            )}
           </div>
         </div>
 
@@ -1388,14 +2109,6 @@ export default function ProjectManagement() {
       <Dialog
         open={dialogOpen}
         onOpenChange={(open) => {
-          // If user closes the create route, go back to list view.
-          if (isCreatePath && !open) {
-            resetForm();
-            setEditingProject(null);
-            setShowAddProjectDialog(false);
-            setLocation("/project-management/view");
-            return;
-          }
           setShowAddProjectDialog(open);
           if (!open) {
             resetForm();
@@ -1404,11 +2117,7 @@ export default function ProjectManagement() {
         }}
       >
         <DialogContent
-          className={
-            isCreatePath
-              ? "w-[98vw] max-w-5xl max-h-[92vh] overflow-y-auto"
-              : "w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto"
-          }
+          className={"w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto"}
         >
           <DialogHeader>
             <DialogTitle>{editingProject ? "Update Project" : "Add New Project"}</DialogTitle>
@@ -1563,34 +2272,6 @@ export default function ProjectManagement() {
                       placeholder="Enter reference number"
                       value={referenceNumber}
                       onChange={(e) => setReferenceNumber(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {/* Total Budget Allocated & Budget Utilized */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="totalBudgetAllocated">Total Budget Allocated</Label>
-                    <Input
-                      id="totalBudgetAllocated"
-                      type="number"
-                      min={0}
-                      step={1}
-                      placeholder="e.g. 100000"
-                      value={totalBudgetAllocated}
-                      onChange={(e) => setTotalBudgetAllocated(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="budgetUtilized">Budget Utilized</Label>
-                    <Input
-                      id="budgetUtilized"
-                      type="number"
-                      min={0}
-                      step={1}
-                      placeholder="e.g. 60000"
-                      value={budgetUtilized}
-                      onChange={(e) => setBudgetUtilized(e.target.value)}
                     />
                   </div>
                 </div>
