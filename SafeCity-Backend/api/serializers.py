@@ -442,7 +442,19 @@ class ProjectSerializer(GeoFeatureModelSerializer):
                     predecessor=pred_obj,
                     type=dep["type"]
                 )
-    
+
+class TopProjectSerializer(serializers.ModelSerializer):
+    division_name = serializers.CharField(source='division.division_name', read_only=True)
+    progress = serializers.FloatField(read_only=True)
+
+    class Meta:
+        model = Project
+        fields = [
+            "id",
+            "project_name",
+            "division_name",
+            "progress"
+        ]
 class TaskSerializer(serializers.ModelSerializer):
     parent_id = serializers.PrimaryKeyRelatedField(
         source='parent',
