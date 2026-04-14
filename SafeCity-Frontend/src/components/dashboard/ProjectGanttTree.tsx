@@ -280,8 +280,10 @@ export function ProjectGanttTree({
   const tableMinWidthPx = useMemo(() => {
     const wbsCol = 320; // w-80
     const durationCol = 112; // w-28
+    const startCol = 144; // w-36
+    const endCol = 144; // w-36
     const optionsCol = readOnly ? 0 : 80; // w-20
-    return wbsCol + durationCol + timelineWidthPx + optionsCol;
+    return wbsCol + durationCol + startCol + endCol + timelineWidthPx + optionsCol;
   }, [timelineWidthPx, readOnly]);
 
   const monthScalePx = useMemo(() => {
@@ -372,6 +374,12 @@ export function ProjectGanttTree({
           </div>
           <div className="w-28 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2 text-center">
             Duration
+          </div>
+          <div className="w-36 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2 text-center">
+            Start_Date
+          </div>
+          <div className="w-36 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2 text-center">
+            End_Date
           </div>
           <div className="shrink-0">
             <div className="grid grid-flow-col auto-cols-[120px] text-xs text-center" style={{ width: timelineWidthPx }}>
@@ -503,11 +511,25 @@ export function ProjectGanttTree({
                   {t.duration_display ?? (typeof t.duration === "number" ? t.duration : "—")}
                 </div>
 
+                <div
+                  className="w-36 border-r border-border/60 px-3 py-2 flex items-center justify-center text-xs tabular-nums text-muted-foreground"
+                  title={t.start ?? "—"}
+                >
+                  {t.start ?? "—"}
+                </div>
+
+                <div
+                  className="w-36 border-r border-border/60 px-3 py-2 flex items-center justify-center text-xs tabular-nums text-muted-foreground"
+                  title={t.end ?? "—"}
+                >
+                  {t.end ?? "—"}
+                </div>
+
                 <div className="shrink-0 bg-background/30" style={{ width: timelineWidthPx }}>
                   <div className="relative h-12 overflow-visible">
                     {/* Planned bar (top row) */}
                     <div
-                      className="absolute h-4 rounded-md top-2 bg-sky-600"
+                      className="absolute h-4 rounded-md top-2 bg-emerald-600"
                       style={{ left: `${leftPx}px`, width: `${widthPx}px` }}
                       title={`Planned: ${t.start ?? "—"} → ${t.end ?? "—"}`}
                     >
