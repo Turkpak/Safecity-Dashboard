@@ -54,6 +54,8 @@ function Router() {
       <Route path="/tehsil-management" component={TehsilManagement} />
       <Route path="/stakeholder-management" component={StakeholderManagement} />
       <Route path="/project-management" component={ProjectManagement} />
+      <Route path="/project-management/create" component={ProjectManagement} />
+      <Route path="/project-management/view" component={ProjectManagement} />
       <Route path="/project-activity-management" component={ProjectActivityManagement} />
       <Route path="/user-management" component={UserManagement} />
       <Route component={NotFound} />

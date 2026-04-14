@@ -170,7 +170,7 @@ function ProjectAreaMap({ geoData }: { geoData: any }) {
 export default function ProjectManagement() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [showXERDialog, setShowXERDialog] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -185,22 +185,42 @@ export default function ProjectManagement() {
     queryFn: listProjects,
   });
 
-  // Deep-link support from sidebar:
-  // - /project-management?mode=create → open "Create New Project" dialog
-  // - /project-management?mode=view   → ensure dialog is closed (default list view)
-  useEffect(() => {
+  // Sidebar deep-link support.
+  // NOTE: wouter commonly tracks pathname only; query params may not trigger location updates.
+  // We support BOTH:
+  // - /project-management/create  (preferred)
+  // - /project-management/view
+  // - /project-management?mode=create (fallback)
+  const deepLinkMode = useMemo<"create" | "view" | "">(() => {
     try {
-      const url = new URL(location, window.location.origin);
-      const mode = (url.searchParams.get("mode") || "").toLowerCase();
-      if (mode === "create") {
-        setShowAddProjectDialog(true);
-      } else if (mode === "view") {
-        setShowAddProjectDialog(false);
-      }
+      const rawPath = String(location || "");
+      // Prefer explicit path suffixes (works reliably with wouter)
+      if (rawPath.startsWith("/project-management/create")) return "create";
+      if (rawPath.startsWith("/project-management/view")) return "view";
+
+      // Fallback: read from the actual browser URL search params
+      const mode = (new URL(window.location.href).searchParams.get("mode") || "").toLowerCase();
+      return mode === "create" || mode === "view" ? (mode as any) : "";
     } catch {
-      // ignore
+      return "";
     }
   }, [location]);
+
+  useEffect(() => {
+    if (deepLinkMode === "create") {
+      // Ensure Create New Project is never "same as view":
+      // keep opening the full 3-step dialog whenever mode=create is present.
+      if (!showAddProjectDialog || editingProject) {
+        setEditingProject(null);
+        resetForm();
+        setShowAddProjectDialog(true);
+      }
+      return;
+    }
+    if (deepLinkMode === "view") {
+      if (showAddProjectDialog) setShowAddProjectDialog(false);
+    }
+  }, [deepLinkMode, showAddProjectDialog, editingProject]);
   const { data: stakeholdersList = [] } = useQuery({
     queryKey: ["stakeholders"],
     queryFn: listStakeholders,
@@ -867,9 +887,16 @@ export default function ProjectManagement() {
     setProjectsPage(1);
   }, [locationSearch]);
 
+  const isCreatePath =
+    typeof window !== "undefined" &&
+    window.location?.pathname === "/project-management/create";
+  const dialogOpen = showAddProjectDialog || isCreatePath;
+
   return (
     <Layout title="Project Management">
       <div className="flex flex-col min-h-[calc(100vh-8rem)] w-full min-w-0">
+        {!isCreatePath && (
+        <>
         {/* Header with search and Add Project button */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0 mb-4">
           <div className="min-w-0">
@@ -896,7 +923,11 @@ export default function ProjectManagement() {
               </div>
             )}
             <Button
-              onClick={() => setShowAddProjectDialog(true)}
+              onClick={() => {
+                setEditingProject(null);
+                resetForm();
+                setShowAddProjectDialog(true);
+              }}
               className="gap-2 shrink-0 px-3 sm:px-4"
             >
               <Plus className="h-4 w-4" />
@@ -1349,17 +1380,36 @@ export default function ProjectManagement() {
             </CardContent>
           </Card>
         )}
+        </>
+        )}
       </div>
 
-      {/* Add Project Dialog */}
-      <Dialog open={showAddProjectDialog} onOpenChange={(open) => {
-        setShowAddProjectDialog(open);
-        if (!open) {
-          resetForm();
-          setEditingProject(null);
-        }
-      }}>
-        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
+      {/* Add Project Dialog (also used as full-page on /project-management/create) */}
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          // If user closes the create route, go back to list view.
+          if (isCreatePath && !open) {
+            resetForm();
+            setEditingProject(null);
+            setShowAddProjectDialog(false);
+            setLocation("/project-management/view");
+            return;
+          }
+          setShowAddProjectDialog(open);
+          if (!open) {
+            resetForm();
+            setEditingProject(null);
+          }
+        }}
+      >
+        <DialogContent
+          className={
+            isCreatePath
+              ? "w-[98vw] max-w-5xl max-h-[92vh] overflow-y-auto"
+              : "w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto"
+          }
+        >
           <DialogHeader>
             <DialogTitle>{editingProject ? "Update Project" : "Add New Project"}</DialogTitle>
             <DialogDescription>

@@ -68,8 +68,8 @@ const NAV_ITEMS: NavItem[] = [
     icon: FolderKanban,
     label: "Projects",
     subItems: [
-      { icon: Plus, label: "Create New Project", href: "/project-management?mode=create" },
-      { icon: Eye, label: "View All Projects", href: "/project-management?mode=view" },
+      { icon: Plus, label: "Create New Project", href: "/project-management/create" },
+      { icon: Eye, label: "View All Projects", href: "/project-management/view" },
     ],
   },
   // {

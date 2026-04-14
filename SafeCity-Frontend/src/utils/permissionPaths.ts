@@ -35,6 +35,14 @@ export function getPermissionForPath(
       sidebar_label: "Project Management",
       sub_label: null,
     },
+    "/project-management/create": {
+      sidebar_label: "Project Management",
+      sub_label: null,
+    },
+    "/project-management/view": {
+      sidebar_label: "Project Management",
+      sub_label: null,
+    },
     "/project-activity-management": {
       sidebar_label: "Project Activities",
       sub_label: null,
