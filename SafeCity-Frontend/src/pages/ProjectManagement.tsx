@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import {
   listProjects,
   listStakeholders,
@@ -169,6 +170,7 @@ function ProjectAreaMap({ geoData }: { geoData: any }) {
 export default function ProjectManagement() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [location] = useLocation();
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [showXERDialog, setShowXERDialog] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -182,6 +184,23 @@ export default function ProjectManagement() {
     queryKey: ["projects"],
     queryFn: listProjects,
   });
+
+  // Deep-link support from sidebar:
+  // - /project-management?mode=create → open "Create New Project" dialog
+  // - /project-management?mode=view   → ensure dialog is closed (default list view)
+  useEffect(() => {
+    try {
+      const url = new URL(location, window.location.origin);
+      const mode = (url.searchParams.get("mode") || "").toLowerCase();
+      if (mode === "create") {
+        setShowAddProjectDialog(true);
+      } else if (mode === "view") {
+        setShowAddProjectDialog(false);
+      }
+    } catch {
+      // ignore
+    }
+  }, [location]);
   const { data: stakeholdersList = [] } = useQuery({
     queryKey: ["stakeholders"],
     queryFn: listStakeholders,

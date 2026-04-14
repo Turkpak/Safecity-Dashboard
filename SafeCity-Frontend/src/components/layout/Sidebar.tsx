@@ -16,6 +16,8 @@ import {
   Users,
   FolderKanban,
   UserCog,
+  Plus,
+  Eye,
 } from "lucide-react";
 import {
   Accordion,
@@ -47,11 +49,11 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   {
-    icon: UserCog,
-    label: "User Management",
-    href: "/user-management",
-    roles: ["super_admin"],
+    icon: LayoutDashboard,
+    label: "Dashboard",
+    href: "/",
   },
+  { icon: Users, label: "Stakeholders", href: "/stakeholder-management" },
   {
     icon: Navigation2,
     label: "Area Management",
@@ -62,22 +64,28 @@ const NAV_ITEMS: NavItem[] = [
       { icon: MapPin, label: "Tehsil", href: "/tehsil-management" },
     ],
   },
-  { icon: Users, label: "Stakeholders", href: "/stakeholder-management" },
   {
     icon: FolderKanban,
-    label: "Project Management",
-    href: "/project-management",
+    label: "Projects",
+    subItems: [
+      { icon: Plus, label: "Create New Project", href: "/project-management?mode=create" },
+      { icon: Eye, label: "View All Projects", href: "/project-management?mode=view" },
+    ],
   },
   // {
   //   icon: FolderKanban,
   //   label: "Project Activities",
   //   href: "/project-activity-management",
   // },
-
-  { icon: LayoutDashboard, label: "Citywise Progress", href: "/" },
-  { icon: BarChart3, label: "City Comparison", href: "/comparison" },
   { icon: LucideBanknote, label: "Finance & Budget", href: "/finance" },
   { icon: MapIcon, label: "GIS Layers", href: "/gis" },
+  { icon: BarChart3, label: "Citywise Comparison", href: "/comparison" },
+  {
+    icon: UserCog,
+    label: "User Management",
+    href: "/user-management",
+    roles: ["super_admin"],
+  },
 ];
 
 export function Sidebar() {
