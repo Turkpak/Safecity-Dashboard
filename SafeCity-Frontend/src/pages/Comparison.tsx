@@ -224,7 +224,7 @@ export default function Comparison() {
         />
 
         {/* Heatmap Chart */}
-        <HeatmapChart data={stackedData} />
+        {/* <HeatmapChart data={stackedData} /> */}
 
         {/* Stacked Phase Chart */}
         {/* <StackedPhaseChart data={stackedData} /> */}

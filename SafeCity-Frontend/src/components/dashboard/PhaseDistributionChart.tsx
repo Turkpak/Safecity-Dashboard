@@ -7,11 +7,17 @@ interface PhaseDistributionChartProps {
     phase: string;
     percentage: number;
   }[];
+  title?: string;
+  description?: string;
 }
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#a855f7", "#ef4444", "#eab308"];
 
-export function PhaseDistributionChart({ data }: PhaseDistributionChartProps) {
+export function PhaseDistributionChart({
+  data,
+  title = "Phase Distribution",
+  description = "Progress distribution across milestone progress",
+}: PhaseDistributionChartProps) {
   const { width } = useWindowSize();
   const isMobile = width < 640;
   const isTablet = width >= 640 && width < 1024;
@@ -77,8 +83,8 @@ export function PhaseDistributionChart({ data }: PhaseDistributionChartProps) {
       }}
     >
       <CardHeader className="pb-4">
-        <CardTitle className="font-heading text-xl font-bold">Phase Distribution</CardTitle>
-        <CardDescription className="text-sm">Progress distribution across milestone progress</CardDescription>
+        <CardTitle className="font-heading text-xl font-bold">{title}</CardTitle>
+        <CardDescription className="text-sm">{description}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col lg:flex-row gap-4">

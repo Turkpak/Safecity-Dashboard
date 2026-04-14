@@ -1116,6 +1116,66 @@ export default function Dashboard() {
     return count > 0 ? clampPct(sum / count) : 0;
   };
 
+  const distributionChart = useMemo(() => {
+    if (!selectedItemType || !selectedItemId) return null;
+
+    const avg = (values: number[]): number => {
+      if (values.length === 0) return 0;
+      const sum = values.reduce((acc, v) => acc + v, 0);
+      return sum / values.length;
+    };
+
+    const roundPct = (n: number) => Math.max(0, Math.min(100, Number(n.toFixed(2))));
+
+    const tehsilOverall = (tehsilId: number): number => {
+      const tehsilProjects = apiProjects.filter((p) => p.tehsil === tehsilId);
+      if (tehsilProjects.length === 0) return 0;
+      return calcProjectsOverall(tehsilProjects);
+    };
+
+    const districtOverallFromTehsils = (districtId: number): number => {
+      const distTehsils = apiTehsils.filter((t) => t.district === districtId);
+      if (distTehsils.length === 0) return 0;
+      const tehsilOveralls = distTehsils.map((t) => tehsilOverall(t.id));
+      return avg(tehsilOveralls);
+    };
+
+    if (selectedItemType === "division") {
+      const divDistricts = apiDistricts.filter((d) => d.division === selectedItemId);
+      const rows = divDistricts.map((d) => ({
+        phase: d.district_name,
+        percentage: roundPct(districtOverallFromTehsils(d.id)),
+      }));
+      return {
+        title: "District Progress Distribution",
+        description: "Progress % of all districts within the selected division",
+        data: rows.sort((a, b) => b.percentage - a.percentage),
+      };
+    }
+
+    if (selectedItemType === "district") {
+      const distTehsils = apiTehsils.filter((t) => t.district === selectedItemId);
+      const rows = distTehsils.map((t) => ({
+        phase: t.tehsil_name,
+        percentage: roundPct(tehsilOverall(t.id)),
+      }));
+      return {
+        title: "Tehsil Progress Distribution",
+        description: "Progress % of all tehsils within the selected district",
+        data: rows.sort((a, b) => b.percentage - a.percentage),
+      };
+    }
+
+    return null;
+  }, [
+    selectedItemType,
+    selectedItemId,
+    apiDistricts,
+    apiTehsils,
+    apiProjects,
+    ganttProgressByProjectId,
+  ]);
+
   // Calculate aggregated data from a list of projects
   const getAggregatedDataFromProjects = (
     projects: Project[],
@@ -2051,10 +2111,15 @@ export default function Dashboard() {
             <div className="grid gap-4 lg:grid-cols-12">
               <div className="lg:col-span-12">
                 <PhaseDistributionChart
-                  data={installationPhases.map((phase) => ({
-                    phase: phase.title,
-                    percentage: getProgressValue(data[phase.key]),
-                  }))}
+                  title={distributionChart?.title}
+                  description={distributionChart?.description}
+                  data={
+                    distributionChart?.data ??
+                    installationPhases.map((phase) => ({
+                      phase: phase.title,
+                      percentage: getProgressValue(data[phase.key]),
+                    }))
+                  }
                 />
               </div>
             </div>
