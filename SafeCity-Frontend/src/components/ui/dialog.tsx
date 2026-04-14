@@ -54,6 +54,31 @@ const DialogContent = React.forwardRef<
 ))
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
+/**
+ * Inline (non-portal) dialog content.
+ * Useful when you want to reuse dialog body markup as a normal page section.
+ * - No overlay
+ * - No portal
+ * - No fixed positioning defaults
+ * - No built-in close (X) button
+ */
+const DialogContentInline = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
+>(({ className, children, ...props }, ref) => (
+  <DialogPrimitive.Content
+    ref={ref}
+    className={cn(
+      "grid w-full gap-4 border bg-background p-4 sm:p-6 shadow-sm rounded-lg",
+      className
+    )}
+    {...props}
+  >
+    {children}
+  </DialogPrimitive.Content>
+))
+DialogContentInline.displayName = "DialogContentInline"
+
 const DialogHeader = ({
   className,
   ...props
@@ -116,6 +141,7 @@ export {
   DialogTrigger,
   DialogClose,
   DialogContent,
+  DialogContentInline,
   DialogHeader,
   DialogFooter,
   DialogTitle,
