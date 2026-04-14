@@ -5,12 +5,9 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Shield, Moon, Sun, Lock, Globe, Save } from "lucide-react";
-import { useTheme } from "@/hooks/use-theme.ts";
+import { Bell, Lock, Save, Palette } from "lucide-react";
 
 export default function Settings() {
-  const { theme, toggleTheme } = useTheme();
-
   return (
     <Layout title="System Settings">
       <div className="w-full max-w-4xl mx-auto space-y-6 min-w-0">
@@ -29,19 +26,12 @@ export default function Settings() {
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
-                <Sun className="h-4 w-4 text-primary" />
+                <Palette className="h-4 w-4 text-primary" />
                 <CardTitle>Appearance & Display</CardTitle>
               </div>
               <CardDescription>Customize how the dashboard looks on your station.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Dark Mode</Label>
-                  <p className="text-xs text-muted-foreground">Switch between light and dark mission control themes.</p>
-                </div>
-                <Switch checked={theme === "dark"} onCheckedChange={toggleTheme} />
-              </div>
               <div className="space-y-2">
                 <Label>Map Tile Provider</Label>
                 <Select defaultValue="carto-dark">
