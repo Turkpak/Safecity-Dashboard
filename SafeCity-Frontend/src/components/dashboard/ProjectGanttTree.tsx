@@ -369,7 +369,7 @@ export function ProjectGanttTree({
       <div style={{ minWidth: Math.max(1200, tableMinWidthPx) }}>
         {/* Header */}
         <div className="flex border-b mb-3">
-          <div className="w-[520px] font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2">
+          <div className="w-[280px] sm:w-[520px] font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2">
             WBS Subprocess
           </div>
           <div className="w-28 font-semibold text-sm bg-muted/40 border-r border-border/60 px-3 py-2 text-center">
@@ -430,7 +430,7 @@ export function ProjectGanttTree({
             return (
               <div key={t.id} className="flex items-stretch gap-0 rounded-lg border border-border/60 bg-card/50">
                 <div
-                  className="w-[520px] min-w-[520px] border-r border-border/60 px-3 py-2 flex items-start gap-2"
+                  className="w-[280px] min-w-[280px] sm:w-[520px] sm:min-w-[520px] border-r border-border/60 px-3 py-2 flex items-start gap-2"
                   style={{ paddingLeft: `${12 + t.depth * 18}px` }}
                   title={t.label}
                 >

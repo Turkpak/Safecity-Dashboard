@@ -169,15 +169,15 @@ export function Sidebar() {
     });
   }, [userRole, canView, isSuperAdmin]);
 
-  const NavContent = () => (
+  const NavContent = ({ collapsed }: { collapsed: boolean }) => (
     <div className="flex h-full flex-col gap-4">
       <div
         className={cn(
           "flex h-16 items-center border-b border-white/10 transition-all duration-300",
-          isCollapsed ? "px-3 justify-center" : "px-6 justify-between",
+          collapsed ? "px-3 justify-center" : "px-6 justify-between",
         )}
       >
-        {!isCollapsed && (
+        {!collapsed && (
           <Link
             href="/"
             className="flex items-center gap-3 font-heading font-bold text-2xl text-white tracking-wide"
@@ -195,7 +195,7 @@ export function Sidebar() {
             </div>
           </Link>
         )}
-        {isCollapsed && (
+        {collapsed && (
           <Link href="/" className="flex items-center justify-center">
             <img
               src="/Assets/psca logo.png"
@@ -213,7 +213,7 @@ export function Sidebar() {
                 onClick={toggleSidebar}
                 className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10 hidden md:flex"
               >
-                {isCollapsed ? (
+                {collapsed ? (
                   <ChevronRight className="h-4 w-4" />
                 ) : (
                   <ChevronLeft className="h-4 w-4" />
@@ -221,7 +221,7 @@ export function Sidebar() {
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right">
-              <p>{isCollapsed ? "Expand sidebar" : "Collapse sidebar"}</p>
+              <p>{collapsed ? "Expand sidebar" : "Collapse sidebar"}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -230,7 +230,7 @@ export function Sidebar() {
         <nav
           className={cn(
             "grid items-start text-sm font-medium space-y-1 transition-all duration-300",
-            isCollapsed ? "px-2" : "px-4",
+            collapsed ? "px-2" : "px-4",
           )}
         >
           {visibleNavItems.map((item) =>
@@ -239,7 +239,7 @@ export function Sidebar() {
                 <Tooltip delayDuration={0}>
                   <TooltipTrigger asChild>
                     <div>
-                      {isCollapsed ? (
+                      {collapsed ? (
                         <div
                           className={cn(
                             "flex items-center rounded-lg px-2 py-2 justify-center transition-all text-white/80 hover:bg-white/5 hover:text-white font-sans",
@@ -318,7 +318,7 @@ export function Sidebar() {
                       )}
                     </div>
                   </TooltipTrigger>
-                  {isCollapsed && (
+                  {collapsed && (
                     <TooltipContent side="right">
                       <div className="space-y-1">
                         <p className="font-semibold">{item.label}</p>
@@ -347,7 +347,7 @@ export function Sidebar() {
                         href={item.href!}
                         className={cn(
                           "flex items-center rounded-lg transition-all text-sm font-medium font-sans",
-                          isCollapsed
+                          collapsed
                             ? "px-2 py-2 justify-center"
                             : "px-3 py-2 gap-3",
                           location === item.href
@@ -356,11 +356,11 @@ export function Sidebar() {
                         )}
                       >
                         <item.icon className="h-4 w-4 flex-shrink-0" />
-                        {!isCollapsed && <span>{item.label}</span>}
+                        {!collapsed && <span>{item.label}</span>}
                       </Link>
                     </div>
                   </TooltipTrigger>
-                  {isCollapsed && (
+                  {collapsed && (
                     <TooltipContent side="right">
                       <p>{item.label}</p>
                     </TooltipContent>
@@ -374,7 +374,7 @@ export function Sidebar() {
       <div
         className={cn(
           "border-t border-white/10 mt-auto transition-all duration-300",
-          isCollapsed ? "p-2" : "p-4",
+          collapsed ? "p-2" : "p-4",
         )}
       >
         <TooltipProvider>
@@ -390,19 +390,19 @@ export function Sidebar() {
                   }}
                   className={cn(
                     "flex items-center rounded-lg bg-white/5 p-3 hover:bg-white/10 transition-all group pointer-events-auto",
-                    isCollapsed ? "justify-center" : "justify-between gap-3",
+                    collapsed ? "justify-center" : "justify-between gap-3",
                   )}
                 >
                   <div
                     className={cn(
                       "flex items-center",
-                      isCollapsed ? "justify-center" : "gap-3",
+                      collapsed ? "justify-center" : "gap-3",
                     )}
                   >
                     <div className="h-10 w-10 rounded-full bg-secondary/20 flex items-center justify-center text-secondary font-bold border border-secondary/30 flex-shrink-0">
                       {userRole === "Client" ? "CL" : "AD"}
                     </div>
-                    {!isCollapsed && (
+                    {!collapsed && (
                       <div className="text-xs">
                         <p className="font-semibold text-white">
                           {userRole === "Client"
@@ -417,13 +417,13 @@ export function Sidebar() {
                       </div>
                     )}
                   </div>
-                  {!isCollapsed && (
+                  {!collapsed && (
                     <LogOut className="h-4 w-4 text-white/40 group-hover:text-white transition-colors" />
                   )}
                 </Link>
               </div>
             </TooltipTrigger>
-            {isCollapsed && (
+            {collapsed && (
               <TooltipContent side="right">
                 <div className="text-xs">
                   <p className="font-semibold">
@@ -453,12 +453,12 @@ export function Sidebar() {
           isCollapsed ? "w-16" : "w-64",
         )}
       >
-        <NavContent />
+        <NavContent collapsed={isCollapsed} />
       </div>
 
       <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
         <SheetContent side="left" className="w-64 p-0 bg-sidebar border-none">
-          <NavContent />
+          <NavContent collapsed={false} />
         </SheetContent>
       </Sheet>
     </>

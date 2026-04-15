@@ -15,6 +15,7 @@ import {
   ResponsiveContainer,
   Tooltip,
   Legend,
+  Label as RechartsLabel,
 } from "recharts";
 import { useWindowSize } from "@/hooks/use-window-size";
 import { CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -64,14 +65,6 @@ import { CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import { listProjects, getProjectById } from "@/api/project";
 import { useSidebar } from "@/contexts/SidebarContext";
 
@@ -1804,8 +1797,8 @@ export default function Dashboard() {
                           },
                         ]}
                         cx="50%"
-                        cy="50%"
-                        innerRadius={isMobile ? 38 : isTablet ? 44 : 54}
+                        cy={isMobile ? "46%" : "50%"}
+                        innerRadius={isMobile ? 42 : isTablet ? 44 : 54}
                         outerRadius={isMobile ? 60 : isTablet ? 72 : 88}
                         paddingAngle={2}
                         dataKey="value"
@@ -1815,6 +1808,37 @@ export default function Dashboard() {
                         animationDuration={800}
                         animationBegin={0}
                       >
+                        <RechartsLabel
+                          content={({ viewBox }: any) => {
+                            const cx = viewBox?.cx ?? 0;
+                            const cy = viewBox?.cy ?? 0;
+                            const valueText = `${financialActual.toFixed(1)}%`;
+                            return (
+                              <g>
+                                <text
+                                  x={cx}
+                                  y={cy - (isMobile ? 2 : 3)}
+                                  textAnchor="middle"
+                                  dominantBaseline="central"
+                                  className="font-heading font-bold tabular-nums fill-foreground"
+                                  style={{ fontSize: isMobile ? 14 : 18 }}
+                                >
+                                  {valueText}
+                                </text>
+                                <text
+                                  x={cx}
+                                  y={cy + (isMobile ? 12 : 14)}
+                                  textAnchor="middle"
+                                  dominantBaseline="central"
+                                  className="font-medium uppercase tracking-wider fill-muted-foreground"
+                                  style={{ fontSize: isMobile ? 9 : 10 }}
+                                >
+                                  Actual
+                                </text>
+                              </g>
+                            );
+                          }}
+                        />
                         {["#60a5fa", "#22c55e", "#ef4444"].map((fill, index) => (
                           <Cell
                             key={`cell-f-${index}`}
@@ -1871,15 +1895,6 @@ export default function Dashboard() {
                       />
                     </PieChart>
                   </ResponsiveContainer>
-                  {/* Center label - centered in chart area */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-xl sm:text-2xl font-bold font-heading tabular-nums text-foreground">
-                      {financialActual.toFixed(1)}%
-                    </span>
-                    <span className="text-[9px] sm:text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      Actual
-                    </span>
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1924,8 +1939,8 @@ export default function Dashboard() {
                           },
                         ]}
                         cx="50%"
-                        cy="50%"
-                        innerRadius={isMobile ? 38 : isTablet ? 44 : 54}
+                        cy={isMobile ? "46%" : "50%"}
+                        innerRadius={isMobile ? 42 : isTablet ? 44 : 54}
                         outerRadius={isMobile ? 60 : isTablet ? 72 : 88}
                         paddingAngle={2}
                         dataKey="value"
@@ -1935,6 +1950,37 @@ export default function Dashboard() {
                         animationDuration={800}
                         animationBegin={0}
                       >
+                        <RechartsLabel
+                          content={({ viewBox }: any) => {
+                            const cx = viewBox?.cx ?? 0;
+                            const cy = viewBox?.cy ?? 0;
+                            const valueText = `${overallActualPct.toFixed(1)}%`;
+                            return (
+                              <g>
+                                <text
+                                  x={cx}
+                                  y={cy - (isMobile ? 2 : 3)}
+                                  textAnchor="middle"
+                                  dominantBaseline="central"
+                                  className="font-heading font-bold tabular-nums fill-foreground"
+                                  style={{ fontSize: isMobile ? 14 : 18 }}
+                                >
+                                  {valueText}
+                                </text>
+                                <text
+                                  x={cx}
+                                  y={cy + (isMobile ? 12 : 14)}
+                                  textAnchor="middle"
+                                  dominantBaseline="central"
+                                  className="font-medium uppercase tracking-wider fill-muted-foreground"
+                                  style={{ fontSize: isMobile ? 9 : 10 }}
+                                >
+                                  Actual
+                                </text>
+                              </g>
+                            );
+                          }}
+                        />
                         {["#60a5fa", "#22c55e", "#ef4444"].map((fill, index) => (
                           <Cell
                             key={`cell-o-${index}`}
@@ -1989,15 +2035,6 @@ export default function Dashboard() {
                       />
                     </PieChart>
                   </ResponsiveContainer>
-                  {/* Center label - centered in chart area */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-xl sm:text-2xl font-bold font-heading tabular-nums text-foreground">
-                      {overallActualPct.toFixed(1)}%
-                    </span>
-                    <span className="text-[9px] sm:text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      Actual
-                    </span>
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -2232,7 +2269,7 @@ export default function Dashboard() {
       >
         {/* Top Header Section - Enhanced Design with Filter Bar */}
         <div
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border shadow-lg"
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border shadow-lg flex flex-col"
           style={{
             borderColor: "var(--progress-accent-border)",
             boxShadow: `0 16px 40px var(--progress-accent-glow)`,
@@ -2254,7 +2291,7 @@ export default function Dashboard() {
 
           {/* Filter Bar Section - Radio Buttons */}
           <div
-            className={`relative transition-all duration-300 ${
+            className={`relative transition-all duration-300 order-2 md:order-1 ${
               isFilterBarExpanded
                 ? "border-b border-border/30 pb-3 px-3 sm:px-6 pt-3 sm:pt-4"
                 : "pb-2 px-3 sm:px-4 pt-2 sm:pt-3"
@@ -2283,7 +2320,7 @@ export default function Dashboard() {
                       animate={{ width: "auto", opacity: 1, x: 0 }}
                       exit={{ width: 0, opacity: 0, x: -20 }}
                       transition={{ duration: 0.4, ease: "circOut" }}
-                      className="overflow-x-auto overflow-y-hidden flex items-center min-w-0 w-full pb-1"
+                      className="overflow-hidden flex items-center min-w-0 w-full pb-1"
                     >
                       <RadioGroup
                         value={viewType}
@@ -2310,7 +2347,7 @@ export default function Dashboard() {
                           }
                           setTehsilSearchQuery("");
                         }}
-                        className="flex items-center gap-2 sm:gap-4 md:gap-6 whitespace-nowrap pl-1 sm:pl-2"
+                        className="grid grid-cols-2 gap-2 pl-1 sm:pl-2 sm:flex sm:items-center sm:gap-4 md:gap-6 sm:whitespace-nowrap"
                       >
                         <div className="flex items-center space-x-1.5 sm:space-x-2 rounded-md bg-background/40 px-2 py-1">
                           <RadioGroupItem
@@ -2383,25 +2420,28 @@ export default function Dashboard() {
 
                 {/* Compact breadcrumb on same row when filters are collapsed */}
                 {!showFilters && navigationFlow.length > 1 && (
-                  <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm min-w-0">
+                  <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm min-w-0 sm:flex sm:flex-wrap sm:items-center">
                     {navigationFlow.map((step, idx) => (
-                      <div key={`${step.key}-compact-${idx}`} className="flex items-center gap-2">
+                      <button
+                        key={`${step.key}-compact-${idx}`}
+                        type="button"
+                        onClick={() =>
+                          step.clickable && handleNavigateToLevel(step.key)
+                        }
+                        disabled={!step.clickable}
+                        className={`flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors min-w-0 justify-center sm:justify-start ${
+                          step.clickable
+                            ? "border-[#1e3a8a] bg-[#1e3a8a] text-white hover:bg-[#1d4ed8] cursor-pointer"
+                            : "border-[#b91c1c] bg-[#b91c1c] text-white cursor-default"
+                        }`}
+                      >
                         {idx > 0 && (
-                          <span className="text-muted-foreground/70">{"->"}</span>
+                          <span className="text-white/80" aria-hidden>
+                            {"->"}
+                          </span>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => step.clickable && handleNavigateToLevel(step.key)}
-                          disabled={!step.clickable}
-                          className={`rounded-md border px-2 py-1 transition-colors ${
-                            step.clickable
-                              ? "border-[#1e3a8a] bg-[#1e3a8a] text-white hover:bg-[#1d4ed8] cursor-pointer"
-                              : "border-[#b91c1c] bg-[#b91c1c] text-white cursor-default"
-                          }`}
-                        >
-                          {step.label}
-                        </button>
-                      </div>
+                        <span className="truncate">{step.label}</span>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -2425,67 +2465,89 @@ export default function Dashboard() {
 
             {/* Drilldown navigation flow (shown in header bar) */}
             {showFilters && navigationFlow.length > 1 && (
-              <div className="mt-2 ml-1 sm:ml-2 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+              <div className="mt-2 ml-1 sm:ml-2 text-xs sm:text-sm">
                 <span className="font-medium text-muted-foreground">
                   Navigation:
                 </span>
-                {navigationFlow.map((step, idx) => (
-                  <div key={`${step.key}-${idx}`} className="flex items-center gap-2">
-                    {idx > 0 && (
-                      <span className="text-muted-foreground/70">{"->"}</span>
-                    )}
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-0 sm:ml-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
+                  {navigationFlow.map((step, idx) => (
                     <button
+                      key={`${step.key}-${idx}`}
                       type="button"
-                      onClick={() => step.clickable && handleNavigateToLevel(step.key)}
+                      onClick={() =>
+                        step.clickable && handleNavigateToLevel(step.key)
+                      }
                       disabled={!step.clickable}
-                      className={`rounded-md border px-2 py-1 transition-colors ${
+                      className={`flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors min-w-0 justify-center sm:justify-start ${
                         step.clickable
                           ? "border-[#1e3a8a] bg-[#1e3a8a] text-white hover:bg-[#1d4ed8] cursor-pointer"
                           : "border-[#b91c1c] bg-[#b91c1c] text-white cursor-default"
                       }`}
                     >
-                      {step.label}
+                      {idx > 0 && (
+                        <span className="text-white/80" aria-hidden>
+                          {"->"}
+                        </span>
+                      )}
+                      <span className="truncate">{step.label}</span>
                     </button>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
 
           {/* Header Content Section - Collapsible */}
           <div
-            className={`relative flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 ease-in-out overflow-hidden ${
+            className={`relative flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 ease-in-out overflow-hidden order-1 md:order-2 ${
               isFilterBarExpanded
                 ? "max-h-[500px] opacity-100 px-4 md:px-6 pt-2 pb-4 md:pb-5"
                 : "max-h-0 opacity-0 p-0"
             }`}
           >
-            <div className="space-y-2 flex-1">
-              <div className="flex items-center gap-3 flex-wrap">
-                <div>
-                  <h1 className="text-xl sm:text-3xl md:text-4xl font-bold font-heading bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                    {selectedItemName && selectedItemType === "division"
-                      ? `${selectedItemName} Division`
-                      : selectedItemName && selectedItemType === "district"
-                        ? `${selectedItemName} District`
-                        : selectedItemName && selectedItemType === "tehsil"
-                          ? `${selectedItemName} Tehsil`
-                          : viewType === "divisions"
-                            ? "All Punjab Divisions"
-                            : viewType === "districts"
-                              ? "All Punjab Districts"
-                              : viewType === "tehsils"
-                                ? "All Punjab Tehsils"
-                                : "PSCA Progress Dashboard"}
-                  </h1>
-                </div>
-              </div>
-              {isLoading ? (
-                <div className="flex items-center gap-3">
-                  <Skeleton className="h-7 w-32 rounded-full" />
-                </div>
-              ) : (selectedItemName && singleItemData) || aggregatedData ? (
-                (() => {
+            <div className="flex-1 min-w-0">
+              {(() => {
+                const titleText =
+                  selectedItemName && selectedItemType === "division"
+                    ? `${selectedItemName} Division`
+                    : selectedItemName && selectedItemType === "district"
+                      ? `${selectedItemName} District`
+                      : selectedItemName && selectedItemType === "tehsil"
+                        ? `${selectedItemName} Tehsil`
+                        : viewType === "divisions"
+                          ? "All Punjab Divisions"
+                          : viewType === "districts"
+                            ? "All Punjab Districts"
+                            : viewType === "tehsils"
+                              ? "All Punjab Tehsils"
+                              : "PSCA Progress Dashboard";
+
+                if (isLoading) {
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2 min-w-0">
+                        <h1 className="text-xl sm:text-3xl md:text-4xl font-bold font-heading bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent truncate sm:whitespace-normal">
+                          {titleText}
+                        </h1>
+                        <Skeleton className="h-7 w-28 rounded-full shrink-0" />
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (!((selectedItemName && singleItemData) || aggregatedData)) {
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2 min-w-0">
+                        <h1 className="text-xl sm:text-3xl md:text-4xl font-bold font-heading bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent truncate sm:whitespace-normal">
+                          {titleText}
+                        </h1>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (() => {
                   const overall =
                     selectedItemName && singleItemData
                       ? singleItemData.overall
@@ -2522,18 +2584,18 @@ export default function Dashboard() {
                   const getBadgeClasses = (color: string) => {
                     if (color === "#ef4444") {
                       // red - Low
-                      return "px-4 py-1.5 text-sm font-semibold bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors";
+                      return "px-3 py-1 text-xs sm:px-4 sm:py-1.5 sm:text-sm font-semibold bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors";
                     } else if (color === "#f59e0b") {
                       // orange/amber - Moderate
-                      return "px-4 py-1.5 text-sm font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors";
+                      return "px-3 py-1 text-xs sm:px-4 sm:py-1.5 sm:text-sm font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors";
                     } else if (color === "#3b82f6") {
                       // blue - Good
-                      return "px-4 py-1.5 text-sm font-semibold bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-colors";
+                      return "px-3 py-1 text-xs sm:px-4 sm:py-1.5 sm:text-sm font-semibold bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-colors";
                     } else if (color === "#22c55e" || color === "#10b981") {
                       // green/emerald - High/Fully Completed
-                      return "px-4 py-1.5 text-sm font-semibold bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-950/50 transition-colors";
+                      return "px-3 py-1 text-xs sm:px-4 sm:py-1.5 sm:text-sm font-semibold bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-950/50 transition-colors";
                     }
-                    return "px-4 py-1.5 text-sm font-semibold bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors";
+                    return "px-3 py-1 text-xs sm:px-4 sm:py-1.5 sm:text-sm font-semibold bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors";
                   };
 
                   const getIconClasses = (color: string) => {
@@ -2549,34 +2611,100 @@ export default function Dashboard() {
                   };
 
                   return (
-                    <div className="flex flex-col gap-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge className={getBadgeClasses(meta.color)}>
-                          <TrendingUp className={getIconClasses(meta.color)} />
-                          Overall: {overallLabel}%
-                        </Badge>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0 border-0 bg-transparent p-0 shadow-none ring-offset-background hover:bg-muted/40 focus-visible:ring-1 focus-visible:ring-ring"
-                          aria-expanded={progressLegendOpen}
-                          aria-controls="dashboard-progress-color-legend"
-                          aria-label={
-                            progressLegendOpen
-                              ? "Hide progress color guide"
-                              : "Show progress color guide"
-                          }
-                          onClick={() =>
-                            setProgressLegendOpen((open) => !open)
-                          }
-                        >
-                          <Info
-                            className="h-4 w-4"
-                            style={{ color: meta.color }}
-                            aria-hidden
-                          />
-                        </Button>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2 min-w-0">
+                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold font-heading bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent truncate sm:whitespace-normal">
+                          {titleText}
+                        </h1>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Badge className={getBadgeClasses(meta.color)}>
+                            <TrendingUp className={getIconClasses(meta.color)} />
+                            Overall: {overallLabel}%
+                          </Badge>
+                          {/* Mobile: icon-only export button in the same header row */}
+                          {((selectedItemName && singleItemData) || aggregatedData) &&
+                            viewType && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="sm:hidden h-8 w-8 rounded-lg border-emerald-600/60 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50/70 dark:hover:bg-emerald-950/30 shadow-sm"
+                                aria-label="Export PPTX"
+                                onClick={async () => {
+                                  try {
+                                    const dataToExport =
+                                      selectedItemName && singleItemData
+                                        ? singleItemData
+                                        : aggregatedData;
+                                    const exportName =
+                                      selectedItemName &&
+                                      selectedItemType === "division"
+                                        ? `${selectedItemName} Division`
+                                        : selectedItemName &&
+                                            selectedItemType === "district"
+                                          ? `${selectedItemName} District`
+                                          : selectedItemName &&
+                                              selectedItemType === "tehsil"
+                                            ? `${selectedItemName} Tehsil`
+                                            : viewType === "divisions"
+                                              ? "All Punjab Divisions"
+                                              : viewType === "districts"
+                                                ? "All Punjab Districts"
+                                                : "All Punjab Tehsils";
+
+                                    if (!dataToExport) {
+                                      setShowErrorDialog(true);
+                                      return;
+                                    }
+
+                                    await exportDashboardToPPTX({
+                                      cityName: exportName,
+                                      cityData: dataToExport as any,
+                                      installationPhases:
+                                        installationPhases.map((phase) => ({
+                                          key: phase.key,
+                                          title: phase.title,
+                                          percentage: getProgressValue(
+                                            dataToExport[phase.key],
+                                          ),
+                                        })),
+                                    });
+                                    setShowSuccessDialog(true);
+                                  } catch (error) {
+                                    console.error(
+                                      "Error exporting to PPTX:",
+                                      error,
+                                    );
+                                    setShowErrorDialog(true);
+                                  }
+                                }}
+                              >
+                                <FileDown className="h-4 w-4" />
+                              </Button>
+                            )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 border-0 bg-transparent p-0 shadow-none ring-offset-background hover:bg-muted/40 focus-visible:ring-1 focus-visible:ring-ring"
+                            aria-expanded={progressLegendOpen}
+                            aria-controls="dashboard-progress-color-legend"
+                            aria-label={
+                              progressLegendOpen
+                                ? "Hide progress color guide"
+                                : "Show progress color guide"
+                            }
+                            onClick={() =>
+                              setProgressLegendOpen((open) => !open)
+                            }
+                          >
+                            <Info
+                              className="h-4 w-4"
+                              style={{ color: meta.color }}
+                              aria-hidden
+                            />
+                          </Button>
+                        </div>
                       </div>
                       <AnimatePresence initial={false}>
                         {progressLegendOpen ? (
@@ -2613,15 +2741,15 @@ export default function Dashboard() {
                       </AnimatePresence>
                     </div>
                   );
-                })()
-              ) : null}
+                })();
+              })()}
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
               {((selectedItemName && singleItemData) || aggregatedData) &&
                 viewType && (
                   <Button
-                    className="rounded-xl h-11 bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-sm font-semibold"
+                    className="hidden sm:inline-flex rounded-xl h-11 bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-sm font-semibold"
                     onClick={async () => {
                       try {
                         const dataToExport =
@@ -2670,8 +2798,7 @@ export default function Dashboard() {
                     }}
                   >
                     <FileDown className="h-4 w-4 mr-2" />
-                    <span className="sm:hidden">Export</span>
-                    <span className="hidden sm:inline">Export Operation pptx</span>
+                    <span>Export Operation pptx</span>
                   </Button>
                 )}
             </div>
@@ -2720,29 +2847,7 @@ export default function Dashboard() {
                       </p>
                     </div>
 
-                    <Breadcrumb className="w-full min-w-0 overflow-x-auto overflow-x-touch pb-1 sm:w-auto sm:shrink-0 sm:pb-0 scrollbar-hide">
-                      <BreadcrumbList className="justify-start sm:justify-end flex-nowrap whitespace-nowrap min-w-max">
-                        <BreadcrumbItem>
-                          <BreadcrumbLink asChild>
-                            <button
-                              type="button"
-                              onClick={() => handleNavigateToLevel("all")}
-                              className="hover:underline"
-                            >
-                              Divisions
-                            </button>
-                          </BreadcrumbLink>
-                        </BreadcrumbItem>
-                        <BreadcrumbSeparator>
-                          <span className="text-muted-foreground/70 font-mono">
-                            {"<>"}
-                          </span>
-                        </BreadcrumbSeparator>
-                        <BreadcrumbItem>
-                          <BreadcrumbPage>{selectedItemName} Division</BreadcrumbPage>
-                        </BreadcrumbItem>
-                      </BreadcrumbList>
-                    </Breadcrumb>
+                    {/* Breadcrumb removed (keep header navigation only) */}
                   </div>
 
                   {/* District Cards */}
@@ -2843,46 +2948,7 @@ export default function Dashboard() {
                       </p>
                     </div>
 
-                    <Breadcrumb className="w-full min-w-0 overflow-x-auto overflow-x-touch pb-1 sm:w-auto sm:shrink-0 sm:pb-0 scrollbar-hide">
-                      <BreadcrumbList className="justify-start sm:justify-end flex-nowrap whitespace-nowrap min-w-max">
-                        <BreadcrumbItem>
-                          <BreadcrumbLink asChild>
-                            <button
-                              type="button"
-                              onClick={() => handleNavigateToLevel("all")}
-                              className="hover:underline"
-                            >
-                              Divisions
-                            </button>
-                          </BreadcrumbLink>
-                        </BreadcrumbItem>
-                        <BreadcrumbSeparator>
-                          <span className="text-muted-foreground/70 font-mono">
-                            {"<>"}
-                          </span>
-                        </BreadcrumbSeparator>
-                        <BreadcrumbItem>
-                          <BreadcrumbLink asChild>
-                            <button
-                              type="button"
-                              onClick={() => handleNavigateToLevel("division")}
-                              className="hover:underline"
-                              disabled={!parentDivisionName}
-                            >
-                              {parentDivisionName} Division
-                            </button>
-                          </BreadcrumbLink>
-                        </BreadcrumbItem>
-                        <BreadcrumbSeparator>
-                          <span className="text-muted-foreground/70 font-mono">
-                            {"<>"}
-                          </span>
-                        </BreadcrumbSeparator>
-                        <BreadcrumbItem>
-                          <BreadcrumbPage>{selectedItemName} District</BreadcrumbPage>
-                        </BreadcrumbItem>
-                      </BreadcrumbList>
-                    </Breadcrumb>
+                    {/* Breadcrumb removed (keep header navigation only) */}
                   </div>
 
                   {/* Tehsil Cards */}
@@ -2958,69 +3024,7 @@ export default function Dashboard() {
                       {/* Title removed per request (avoid duplicate tehsil text). */}
                     </div>
 
-                    <Breadcrumb className="w-full min-w-0 overflow-x-auto overflow-x-touch pb-1 sm:w-auto sm:shrink-0 sm:pb-0 scrollbar-hide">
-                      <BreadcrumbList className="justify-start sm:justify-end flex-nowrap whitespace-nowrap min-w-max">
-                        <BreadcrumbItem>
-                          <BreadcrumbLink asChild>
-                            <button
-                              type="button"
-                              onClick={() => handleNavigateToLevel("all")}
-                              className="hover:underline"
-                            >
-                              Divisions
-                            </button>
-                          </BreadcrumbLink>
-                        </BreadcrumbItem>
-                        {parentDivisionName && (
-                          <>
-                            <BreadcrumbSeparator>
-                              <span className="text-muted-foreground/70 font-mono">
-                                {"<>"}
-                              </span>
-                            </BreadcrumbSeparator>
-                            <BreadcrumbItem>
-                              <BreadcrumbLink asChild>
-                                <button
-                                  type="button"
-                                  onClick={() => handleNavigateToLevel("division")}
-                                  className="hover:underline"
-                                >
-                                  {parentDivisionName} Division
-                                </button>
-                              </BreadcrumbLink>
-                            </BreadcrumbItem>
-                          </>
-                        )}
-                        {parentDistrictName && (
-                          <>
-                            <BreadcrumbSeparator>
-                              <span className="text-muted-foreground/70 font-mono">
-                                {"<>"}
-                              </span>
-                            </BreadcrumbSeparator>
-                            <BreadcrumbItem>
-                              <BreadcrumbLink asChild>
-                                <button
-                                  type="button"
-                                  onClick={() => handleNavigateToLevel("district")}
-                                  className="hover:underline"
-                                >
-                                  {parentDistrictName} District
-                                </button>
-                              </BreadcrumbLink>
-                            </BreadcrumbItem>
-                          </>
-                        )}
-                        <BreadcrumbSeparator>
-                          <span className="text-muted-foreground/70 font-mono">
-                            {"<>"}
-                          </span>
-                        </BreadcrumbSeparator>
-                        <BreadcrumbItem>
-                          <BreadcrumbPage>{selectedItemName} Tehsil</BreadcrumbPage>
-                        </BreadcrumbItem>
-                      </BreadcrumbList>
-                    </Breadcrumb>
+                    {/* Breadcrumb removed (keep header navigation only) */}
                   </div>
 
                   {/* Project Cards from API */}

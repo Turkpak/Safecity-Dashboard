@@ -6,7 +6,7 @@ export function Header({ title }: { title: string }) {
   const { setMobileSidebarOpen } = useSidebar();
 
   return (
-    <header className="relative flex h-16 sm:h-16 items-center border-b bg-card/25 backdrop-blur px-8 sm:px-8 sticky top-0 z-20 min-w-0">
+    <header className="relative flex h-16 sm:h-16 items-center border-b bg-card/25 backdrop-blur px-2 sm:px-8 sticky top-0 z-20 min-w-0">
       <div className="grid w-full grid-cols-3 items-center">
         <div className="flex items-center">
           <Button
@@ -24,7 +24,13 @@ export function Header({ title }: { title: string }) {
           className="col-start-2 text-center text-xl sm:text-xl md:text-2xl lg:text-2xl font-heading font-bold text-foreground break-words leading-tight block uppercase
           md:normal-case md:col-start-1 md:col-span-2 md:text-left whitespace-normal"
         >
-          {title}
+          {/* Mobile shows shorter header to avoid wrapping */}
+          <span className="sm:hidden">
+            {title.trim().toLowerCase() === "psca progress dashboard"
+              ? "PSCA Dashboard"
+              : title}
+          </span>
+          <span className="hidden sm:inline">{title}</span>
         </h1>
 
         <div className="col-start-3 justify-self-end hidden md:flex items-center gap-4">

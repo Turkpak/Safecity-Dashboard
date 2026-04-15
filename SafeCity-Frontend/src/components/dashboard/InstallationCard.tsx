@@ -29,6 +29,7 @@ export function InstallationCard({
   nonInteractive = false,
 }: InstallationCardProps) {
   const showDualProgress = actualProgress !== undefined && plannedProgress !== undefined;
+  const clampedPct = Math.max(0, Math.min(100, Number.isFinite(percentage) ? percentage : 0));
   
   // Calculate actual vs planned variance
   const variance = showDualProgress ? actualProgress - plannedProgress : null;
@@ -94,20 +95,28 @@ export function InstallationCard({
   };
 
   const colors = getColorClasses();
-  const status = percentage === 100 ? "Completed" : percentage >= 80 ? "Near Complete" : percentage >= 50 ? "In Progress" : "Started";
+  const status =
+    clampedPct === 100
+      ? "Completed"
+      : clampedPct >= 80
+        ? "Near Complete"
+        : clampedPct >= 50
+          ? "In Progress"
+          : "Started";
 
   return (
     <Card className={cn(
       "relative overflow-hidden transition-all duration-300 group",
-      !nonInteractive && "hover:shadow-2xl hover:-translate-y-1.5",
+      // keep compact size, improve feel via subtle lift + better border/shadow
+      !nonInteractive && "hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0",
       colors.border,
-      "border-r border-t border-b border-border/40",
-      !nonInteractive && "hover:border-border",
-      "bg-gradient-to-br from-card to-card/95",
+      "border-r border-t border-b border-border/50",
+      !nonInteractive && "hover:border-border/80",
+      "bg-gradient-to-br from-card to-card/90",
       onClick && !nonInteractive && "cursor-pointer select-none",
       nonInteractive && "cursor-default",
       selected && colors.selectedRing,
-      selected && "shadow-2xl",
+      selected && "shadow-lg",
       className
     )}
       role={onClick && !nonInteractive ? "button" : undefined}
@@ -123,18 +132,18 @@ export function InstallationCard({
     >
       {/* Subtle background gradient */}
       <div className={cn(
-        "absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl opacity-20 -mr-12 -mt-12 transition-opacity group-hover:opacity-30",
+        "absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl opacity-15 -mr-12 -mt-12 transition-opacity group-hover:opacity-25",
         colors.iconBg.replace("bg-", "bg-").replace("-50", "-200")
       )}></div>
       
       <CardHeader className="relative flex flex-row items-start justify-between space-y-0 pb-3 pt-4 px-3.5">
         <div className="flex-1 min-w-0 pr-2">
-          <CardTitle className="text-[9px] font-bold text-foreground/90 uppercase tracking-wide leading-tight line-clamp-2">
+          <CardTitle className="text-[10px] font-extrabold text-foreground/90 uppercase tracking-[0.16em] leading-tight line-clamp-2">
             {title}
           </CardTitle>
         </div>
         <div className={cn(
-          "flex-shrink-0 p-1.5 rounded-md shadow-sm group-hover:shadow transition-all",
+          "flex-shrink-0 p-1.5 rounded-md shadow-sm group-hover:shadow-md transition-all",
           colors.iconBg
         )}>
           <Icon className={cn("h-3.5 w-3.5", colors.icon)} />
@@ -144,10 +153,10 @@ export function InstallationCard({
         <div className="space-y-2.5">
           <div className="flex items-end justify-between gap-1">
             <span className={cn("text-2xl font-bold tabular-nums leading-none", colors.percentage)}>
-              {percentage}
+              {Math.round(clampedPct)}
               <span className="text-sm font-semibold ml-0.5">%</span>
             </span>
-            <span className="text-[8px] font-semibold text-muted-foreground/80 uppercase tracking-wider px-1 py-0.5 rounded bg-muted/50 leading-tight">
+            <span className="text-[8px] font-semibold text-muted-foreground/80 uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-muted/50 border border-border/40 leading-tight">
               {status}
             </span>
           </div>
@@ -193,15 +202,17 @@ export function InstallationCard({
             </div>
           ) : (
             /* Single progress bar (legacy) */
-            <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted/50 shadow-inner">
+            <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted/40 shadow-inner">
               <div 
                 className={cn(
                   "h-full rounded-full transition-all duration-1000 ease-out shadow-md relative overflow-hidden",
                   colors.progress
                 )}
-                style={{ width: `${percentage}%` }}
+                style={{ width: `${clampedPct}%` }}
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+                {clampedPct > 0 && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent animate-shimmer" />
+                )}
               </div>
               </div>
           )}
