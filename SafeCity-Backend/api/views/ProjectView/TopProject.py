@@ -1,5 +1,6 @@
 from ..common_imports import *
-from django.db.models import Avg
+from django.db.models import Avg, FloatField, Value
+from django.db.models.functions import Coalesce
 
 class TopProjectsView(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
@@ -11,19 +12,27 @@ class TopProjectsView(viewsets.ViewSet):
 
             queryset = Project.objects.select_related("division")
 
-            # ✅ Filter by division
+            # ✅ Filter
             if division_id:
                 queryset = queryset.filter(division_id=division_id)
 
-            # ✅ 🔥 CALCULATE PROGRESS FROM ACTIVITIES
+            # ✅ Calculate average safely
             queryset = queryset.annotate(
-                progress=Avg('activities__progress')
+                progress=Coalesce(
+                    Avg('activities__progress'),
+                    Value(0),
+                    output_field=FloatField()
+                )
             )
 
-            # ✅ Order by calculated progress
-            queryset = queryset.order_by('-progress')
+            # ✅ 🔥 Convert to percentage (IMPORTANT FIX)
+            for obj in queryset:
+                obj.progress = round((obj.progress or 0) * 100, 2)
 
-            # ✅ LIMIT
+            # ✅ Order
+            queryset = sorted(queryset, key=lambda x: x.progress, reverse=True)
+
+            # ✅ Limit
             queryset = queryset[:limit]
 
             serializer = TopProjectSerializer(queryset, many=True)
