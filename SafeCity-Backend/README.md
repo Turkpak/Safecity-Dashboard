@@ -12,7 +12,7 @@ password: postgres
 password: postgres
 "GDAL_LIBRARY_PATH": "C:/Program Files/QGIS 3.44.1/bin/gdal311.dll",
 "GEOS_LIBRARY_PATH": "C:/Program Files/QGIS 3.44.1/bin/geos_c.dll"
-
+.....
 **Make Migration Command**
 python manage.py makemigrations --settings=server.settings.local
 
