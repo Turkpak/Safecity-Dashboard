@@ -199,10 +199,69 @@ export async function createProject(payload: ProjectCreateInput): Promise<Projec
 }
 
 export async function updateProject(id: number, payload: ProjectUpdateInput): Promise<Project> {
-  return put<Project>(
-    `${UPDATE}${id}/`,
-    sanitizeProjectDates({ ...payload } as Record<string, unknown>) as ProjectUpdateInput,
-  );
+  const hasFiles = (payload as any).xer_file != null || (payload as any).boundary_file != null;
+  if (hasFiles) {
+    const p = payload as any;
+    const form = new FormData();
+
+    // Core fields (append only if present to keep partial update semantics)
+    if (Array.isArray(p.stakeholder)) {
+      for (const sid of p.stakeholder) appendFormValue(form, "stakeholder", sid);
+    } else {
+      appendFormValue(form, "stakeholder", p.stakeholder);
+    }
+    appendFormValue(form, "project_name", p.project_name);
+    appendFormValue(form, "project_description", p.project_description);
+    appendFormValue(form, "project_starting_date", normalizeDateFieldForApi(p.project_starting_date) ?? undefined);
+    appendFormValue(form, "project_reference_no", p.project_reference_no);
+    appendFormValue(form, "province", p.province);
+    appendFormValue(form, "division", p.division);
+    appendFormValue(form, "district", p.district);
+    appendFormValue(form, "tehsil", p.tehsil);
+
+    appendFormValue(form, "total_budget_allocated", p.total_budget_allocated);
+    appendFormValue(form, "budget_utilized", p.budget_utilized);
+    appendFormValue(form, "budget_variance", p.budget_variance);
+    appendFormValue(form, "budget_remaining", p.budget_remaining);
+
+    // Financial breakdown fields (optional)
+    for (const key of [
+      "allocation_capital_cost",
+      "allocation_revenue_cost",
+      "allocation_total_cost",
+      "pd_release_capital_cost",
+      "pd_release_cost",
+      "pd_release_total_cost",
+      "spending_release_capital_cost",
+      "spending_release_revenue_cost",
+      "spending_release_total_cost",
+      "pifra_utilization_capital_cost",
+      "pifra_utilization_revenue_cost",
+      "pifra_utilization_total_cost",
+      "pifra_utilization_date",
+      "percentage_utilization_capital",
+      "percentage_utilization_revenue",
+      "percentage_utilization_total",
+    ] as const) {
+      if (key === "pifra_utilization_date") {
+        appendFormValue(form, key, normalizeDateFieldForApi(p[key]) ?? undefined);
+      } else {
+        appendFormValue(form, key, p[key]);
+      }
+    }
+
+    if (p.xer_file) form.append("xer_file", p.xer_file);
+
+    let boundaryFile: File | null = p.boundary_file ?? null;
+    if (boundaryFile) {
+      boundaryFile = await boundaryFileToGeojson(boundaryFile);
+      form.append("boundary_file", boundaryFile);
+    }
+
+    return request<Project>(`${UPDATE}${id}/`, { method: "PUT", formData: form });
+  }
+
+  return put<Project>(`${UPDATE}${id}/`, sanitizeProjectDates({ ...payload } as Record<string, unknown>) as ProjectUpdateInput);
 }
 
 export async function deleteProject(id: number): Promise<void> {

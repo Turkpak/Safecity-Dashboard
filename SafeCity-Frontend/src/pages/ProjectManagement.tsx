@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import {
   listProjects,
+  getProjectById,
   listStakeholders,
   listProvinces,
   listDivisions,
@@ -331,7 +332,11 @@ export default function ProjectManagement() {
     }
   }, [location]);
 
+  const prevDeepLinkModeRef = useRef<typeof deepLinkMode>("");
   useEffect(() => {
+    const prev = prevDeepLinkModeRef.current;
+    prevDeepLinkModeRef.current = deepLinkMode;
+
     if (deepLinkMode === "create") {
       // Ensure Create New Project is never "same as view":
       // keep opening the full 3-step dialog whenever mode=create is present.
@@ -343,7 +348,8 @@ export default function ProjectManagement() {
       return;
     }
     if (deepLinkMode === "view") {
-      if (showAddProjectDialog) setShowAddProjectDialog(false);
+      // Only auto-close when we *navigate* from create -> view.
+      if (prev === "create" && showAddProjectDialog) setShowAddProjectDialog(false);
     }
   }, [deepLinkMode, showAddProjectDialog, editingProject]);
   const { data: stakeholdersList = [] } = useQuery({
@@ -625,73 +631,82 @@ export default function ProjectManagement() {
 
   // Open dialog for editing a project — prefetch division/district/tehsil so dropdowns show selected values
   const openEditDialog = async (project: ApiProject) => {
+    // Always refetch the full project payload for prefill (includes financials + geom).
+    // If fetch fails (auth/network), still open the wizard using the card payload.
+    let p: ApiProject = project;
+    try {
+      const full = await getProjectById(project.id);
+      if (full) p = full as ApiProject;
+    } catch {
+      // best-effort; continue with provided card project
+    }
     skipGeographyClearRef.current = true;
     await Promise.all([
-      queryClient.prefetchQuery({ queryKey: ["divisions", project.province], queryFn: () => listDivisions(project.province) }),
-      queryClient.prefetchQuery({ queryKey: ["districts", project.division], queryFn: () => listDistricts(project.division) }),
-      queryClient.prefetchQuery({ queryKey: ["tehsils", project.district], queryFn: () => listTehsils(project.district) }),
+      queryClient.prefetchQuery({ queryKey: ["divisions", p.province], queryFn: () => listDivisions(p.province) }),
+      queryClient.prefetchQuery({ queryKey: ["districts", p.division], queryFn: () => listDistricts(p.division) }),
+      queryClient.prefetchQuery({ queryKey: ["tehsils", p.district], queryFn: () => listTehsils(p.district) }),
     ]);
-    setEditingProject(project);
-    setProjectName(project.project_name ?? "");
-    setProjectDescription(project.project_description ?? "");
-    setStartingDate(project.project_starting_date ? project.project_starting_date.slice(0, 10) : "");
-    setReferenceNumber(project.project_reference_no ?? "");
+    setEditingProject(p);
+    setProjectName(p.project_name ?? "");
+    setProjectDescription(p.project_description ?? "");
+    setStartingDate(p.project_starting_date ? p.project_starting_date.slice(0, 10) : "");
+    setReferenceNumber(p.project_reference_no ?? "");
     setStakeholderIds(
-      Array.isArray(project.stakeholder)
-        ? project.stakeholder.map(String)
-        : project.stakeholder != null
-          ? [String(project.stakeholder)]
+      Array.isArray(p.stakeholder)
+        ? p.stakeholder.map(String)
+        : p.stakeholder != null
+          ? [String(p.stakeholder)]
           : []
     );
-    setSelectedProvinceId(String(project.province));
-    setSelectedDivisionId(String(project.division));
-    setSelectedDistrictId(String(project.district));
-    setSelectedTehsilId(String(project.tehsil));
-    setTotalBudgetAllocated(project.total_budget_allocated ?? "");
-    setBudgetUtilized(project.budget_utilized ?? "");
+    setSelectedProvinceId(String(p.province));
+    setSelectedDivisionId(String(p.division));
+    setSelectedDistrictId(String(p.district));
+    setSelectedTehsilId(String(p.tehsil));
+    setTotalBudgetAllocated(p.total_budget_allocated ?? "");
+    setBudgetUtilized(p.budget_utilized ?? "");
 
     const hasAny = (...vals: Array<unknown>) =>
       vals.some((v) => v !== null && v !== undefined && String(v).trim() !== "");
 
-    const allocationEnabled = hasAny(project.allocation_capital_cost, project.allocation_revenue_cost, project.allocation_total_cost);
+    const allocationEnabled = hasAny(p.allocation_capital_cost, p.allocation_revenue_cost, p.allocation_total_cost);
     setEnableAllocation(allocationEnabled);
-    setAllocationCapital(project.allocation_capital_cost ?? "");
-    setAllocationRevenue(project.allocation_revenue_cost ?? "");
-    setAllocationTotal(project.allocation_total_cost ?? "");
+    setAllocationCapital(p.allocation_capital_cost ?? "");
+    setAllocationRevenue(p.allocation_revenue_cost ?? "");
+    setAllocationTotal(p.allocation_total_cost ?? "");
 
-    const pdEnabled = hasAny(project.pd_release_capital_cost, project.pd_release_cost, project.pd_release_total_cost);
+    const pdEnabled = hasAny(p.pd_release_capital_cost, p.pd_release_cost, p.pd_release_total_cost);
     setEnablePdRelease(pdEnabled);
-    setPdReleaseCapital(project.pd_release_capital_cost ?? "");
-    setPdReleaseRevenue(project.pd_release_cost ?? "");
-    setPdReleaseTotal(project.pd_release_total_cost ?? "");
+    setPdReleaseCapital(p.pd_release_capital_cost ?? "");
+    setPdReleaseRevenue(p.pd_release_cost ?? "");
+    setPdReleaseTotal(p.pd_release_total_cost ?? "");
 
-    const spendingEnabled = hasAny(project.spending_release_capital_cost, project.spending_release_revenue_cost, project.spending_release_total_cost);
+    const spendingEnabled = hasAny(p.spending_release_capital_cost, p.spending_release_revenue_cost, p.spending_release_total_cost);
     setEnableSpendingRelease(spendingEnabled);
-    setSpendingReleaseCapital(project.spending_release_capital_cost ?? "");
-    setSpendingReleaseRevenue(project.spending_release_revenue_cost ?? "");
-    setSpendingReleaseTotal(project.spending_release_total_cost ?? "");
+    setSpendingReleaseCapital(p.spending_release_capital_cost ?? "");
+    setSpendingReleaseRevenue(p.spending_release_revenue_cost ?? "");
+    setSpendingReleaseTotal(p.spending_release_total_cost ?? "");
 
     const pifraEnabled = hasAny(
-      project.pifra_utilization_capital_cost,
-      project.pifra_utilization_revenue_cost,
-      project.pifra_utilization_total_cost,
-      project.pifra_utilization_date,
+      p.pifra_utilization_capital_cost,
+      p.pifra_utilization_revenue_cost,
+      p.pifra_utilization_total_cost,
+      p.pifra_utilization_date,
     );
     setEnablePifraUtilization(pifraEnabled);
-    setPifraCapital(project.pifra_utilization_capital_cost ?? "");
-    setPifraRevenue(project.pifra_utilization_revenue_cost ?? "");
-    setPifraTotal(project.pifra_utilization_total_cost ?? "");
-    setPifraDate(project.pifra_utilization_date ? project.pifra_utilization_date.slice(0, 10) : "");
+    setPifraCapital(p.pifra_utilization_capital_cost ?? "");
+    setPifraRevenue(p.pifra_utilization_revenue_cost ?? "");
+    setPifraTotal(p.pifra_utilization_total_cost ?? "");
+    setPifraDate(p.pifra_utilization_date ? p.pifra_utilization_date.slice(0, 10) : "");
 
-    const pctEnabled = hasAny(project.percentage_utilization_capital, project.percentage_utilization_revenue, project.percentage_utilization_total);
+    const pctEnabled = hasAny(p.percentage_utilization_capital, p.percentage_utilization_revenue, p.percentage_utilization_total);
     setEnableUtilPct(pctEnabled);
-    setUtilPctCapital(project.percentage_utilization_capital ?? "");
-    setUtilPctRevenue(project.percentage_utilization_revenue ?? "");
-    setUtilPctTotal(project.percentage_utilization_total ?? "");
+    setUtilPctCapital(p.percentage_utilization_capital ?? "");
+    setUtilPctRevenue(p.percentage_utilization_revenue ?? "");
+    setUtilPctTotal(p.percentage_utilization_total ?? "");
 
     setXerFile(null);
     setAreaFile(null);
-    setGeoData(project.geom && typeof project.geom === "object" ? (project.geom as object) : null);
+    setGeoData(p.geom && typeof p.geom === "object" ? (p.geom as object) : null);
     setCurrentStep(1);
     setShowAddProjectDialog(true);
   };
