@@ -943,10 +943,10 @@ export default function Finance() {
                     <div key={item.label} className="space-y-3">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <span className="font-bold text-primary">{item.label}</span>
-                        <div className="text-xs font-mono text-muted-foreground space-y-0.5 sm:text-right">
-                          <div>C: {item.triple.capital.toFixed(2)} M</div>
-                          <div>R: {item.triple.revenue.toFixed(2)} M</div>
-                          <div className="font-bold text-foreground">T: {item.triple.total.toFixed(2)} M</div>
+                        <div className="text-xs font-mono text-muted-foreground flex items-center gap-3 sm:gap-0 sm:space-y-0.5 sm:block sm:text-right">
+                          <span className="whitespace-nowrap">C: {item.triple.capital.toFixed(2)} M</span>
+                          <span className="whitespace-nowrap">R: {item.triple.revenue.toFixed(2)} M</span>
+                          <span className="whitespace-nowrap font-bold text-foreground">T: {item.triple.total.toFixed(2)} M</span>
                         </div>
                       </div>
                       <div className="w-full bg-muted h-3 rounded-full overflow-hidden">

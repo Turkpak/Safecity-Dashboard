@@ -13,7 +13,7 @@ import {
   getProjectGanttData,
   getProjectGanttAll,
 } from "@/api";
-import { Download, FolderKanban, Loader2, AlertTriangle, CalendarCheck, Filter } from "lucide-react";
+import { FolderKanban, Loader2, AlertTriangle, CalendarCheck, Filter } from "lucide-react";
 import React, { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { getMapCenterForArea } from "@/data/areaMapCenters";
@@ -370,11 +370,6 @@ export default function GISLayers() {
     return buildProjectsFeatureCollection([activeSelectedProject], projectStatusById);
   }, [activeSelectedProject, projectStatusById]);
 
-  const handleExportMap = () => {
-    // Export functionality - can be enhanced with html2canvas
-    alert("Map export functionality - Coming soon!");
-  };
-
   return (
     <Layout title="Advanced GIS Intelligence">
       <div className="flex flex-col gap-4 sm:gap-6 w-full min-w-0">
@@ -535,23 +530,6 @@ export default function GISLayers() {
         </div>
 
         <div className="w-full">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-            <h2 className="text-xl font-bold font-heading text-primary">Operations Center</h2>
-
-
-            <div className="flex flex-wrap gap-2 items-center">
-            
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportMap}
-                className="h-8 text-xs"
-              >
-                <Download className="h-3 w-3 mr-1" /> Export
-              </Button>
-             
-            </div>
-          </div>
 
           <div className="w-full min-h-[480px] h-[65vh] max-h-[720px] rounded-xl overflow-hidden">
             <CityMap
