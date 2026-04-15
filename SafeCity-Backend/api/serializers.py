@@ -5,6 +5,7 @@ from django.contrib.gis.geos import GEOSGeometry, Polygon, MultiPolygon
 import json
 from django.contrib.auth import get_user_model
 from .utils import parse_xer
+from datetime import datetime
 # --------------------------------------------------------
 # MyUser Serializer
 # --------------------------------------------------------
@@ -244,6 +245,7 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         input_formats=["%Y-%m-%d", "%Y-%m-%d %H:%M"]
     )
     boundary_file = serializers.FileField(write_only=True, required=False)
+    xer_file = serializers.FileField(write_only=True, required=False)
 
     class Meta:
         model = Project
@@ -299,21 +301,17 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         project.stakeholder.set(stakeholders)
 
         if xer_file:
-            # Save uploaded file content to storage under a stable generated path.
-            path = self._generate_xer_path(project, xer_file.name)
-            project.xer_file.save(path, xer_file, save=False)
+            # Parse the uploaded XER in-memory and create activities without
+            # persisting the file to local storage.
+            try:
+                self._save_activities(project, xer_file)
+            except Exception:
+                pass
         # Handle GeoJSON
         if boundary_file:
             project.geom = self._parse_boundary_file(boundary_file)
 
         project.save()
-
-        # Parse XER activities
-        if xer_file and not project.activities.exists():
-            try:
-                self._save_activities(project, xer_file)
-            except Exception:
-                pass
 
         return project
 
@@ -330,13 +328,12 @@ class ProjectSerializer(GeoFeatureModelSerializer):
             instance.stakeholder.set(stakeholders)
 
         if xer_file:
-            path = self._generate_xer_path(instance, xer_file.name)
-            instance.xer_file.save(path, xer_file, save=False)
-            if not instance.activities.exists():
-                try:
-                    self._save_activities(instance, xer_file)
-                except Exception:
-                    pass
+            # Rebuild activities from the uploaded XER without saving the file.
+            instance.activities.all().delete()
+            try:
+                self._save_activities(instance, xer_file)
+            except Exception:
+                pass
 
         # Handle GeoJSON
         if boundary_file:
@@ -391,6 +388,19 @@ class ProjectSerializer(GeoFeatureModelSerializer):
 
     # ---------- Private: Parse XER and save tasks ----------
     def _save_activities(self, project, xer_file):
+        def _parse_xer_date(value):
+            if not value:
+                return None
+            if isinstance(value, datetime):
+                return value.date()
+            if isinstance(value, str):
+                date_string = value.strip().split(" ")[0]
+                try:
+                    return datetime.strptime(date_string, "%Y-%m-%d").date()
+                except ValueError:
+                    return None
+            return None
+
         xer_file.seek(0)
         data = parse_xer(xer_file)
 
@@ -416,33 +426,33 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         # 2. TASKS
         for task in tasks:
             parent = wbs_objects.get(task["wbs_id"])
-            start = task["start_date"].split(" ")[0] if task["start_date"] else None
-            end = task["end_date"].split(" ")[0] if task["end_date"] else None
-            task_type = "milestone" if start == end else "task"
+            start = _parse_xer_date(task.get("start_date"))
+            end = _parse_xer_date(task.get("end_date"))
+            task_type = "milestone" if start and end and start == end else "task"
 
             obj = ProjectActivity.objects.create(
                 project=project,
-                activity_id=task["activity_id"],
-                activity_name=task["activity_name"],
+                activity_id=task.get("activity_id"),
+                activity_name=task.get("activity_name"),
                 parent=parent,
                 start_date=start,
                 end_date=end,
-                progress=task["progress"],
-                duration=task["duration"],
+                progress=task.get("progress") or 0,
+                duration=task.get("duration") or 0,
                 task_type=task_type
             )
-            task_map[task["activity_id"]] = obj
+            task_map[task.get("activity_id")] = obj
 
         # 3. DEPENDENCIES
         for dep in dependencies:
-            task_obj = task_map.get(dep["task_id"])
-            pred_obj = task_map.get(dep["pred_task_id"])
+            task_obj = task_map.get(dep.get("task_id"))
+            pred_obj = task_map.get(dep.get("pred_task_id"))
             if task_obj and pred_obj:
                 TaskDependency.objects.create(
                     project=project,
                     task=task_obj,
                     predecessor=pred_obj,
-                    type=dep["type"]
+                    type=dep.get("type")
                 )
 
 class TopProjectSerializer(serializers.ModelSerializer):

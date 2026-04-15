@@ -379,7 +379,7 @@ class Project(models.Model):
                         predecessor=pred_obj,
                         type=dep.get("type"),
                     )
-
+        
 class ProjectActivity(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="activities")
 
