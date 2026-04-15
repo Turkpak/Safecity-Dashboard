@@ -77,6 +77,136 @@ body {
   animation: pulse-slow 2s ease-in-out infinite;
 }
 
+/* Leaflet / GIS: project status boundary markers (delay/pending/in-progress) */
+.project-status-icon {
+  /* Leaflet adds its own wrapper; keep it predictable */
+}
+
+.project-status-icon__wrap {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+}
+
+.project-status-icon__ring {
+  position: absolute;
+  inset: -8px;
+  border-radius: 9999px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Delayed: strong pulse + expanding ring to catch attention */
+@keyframes projectDelayPulse {
+  0% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(225, 29, 72, 0));
+  }
+  20% {
+    transform: scale(1.12);
+    filter: drop-shadow(0 0 10px rgba(225, 29, 72, 0.55));
+  }
+  40% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(225, 29, 72, 0));
+  }
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(225, 29, 72, 0));
+  }
+}
+
+@keyframes projectDelayRing {
+  0% {
+    transform: scale(0.75);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.55;
+  }
+  65% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+
+.project-status-icon--delay .project-status-icon__dot {
+  animation: projectDelayPulse 1.35s ease-in-out infinite;
+}
+.project-status-icon--delay .project-status-icon__ring {
+  border: 2px solid rgba(225, 29, 72, 0.55);
+  box-shadow: 0 0 0 6px rgba(225, 29, 72, 0.08);
+  animation: projectDelayRing 1.35s ease-out infinite;
+}
+
+/* Pending: gentle bob + soft glow (visible, but not alarming) */
+@keyframes projectPendingBob {
+  0%,
+  100% {
+    transform: translateY(0);
+    filter: drop-shadow(0 0 0 rgba(217, 119, 6, 0));
+  }
+  50% {
+    transform: translateY(-2px);
+    filter: drop-shadow(0 0 8px rgba(217, 119, 6, 0.35));
+  }
+}
+
+@keyframes projectPendingRing {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.25;
+  }
+  100% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+
+.project-status-icon--pending .project-status-icon__dot {
+  animation: projectPendingBob 2.1s ease-in-out infinite;
+}
+.project-status-icon--pending .project-status-icon__ring {
+  border: 1px dashed rgba(217, 119, 6, 0.55);
+  animation: projectPendingRing 2.1s ease-out infinite;
+}
+
+/* In progress: subtle breathe so it's not static */
+@keyframes projectProgressBreathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.95;
+  }
+}
+.project-status-icon--progress .project-status-icon__dot {
+  animation: projectProgressBreathe 2.4s ease-in-out infinite;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .project-status-icon--delay .project-status-icon__dot,
+  .project-status-icon--delay .project-status-icon__ring,
+  .project-status-icon--pending .project-status-icon__dot,
+  .project-status-icon--pending .project-status-icon__ring,
+  .project-status-icon--progress .project-status-icon__dot {
+    animation: none !important;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

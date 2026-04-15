@@ -67,6 +67,7 @@ import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { listProjects, getProjectById } from "@/api/project";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { cn } from "@/lib/utils";
 
 // Enhanced installation progress data with sub-projects and planned vs actual
 interface PhaseProgress {
@@ -2617,9 +2618,42 @@ export default function Dashboard() {
                           {titleText}
                         </h1>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <Badge className={getBadgeClasses(meta.color)}>
+                          <Badge
+                            className={cn(
+                              getBadgeClasses(meta.color),
+                              "flex items-center gap-1.5 pr-1",
+                            )}
+                          >
                             <TrendingUp className={getIconClasses(meta.color)} />
-                            Overall: {overallLabel}%
+                            <span className="whitespace-nowrap">
+                              Overall: {overallLabel}%
+                            </span>
+                            <button
+                              type="button"
+                              className={cn(
+                                "ml-1 inline-flex h-6 w-6 items-center justify-center rounded-md",
+                                "bg-white/60 hover:bg-white/80 dark:bg-white/10 dark:hover:bg-white/15",
+                                "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                              )}
+                              aria-expanded={progressLegendOpen}
+                              aria-controls="dashboard-progress-color-legend"
+                              aria-label={
+                                progressLegendOpen
+                                  ? "Hide progress color guide"
+                                  : "Show progress color guide"
+                              }
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setProgressLegendOpen((open) => !open);
+                              }}
+                            >
+                              <Info
+                                className="h-3.5 w-3.5"
+                                style={{ color: meta.color }}
+                                aria-hidden
+                              />
+                            </button>
                           </Badge>
                           {/* Mobile: icon-only export button in the same header row */}
                           {((selectedItemName && singleItemData) || aggregatedData) &&
@@ -2682,28 +2716,6 @@ export default function Dashboard() {
                                 <FileDown className="h-4 w-4" />
                               </Button>
                             )}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 shrink-0 border-0 bg-transparent p-0 shadow-none ring-offset-background hover:bg-muted/40 focus-visible:ring-1 focus-visible:ring-ring"
-                            aria-expanded={progressLegendOpen}
-                            aria-controls="dashboard-progress-color-legend"
-                            aria-label={
-                              progressLegendOpen
-                                ? "Hide progress color guide"
-                                : "Show progress color guide"
-                            }
-                            onClick={() =>
-                              setProgressLegendOpen((open) => !open)
-                            }
-                          >
-                            <Info
-                              className="h-4 w-4"
-                              style={{ color: meta.color }}
-                              aria-hidden
-                            />
-                          </Button>
                         </div>
                       </div>
                       <AnimatePresence initial={false}>

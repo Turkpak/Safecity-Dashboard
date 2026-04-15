@@ -57,17 +57,26 @@ const PROJECT_STATUS_STYLE: Record<ProjectStatus, { color: string; fillColor: st
 function getProjectStatusIcon(status: ProjectStatus) {
   const cfg = PROJECT_STATUS_STYLE[status] ?? PROJECT_STATUS_STYLE.pending;
   const label = status === "in_delay" ? "!" : status === "in_progress" ? "▶" : "⏳";
+  const statusClass =
+    status === "in_delay"
+      ? "project-status-icon--delay"
+      : status === "pending"
+        ? "project-status-icon--pending"
+        : "project-status-icon--progress";
   return L.divIcon({
-    className: "project-status-icon",
-    html: `<div style="
-      width: 26px; height: 26px;
-      border-radius: 9999px;
-      background: ${cfg.color};
-      border: 2px solid rgba(255,255,255,0.95);
-      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
-      display: flex; align-items: center; justify-content: center;
-      color: white; font-weight: 800; font-size: 13px; line-height: 1;
-    ">${label}</div>`,
+    className: `project-status-icon ${statusClass}`,
+    html: `<div class="project-status-icon__wrap ${statusClass}">
+      <span class="project-status-icon__ring" aria-hidden="true"></span>
+      <span class="project-status-icon__dot" style="
+        width: 26px; height: 26px;
+        border-radius: 9999px;
+        background: ${cfg.color};
+        border: 2px solid rgba(255,255,255,0.95);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+        display: flex; align-items: center; justify-content: center;
+        color: white; font-weight: 800; font-size: 13px; line-height: 1;
+      "><span class="project-status-icon__label">${label}</span></span>
+    </div>`,
     iconSize: [26, 26],
     iconAnchor: [13, 13],
   });
