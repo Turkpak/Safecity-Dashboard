@@ -165,21 +165,25 @@ export default function DivisionManagement() {
                   className="h-10"
                 />
               </div>
-              <div className="flex flex-col sm:flex-row gap-2 lg:col-span-1">
+              <div className="flex flex-row gap-2 min-w-0 lg:col-span-1">
                 <Button
                   onClick={handleSubmit}
                   disabled={createMutation.isPending || updateMutation.isPending}
-                  className="bg-secondary hover:bg-secondary/90 text-white w-full h-10"
+                  className="bg-secondary hover:bg-secondary/90 text-white flex-1 h-10 min-w-0"
                 >
                   {editingId !== null ? "Update Division" : <><Plus className="h-4 w-4 mr-2" /> Create Division</>}
                 </Button>
                 {editingId !== null && (
-                  <Button variant="outline" onClick={handleCancel} className="w-full h-10">
+                  <Button variant="outline" onClick={handleCancel} className="flex-1 h-10 min-w-0">
                     Cancel
                   </Button>
                 )}
                 {editingId === null && (
-                  <Button variant="outline" size="sm" onClick={() => setFormData({ ...formData, division_name: "" })} className="w-full h-7 text-red-600 bg-white hover:bg-red-50 border-red-200 hover:border-red-300 text-xs font-medium">
+                  <Button
+                    variant="outline"
+                    onClick={() => setFormData({ ...formData, division_name: "" })}
+                    className="flex-1 h-10 min-w-0 text-red-600 bg-white hover:bg-red-50 border-red-200 hover:border-red-300 text-xs font-semibold"
+                  >
                     Clear
                   </Button>
                 )}

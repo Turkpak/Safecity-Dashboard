@@ -132,12 +132,12 @@ export default function ProvinceManagement() {
                     className="h-10"
                   />
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex flex-row gap-2 min-w-0">
                   {canCreate && editingId === null && (
                     <Button
                       onClick={handleSubmit}
                       disabled={createMutation.isPending}
-                      className="bg-secondary hover:bg-secondary/90 text-white w-full h-10"
+                      className="bg-secondary hover:bg-secondary/90 text-white flex-1 h-10 min-w-0"
                     >
                       <Plus className="h-4 w-4 mr-2" /> Create Province
                     </Button>
@@ -147,17 +147,21 @@ export default function ProvinceManagement() {
                       <Button
                         onClick={handleSubmit}
                         disabled={updateMutation.isPending}
-                        className="bg-secondary hover:bg-secondary/90 text-white w-full h-10"
+                        className="bg-secondary hover:bg-secondary/90 text-white flex-1 h-10 min-w-0"
                       >
                         Update Province
                       </Button>
-                      <Button variant="outline" onClick={handleCancel} className="w-full h-10">
+                      <Button variant="outline" onClick={handleCancel} className="flex-1 h-10 min-w-0">
                         Cancel
                       </Button>
                     </>
                   )}
                   {editingId === null && canCreate && (
-                    <Button variant="outline" size="sm" onClick={() => setProvinceName("")} className="w-full h-7 text-red-600 bg-white hover:bg-red-50 border-red-200 hover:border-red-300 text-xs font-medium">
+                    <Button
+                      variant="outline"
+                      onClick={() => setProvinceName("")}
+                      className="flex-1 h-10 min-w-0 text-red-600 bg-white hover:bg-red-50 border-red-200 hover:border-red-300 text-xs font-semibold"
+                    >
                       Clear
                     </Button>
                   )}

@@ -23,6 +23,8 @@ export default function DistrictManagement() {
   const [formData, setFormData] = useState({ provinceId: "", divisionId: "", district_name: "" });
   const [editingId, setEditingId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [pageSize] = useState(10);
+  const [page, setPage] = useState(1);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -141,6 +143,16 @@ export default function DistrictManagement() {
       (d.division_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (d.province_name || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredDistricts.length / pageSize));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const startIdx = (safePage - 1) * pageSize;
+  const paginatedDistricts = filteredDistricts.slice(startIdx, startIdx + pageSize);
 
   return (
     <Layout title="Area Hierarchy Management">
@@ -267,9 +279,9 @@ export default function DistrictManagement() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredDistricts.map((district, index) => (
+                    paginatedDistricts.map((district, index) => (
                       <TableRow key={district.id}>
-                        <TableCell className="font-medium">{index + 1}</TableCell>
+                        <TableCell className="font-medium">{startIdx + index + 1}</TableCell>
                         <TableCell className="whitespace-nowrap">{district.province_name ?? ""}</TableCell>
                         <TableCell className="whitespace-nowrap">{district.division_name ?? ""}</TableCell>
                         <TableCell className="font-semibold text-primary whitespace-nowrap">{district.district_name}</TableCell>
@@ -307,6 +319,36 @@ export default function DistrictManagement() {
                 </TableBody>
               </Table>
             </div>
+            {!districtsLoading && filteredDistricts.length > 0 && (
+              <div className="flex items-center justify-between gap-3 px-4 py-3 border-t bg-muted/10">
+                <div className="text-xs text-muted-foreground tabular-nums">
+                  Showing {startIdx + 1}–{Math.min(startIdx + pageSize, filteredDistricts.length)} of {filteredDistricts.length}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={safePage <= 1}
+                  >
+                    Prev
+                  </Button>
+                  <div className="text-xs text-muted-foreground tabular-nums min-w-[88px] text-center">
+                    Page {safePage} / {totalPages}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={safePage >= totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
         </div>
       </div>

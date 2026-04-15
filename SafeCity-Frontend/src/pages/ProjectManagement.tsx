@@ -1723,7 +1723,7 @@ export default function ProjectManagement() {
                     </div>
                   )}
 
-                  <DialogFooter>
+                  <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:gap-3">
                     <Button
                       type="button"
                       variant="outline"

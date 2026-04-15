@@ -326,8 +326,8 @@ export default function StakeholderManagement() {
           </CardHeader>
           <CardContent className="p-0">
             {/* Toolbar: search + page size */}
-            <div className="flex flex-col gap-2 px-4 sm:px-6 py-2 sm:py-4 border-b bg-muted/20 min-w-0 sm:flex-row sm:items-center sm:justify-between">
-              <div className="relative flex-1 min-w-0 sm:max-w-[520px]">
+            <div className="flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-4 border-b bg-muted/20 min-w-0">
+              <div className="relative flex-1 min-w-0">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
                   placeholder="Search by type or title…"
@@ -336,10 +336,13 @@ export default function StakeholderManagement() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              <div className="flex flex-col gap-2 shrink-0 sm:ml-auto sm:flex-row sm:items-center sm:gap-3">
-                <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">Rows per page</span>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
+                  <span className="hidden sm:inline">Rows per page</span>
+                  <span className="sm:hidden">Rows</span>
+                </span>
                 <Select value={pageSize} onValueChange={setPageSize}>
-                  <SelectTrigger className="w-full sm:w-[88px] h-10 min-h-10">
+                  <SelectTrigger className="w-[76px] sm:w-[88px] h-10 min-h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
