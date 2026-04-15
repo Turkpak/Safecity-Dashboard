@@ -272,30 +272,44 @@ def parse_xer(file):
         line = line.decode("utf-8", errors="ignore").strip()
 
         if line.startswith("%T"):
-            current_table = line.split("\t")[1]
+            current_table = line.split("\t")[1].strip().upper()
 
         elif line.startswith("%F"):
-            fields = line.split("\t")[1:]
+            fields = [f.strip().lower() for f in line.split("\t")[1:]]
 
         elif line.startswith("%R"):
             values = line.split("\t")[1:]
             row = dict(zip(fields, values))
 
             if current_table == "PROJWBS":
-                wbs[row["wbs_id"]] = {
+                wbs[row.get("wbs_id")] = {
                     "name": row.get("wbs_name"),
                     "parent": row.get("parent_wbs_id")
                 }
 
             elif current_table == "TASK":
                 tasks.append({
-                    "activity_id": row.get("task_id"),
-                    "activity_name": row.get("task_name"),
+                    "activity_id": row.get("task_id") or row.get("task_id"),
+                    "activity_name": row.get("task_name") or row.get("task_name"),
                     "wbs_id": row.get("wbs_id"),
-                    "start_date": row.get("early_start_date") or row.get("target_start_date"),
-                    "end_date": row.get("early_end_date") or row.get("target_end_date"),
-                    "progress": float(row.get("phys_complete_pct") or 0),
-                    "duration": float(row.get("target_drtn_hr_cnt") or 0)
+                    "start_date": (
+                        row.get("early_start_date") or row.get("target_start_date") or
+                        row.get("start_date") or row.get("scheduled_start_date") or
+                        row.get("planned_start_date")
+                    ),
+                    "end_date": (
+                        row.get("early_end_date") or row.get("target_end_date") or
+                        row.get("finish_date") or row.get("end_date") or
+                        row.get("scheduled_end_date") or row.get("planned_finish_date")
+                    ),
+                    "progress": float(
+                        row.get("phys_complete_pct") or row.get("percent_complete") or
+                        row.get("pcomplete") or 0
+                    ),
+                    "duration": float(
+                        row.get("target_drtn_hr_cnt") or row.get("duration") or
+                        row.get("drtn_hr_cnt") or 0
+                    )
                 })
 
             elif current_table == "TASKPRED":

@@ -309,6 +309,77 @@ class Project(models.Model):
 
         super().save(*args, **kwargs)
 
+    def parse_xer_file(self):
+        """
+        Parse the attached XER file and populate ProjectActivity / TaskDependency.
+        Safe to call multiple times; it will no-op if there is no XER or activities already exist.
+        """
+        if not self.xer_file:
+            return
+        if self.activities.exists():
+            return
+
+        from api.utils import parse_xer
+        from django.db import transaction
+
+        # Ensure file pointer is at start (StorageFile supports open()).
+        with self.xer_file.open("rb") as f:
+            data = parse_xer(f)
+
+        wbs = data.get("wbs", {})
+        tasks = data.get("tasks", [])
+        dependencies = data.get("dependencies", [])
+
+        wbs_objects = {}
+        task_map = {}
+
+        with transaction.atomic():
+            # 1) WBS nodes
+            for wbs_id, w in wbs.items():
+                parent = wbs_objects.get(w.get("parent"))
+                obj = ProjectActivity.objects.create(
+                    project=self,
+                    activity_id=wbs_id,
+                    activity_name=w.get("name"),
+                    parent=parent,
+                    task_type="wbs",
+                )
+                wbs_objects[wbs_id] = obj
+
+            # 2) TASK nodes
+            for task in tasks:
+                parent = wbs_objects.get(task.get("wbs_id"))
+                start = task.get("start_date")
+                end = task.get("end_date")
+                start = start.split(" ")[0] if isinstance(start, str) and start else None
+                end = end.split(" ")[0] if isinstance(end, str) and end else None
+                task_type = "milestone" if start and end and start == end else "task"
+
+                obj = ProjectActivity.objects.create(
+                    project=self,
+                    activity_id=task.get("activity_id"),
+                    activity_name=task.get("activity_name"),
+                    parent=parent,
+                    start_date=start,
+                    end_date=end,
+                    progress=task.get("progress") or 0,
+                    duration=task.get("duration") or 0,
+                    task_type=task_type,
+                )
+                task_map[task.get("activity_id")] = obj
+
+            # 3) Dependencies
+            for dep in dependencies:
+                task_obj = task_map.get(dep.get("task_id"))
+                pred_obj = task_map.get(dep.get("pred_task_id"))
+                if task_obj and pred_obj:
+                    TaskDependency.objects.create(
+                        project=self,
+                        task=task_obj,
+                        predecessor=pred_obj,
+                        type=dep.get("type"),
+                    )
+        
 class ProjectActivity(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="activities")
 
