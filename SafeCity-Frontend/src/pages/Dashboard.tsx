@@ -668,6 +668,8 @@ export default function Dashboard() {
   const [selectedMilestoneKey, setSelectedMilestoneKey] =
     useState<PhaseKey | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const PROJECTS_PAGE_SIZE = 20;
+  const [projectsPage, setProjectsPage] = useState(1);
   const [progressType, setProgressType] = useState<"physical" | "financial">(
     "physical",
   );
@@ -917,6 +919,11 @@ export default function Dashboard() {
     }, 800); // 800ms loading simulation
     return () => clearTimeout(timer);
   }, [viewType, selectedItemName, selectedItemType]);
+
+  // Reset pagination when switching to projects view or when the list changes.
+  useEffect(() => {
+    if (viewType === "projects") setProjectsPage(1);
+  }, [viewType, apiProjects.length]);
 
   // clear project selection when leaving tehsil view or projects view
   useEffect(() => {
@@ -2500,7 +2507,7 @@ export default function Dashboard() {
 
           {/* Header Content Section - Collapsible */}
           <div
-            className={`relative flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 ease-in-out overflow-hidden order-1 md:order-2 ${
+            className={`relative flex flex-col md:flex-row md:items-start justify-between gap-4 transition-all duration-300 ease-in-out overflow-hidden order-1 md:order-2 ${
               isFilterBarExpanded
                 ? "max-h-[500px] opacity-100 px-4 md:px-6 pt-2 pb-4 md:pb-5"
                 : "max-h-0 opacity-0 p-0"
@@ -2521,7 +2528,9 @@ export default function Dashboard() {
                             ? "All Punjab Districts"
                             : viewType === "tehsils"
                               ? "All Punjab Tehsils"
-                              : "PSCA Progress Dashboard";
+                              : viewType === "projects"
+                                ? "All Projects"
+                                : "PSCA Progress Dashboard";
 
                 if (isLoading) {
                   return (
@@ -3597,10 +3606,65 @@ export default function Dashboard() {
                     Select a project to view its Gantt chart and details
                   </p>
                 </div>
+
+                {(() => {
+                  const totalPages = Math.max(
+                    1,
+                    Math.ceil(apiProjects.length / PROJECTS_PAGE_SIZE),
+                  );
+                  const canPrev = projectsPage > 1;
+                  const canNext = projectsPage < totalPages;
+                  return (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground hidden sm:inline">
+                        Page {projectsPage} / {totalPages}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!canPrev}
+                        onClick={() =>
+                          setProjectsPage((p) => Math.max(1, p - 1))
+                        }
+                      >
+                        Prev
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!canNext}
+                        onClick={() =>
+                          setProjectsPage((p) =>
+                            Math.min(totalPages, p + 1),
+                          )
+                        }
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {apiProjects.map((project, index) => {
+                {(() => {
+                  const totalPages = Math.max(
+                    1,
+                    Math.ceil(apiProjects.length / PROJECTS_PAGE_SIZE),
+                  );
+                  const safePage = Math.min(
+                    Math.max(1, projectsPage),
+                    totalPages,
+                  );
+                  const start = (safePage - 1) * PROJECTS_PAGE_SIZE;
+                  const pageProjects = apiProjects.slice(
+                    start,
+                    start + PROJECTS_PAGE_SIZE,
+                  );
+
+                  return pageProjects.map((project, index) => {
                   const progress = Math.round(
                     ganttProgressByProjectId.get(project.id) ?? 0,
                   );
@@ -3614,10 +3678,11 @@ export default function Dashboard() {
                           prev?.id === project.id ? null : project,
                         )
                       }
-                      color={CARD_COLORS[index % CARD_COLORS.length]}
+                      color={CARD_COLORS[(start + index) % CARD_COLORS.length]}
                     />
                   );
-                })}
+                  });
+                })()}
               </div>
 
               {selectedProjectForDetails && (

@@ -47,6 +47,7 @@ type FlatGanttRow = {
   // ✅ ADD THESE
   actual_start?: string | null;
   actual_end?: string | null;
+  progress_date?: string | null;
   has_delay?: boolean;
   delay_info?: unknown;
 };
@@ -539,7 +540,7 @@ export function ProjectGanttTree({
                     </div>
                     {/* Actual/progress bar (bottom row) */}
                     <div
-                      className="absolute h-4 rounded-md top-7 bg-sky-300"
+                      className="absolute h-4 top-7 bg-sky-300 rounded-l-md rounded-r-md"
                       style={{ left: `${leftPx}px`, width: `${actualWidthPx}px` }}
                       title={`Actual: ${Math.round(t.progress ?? 0)}%`}
                     >
@@ -547,6 +548,25 @@ export function ProjectGanttTree({
                         A:{Math.round(clamp(t.progress ?? 0, 0, 100))}%
                       </span>
                     </div>
+                    {/* Late progress overrun (red) when progress_date exceeds planned end */}
+                    {!t.hasChildren && t.progress_date && t.end ? (() => {
+                      const plannedEndPx = getTaskRightPx(t.end);
+                      const progressDatePx = getTaskRightPx(t.progress_date);
+                      const rawOverrun = progressDatePx - plannedEndPx;
+                      if (!Number.isFinite(rawOverrun) || rawOverrun <= 0) return null;
+                      // Slight overlap removes any visible seam between blue and red.
+                      const overlapPx = 1;
+                      const left = Math.max(0, Math.min(timelineWidthPx, plannedEndPx - overlapPx));
+                      const width = Math.max(0, Math.min(timelineWidthPx - left, rawOverrun + overlapPx));
+                      if (width <= 0) return null;
+                      return (
+                        <div
+                          className="absolute h-4 top-7 bg-red-500/90 rounded-r-md"
+                          style={{ left: `${left}px`, width: `${width}px` }}
+                          title={`Late progress date: ${t.progress_date} (planned end: ${t.end})`}
+                        />
+                      );
+                    })() : null}
                   </div>
                 </div>
 

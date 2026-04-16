@@ -171,6 +171,7 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
       end: range.end,
       actual_start: asDate(node?.actual_start),
       actual_end: asDate(node?.actual_end),
+      progress_date: asDate(node?.progress_date),
       progress: typeof node?.progress === "number" && Number.isFinite(node.progress) ? node.progress : 0,
       parent,
       order: orderCounter++,
