@@ -508,3 +508,4 @@ def recompute_activity_ancestors(activity):
         cur.save(update_fields=["start_date", "end_date", "progress"])
 
         cur = cur.parent
+        

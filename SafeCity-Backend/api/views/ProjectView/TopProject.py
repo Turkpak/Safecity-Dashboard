@@ -1,5 +1,5 @@
-from ..common_imports import *
 from collections import defaultdict
+from ..common_imports import *
 
 class TopProjectsView(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
@@ -11,25 +11,21 @@ class TopProjectsView(viewsets.ViewSet):
 
             queryset = Project.objects.select_related("division")
 
-            # ✅ Filter
             if division_id:
                 queryset = queryset.filter(division_id=division_id)
 
             projects = list(queryset)
-            project_ids = [project.id for project in projects]
-
-            activities = ProjectActivity.objects.filter(project_id__in=project_ids).order_by('id')
-            activities_by_project = defaultdict(list)
-            for activity in activities:
-                activities_by_project[activity.project_id].append(activity)
 
             for project in projects:
-                project.progress = round(
-                    self._compute_project_progress(activities_by_project.get(project.id, [])),
-                    2,
+                activities = list(
+                    ProjectActivity.objects.filter(project=project)
+                    .only("id", "parent_id", "progress", "duration", "start_date", "end_date")
                 )
 
+                project.progress = round(self._calc_project_progress(activities), 2)
+
             projects = sorted(projects, key=lambda x: x.progress, reverse=True)[:limit]
+
             serializer = TopProjectSerializer(projects, many=True)
 
             return ApiResponse(
@@ -47,56 +43,83 @@ class TopProjectsView(viewsets.ViewSet):
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             ).create_response()
 
-    def _normalize_progress(self, value):
-        if value is None:
-            return 0.0
-        try:
-            progress = float(value)
-        except (TypeError, ValueError):
-            return 0.0
-        if progress <= 1:
-            return progress * 100
-        return progress
-
-    def _compute_project_progress(self, activities):
+    def _calc_project_progress(self, activities):
         if not activities:
-            return 0.0
+            return 0
 
-        children_by_parent = defaultdict(list)
-        for activity in activities:
-            parent_id = activity.parent_id or 0
-            children_by_parent[parent_id].append(activity)
+        from collections import defaultdict
+        from datetime import datetime
 
-        def calculate_node(node):
-            children = children_by_parent.get(node.id, [])
+        tree = defaultdict(list)
+        ROOT = 0
+
+        # Build tree
+        for a in activities:
+            parent_id = a.parent_id or 0
+            tree[parent_id].append(a)
+
+        def normalize(p):
+            if p is None:
+                return 0
+            return p * 100 if p <= 1 else p
+
+        def calc(node):
+            children = tree.get(node.id, [])
+
+            # ---------- LEAF ----------
             if not children:
-                progress = self._normalize_progress(node.progress or 0)
-                duration = node.duration or 1
-                return progress, max(duration, 1)
+                return {
+                    "progress": normalize(node.progress),
+                    "start": node.start_date,
+                    "end": node.end_date
+                }
+
+            # ---------- CHILDREN ----------
+            child_results = [calc(c) for c in children]
+
+            # 🔥 SAME AS GANTT: recompute duration from dates
+            start_dates = [c["start"] for c in child_results if c["start"]]
+            end_dates = [c["end"] for c in child_results if c["end"]]
+
+            if start_dates and end_dates:
+                start = min(start_dates)
+                end = max(end_dates)
+                duration = (end - start).days + 1
+            else:
+                duration = 0
 
             total_weight = 0
-            weighted_progress = 0
-            total_duration = 0
+            weighted_sum = 0
 
-            for child in children:
-                child_progress, child_duration = calculate_node(child)
-                weighted_progress += child_progress * child_duration
-                total_weight += child_duration
-                total_duration += child_duration
+            for c, res in zip(children, child_results):
+                # fallback duration
+                d = (res["end"] - res["start"]).days + 1 if res["start"] and res["end"] else (c.duration or 1)
 
-            avg_progress = weighted_progress / total_weight if total_weight > 0 else 0
-            duration = total_duration or 1
-            return self._normalize_progress(avg_progress), max(duration, 1)
+                weighted_sum += res["progress"] * d
+                total_weight += d
 
-        root_tasks = children_by_parent.get(0, [])
-        if not root_tasks:
-            return 0.0
+            avg_progress = weighted_sum / total_weight if total_weight else 0
 
-        total_weight = 0
-        weighted_progress = 0
-        for task in root_tasks:
-            task_progress, task_duration = calculate_node(task)
-            weighted_progress += task_progress * task_duration
-            total_weight += task_duration
+            return {
+                "progress": avg_progress,
+                "start": start_dates and min(start_dates),
+                "end": end_dates and max(end_dates)
+            }
 
-        return weighted_progress / total_weight if total_weight > 0 else 0.0
+        roots = tree.get(ROOT, [])
+
+        total = 0
+        weight = 0
+
+        for r in roots:
+            res = calc(r)
+
+            if res["start"] and res["end"]:
+                d = (res["end"] - res["start"]).days + 1
+            else:
+                d = r.duration or 1
+
+            total += res["progress"] * d
+            weight += d
+
+        return (total / weight) * 100 if weight else 0
