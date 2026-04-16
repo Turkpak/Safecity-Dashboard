@@ -1,65 +1,31 @@
 from ..common_imports import *
 
-class DistrictDeleteView(viewsets.ViewSet):
-    queryset = District.objects.all()
-    serializer_class = DistrictSerializer
-    permission_classes = [IsAuthenticated, HasSidebarPermission] 
-    sidebar_label = "Area Management"
-    sub_label = "District"
-    def destroy(self, request, *args, **kwargs):
-        district_id = kwargs.get('pk')
+from django.db.models.deletion import ProtectedError
 
+class DistrictDeleteView(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated, HasSidebarPermission]
+
+    def destroy(self, request, *args, **kwargs):
         try:
-            mydistrict = District.objects.get(id=district_id)
+            district = District.objects.get(id=kwargs.get('pk'))
         except District.DoesNotExist:
             return ApiResponse(
                 status=status.HTTP_404_NOT_FOUND,
                 message="District not found.",
                 http_status=status.HTTP_404_NOT_FOUND
-            ).create_response()       
-        if Project.objects.filter(district=mydistrict).exists():
-            return ApiResponse(
-                status=status.HTTP_400_BAD_REQUEST,
-                message="Cannot delete this District because it is linked to one or more projects.",
-                http_status=status.HTTP_400_BAD_REQUEST
-            ).create_response()
-        if Tehsil.objects.filter(district=mydistrict).exists():
-            return ApiResponse(
-                status=status.HTTP_400_BAD_REQUEST,
-                message="Cannot delete this District because it has linked tehsils.",
-                http_status=status.HTTP_400_BAD_REQUEST
             ).create_response()
 
         try:
-            mydistrict.delete()
+            district.delete()
             return ApiResponse(
                 status=status.HTTP_200_OK,
                 message="District deleted successfully.",
                 http_status=status.HTTP_200_OK
             ).create_response()
+
         except ProtectedError:
             return ApiResponse(
                 status=status.HTTP_400_BAD_REQUEST,
-                message="Cannot delete this District because it is linked to other records.",
+                message="Cannot delete this district because it is linked to other records.",
                 http_status=status.HTTP_400_BAD_REQUEST
-            ).create_response()
-        except IntegrityError:
-            return ApiResponse(
-                status=status.HTTP_400_BAD_REQUEST,
-                message="Cannot delete this District because it is linked to other records.",
-                http_status=status.HTTP_400_BAD_REQUEST
-            ).create_response()
-        except serializers.ValidationError as e:
-            return ApiResponse(
-                status=status.HTTP_400_BAD_REQUEST,
-                message="Serializer error.",
-                data=e.detail,
-                http_status=status.HTTP_400_BAD_REQUEST
-            ).create_response()
-        except Exception as e:
-            return ApiResponse(
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                message="Exception error.",
-                data=str(e),
-                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             ).create_response()

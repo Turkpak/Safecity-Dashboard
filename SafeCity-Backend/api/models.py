@@ -165,7 +165,7 @@ class Province(models.Model):
 # --------------------------------------------------------
 class Division(models.Model):
     division_name = models.CharField(max_length=100)
-    province = models.ForeignKey(Province, on_delete=models.CASCADE, related_name='divisions')
+    province = models.ForeignKey(Province, on_delete=models.PROTECT, related_name='divisions')
 
     def __str__(self):
         return self.division_name
@@ -175,8 +175,8 @@ class Division(models.Model):
 # --------------------------------------------------------
 class District(models.Model):
     district_name = models.CharField(max_length=100)
-    division = models.ForeignKey(Division, on_delete=models.CASCADE, related_name='districts')
-    province = models.ForeignKey(Province, on_delete=models.CASCADE, related_name='districts')
+    division = models.ForeignKey(Division, on_delete=models.PROTECT, related_name='districts')
+    province = models.ForeignKey(Province, on_delete=models.PROTECT, related_name='districts')
 
     def __str__(self):
         return self.district_name
@@ -186,9 +186,9 @@ class District(models.Model):
 # --------------------------------------------------------
 class Tehsil(models.Model):
     tehsil_name = models.CharField(max_length=100)
-    district = models.ForeignKey(District, on_delete=models.CASCADE, related_name='tehsils')
-    division = models.ForeignKey(Division, on_delete=models.CASCADE, related_name='tehsils')
-    province = models.ForeignKey(Province, on_delete=models.CASCADE, related_name='tehsils')
+    district = models.ForeignKey(District, on_delete=models.PROTECT, related_name='tehsils')
+    division = models.ForeignKey(Division, on_delete=models.PROTECT, related_name='tehsils')
+    province = models.ForeignKey(Province, on_delete=models.PROTECT, related_name='tehsils')
 
     def __str__(self):
         return self.tehsil_name
