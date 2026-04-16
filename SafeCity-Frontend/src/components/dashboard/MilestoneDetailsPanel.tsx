@@ -2298,44 +2298,16 @@ export function MilestoneDetailsPanel({
                     <div className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold mb-2`}>WBS Weight Distribution</div>
                     <div className={`w-full ${isMobile ? 'h-[280px]' : isTablet ? 'h-[320px]' : 'h-[340px]'}`}>
                       <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
+                        <PieChart margin={{ top: isMobile ? 18 : 8, right: 0, bottom: 8, left: 0 }}>
                           <Pie
                             data={wbsPieData}
                             dataKey="value"
                             nameKey="name"
                             cx="50%"
-                            cy="50%"
-                            outerRadius={isMobile ? 70 : isTablet ? 90 : 110}
+                            cy={isMobile ? "46%" : "50%"}
+                            outerRadius={isMobile ? 82 : isTablet ? 90 : 110}
                             labelLine={false}
-                            label={({ name, value, cx, cy, midAngle, innerRadius, outerRadius, index }) => {
-                              const pct = value * 100;
-                              if (pct < 6) return null;
-                              const RADIAN = Math.PI / 180;
-                              const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-                              const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                              const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-                              // Calculate the same color as the segment
-                              const segmentColor = `hsl(${Math.round((index / Math.max(1, wbsPieData.length)) * 280)} 75% 55%)`;
-                              const fontSize = isMobile ? '10px' : isTablet ? '11px' : '12px';
-
-                              return (
-                                <text
-                                  x={x}
-                                  y={y}
-                                  fill={segmentColor}
-                                  textAnchor={x > cx ? 'start' : 'end'}
-                                  dominantBaseline="central"
-                                  style={{
-                                    fontSize,
-                                    fontWeight: 600,
-                                    filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1))'
-                                  }}
-                                >
-                                  {`${name}: ${(pct).toFixed(0)}%`}
-                                </text>
-                              );
-                            }}
+                            label={false}
                           >
                             {wbsPieData.map((_, idx) => (
                               <Cell
@@ -2354,17 +2326,41 @@ export function MilestoneDetailsPanel({
                               padding: isMobile ? '4px 6px' : '8px 12px'
                             }}
                           />
-                          <Legend
-                            wrapperStyle={{
-                              fontSize: isMobile ? '10px' : isTablet ? '11px' : '12px'
-                            }}
-                            iconSize={isMobile ? 10 : isTablet ? 11 : 12}
-                            layout={isMobile ? 'vertical' : 'horizontal'}
-                            verticalAlign={isMobile ? 'bottom' : 'top'}
-                          />
+                          {!isMobile && (
+                            <Legend
+                              wrapperStyle={{
+                                fontSize: isTablet ? '11px' : '12px'
+                              }}
+                              iconSize={isTablet ? 11 : 12}
+                              layout="horizontal"
+                              verticalAlign="top"
+                            />
+                          )}
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
+                    {/* Mobile: render activity names as wrapped rows below the pie (avoid slice labels + avoid clipping) */}
+                    {isMobile && (
+                      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-[11px] text-muted-foreground">
+                        {wbsPieData.map((it, idx) => (
+                          <div key={it.name} className="flex items-center gap-2">
+                            <span
+                              className="inline-block h-2.5 w-2.5 rounded-full"
+                              style={{
+                                backgroundColor: `hsl(${Math.round((idx / Math.max(1, wbsPieData.length)) * 280)} 75% 55%)`,
+                              }}
+                              aria-hidden
+                            />
+                            <span className="text-foreground/90">
+                              {it.name}
+                            </span>
+                            <span className="tabular-nums">
+                              {(it.value * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <div className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold mb-2`}>WBS Subprocess KPIs</div>
@@ -2440,44 +2436,16 @@ export function MilestoneDetailsPanel({
                   <div className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold mb-2`}>WBS Weight Distribution</div>
                   <div className={`w-full ${isMobile ? 'h-[280px]' : isTablet ? 'h-[320px]' : 'h-[340px]'}`}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
+                      <PieChart margin={{ top: isMobile ? 18 : 8, right: 0, bottom: 8, left: 0 }}>
                         <Pie
                           data={wbsPieData}
                           dataKey="value"
                           nameKey="name"
                           cx="50%"
-                          cy="50%"
-                          outerRadius={isMobile ? 70 : isTablet ? 90 : 110}
+                          cy={isMobile ? "46%" : "50%"}
+                          outerRadius={isMobile ? 82 : isTablet ? 90 : 110}
                           labelLine={false}
-                          label={({ name, value, cx, cy, midAngle, innerRadius, outerRadius, index }) => {
-                            const pct = value * 100;
-                            if (pct < 6) return null;
-                            const RADIAN = Math.PI / 180;
-                            const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-                            const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                            const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-                            // Calculate the same color as the segment
-                            const segmentColor = `hsl(${Math.round((index / Math.max(1, wbsPieData.length)) * 280)} 75% 55%)`;
-                            const fontSize = isMobile ? '10px' : isTablet ? '11px' : '12px';
-
-                            return (
-                              <text
-                                x={x}
-                                y={y}
-                                fill={segmentColor}
-                                textAnchor={x > cx ? 'start' : 'end'}
-                                dominantBaseline="central"
-                                style={{
-                                  fontSize,
-                                  fontWeight: 600,
-                                  filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1))'
-                                }}
-                              >
-                                {`${name}: ${(pct).toFixed(0)}%`}
-                              </text>
-                            );
-                          }}
+                          label={false}
                         >
                           {wbsPieData.map((_, idx) => (
                             <Cell
@@ -2496,17 +2464,41 @@ export function MilestoneDetailsPanel({
                             padding: isMobile ? '4px 6px' : '8px 12px'
                           }}
                         />
-                        <Legend
-                          wrapperStyle={{
-                            fontSize: isMobile ? '10px' : isTablet ? '11px' : '12px'
-                          }}
-                          iconSize={isMobile ? 10 : isTablet ? 11 : 12}
-                          layout={isMobile ? 'vertical' : 'horizontal'}
-                          verticalAlign={isMobile ? 'bottom' : 'top'}
-                        />
+                        {!isMobile && (
+                          <Legend
+                            wrapperStyle={{
+                              fontSize: isTablet ? '11px' : '12px'
+                            }}
+                            iconSize={isTablet ? 11 : 12}
+                            layout="horizontal"
+                            verticalAlign="top"
+                          />
+                        )}
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
+                  {/* Mobile: render activity names as wrapped rows below the pie (avoid slice labels + avoid clipping) */}
+                  {isMobile && (
+                    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-[11px] text-muted-foreground">
+                      {wbsPieData.map((it, idx) => (
+                        <div key={it.name} className="flex items-center gap-2">
+                          <span
+                            className="inline-block h-2.5 w-2.5 rounded-full"
+                            style={{
+                              backgroundColor: `hsl(${Math.round((idx / Math.max(1, wbsPieData.length)) * 280)} 75% 55%)`,
+                            }}
+                            aria-hidden
+                          />
+                          <span className="text-foreground/90">
+                            {it.name}
+                          </span>
+                          <span className="tabular-nums">
+                            {(it.value * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <div className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold mb-2`}>WBS Subprocess KPIs</div>
