@@ -1,4 +1,5 @@
 from ..common_imports import *
+import datetime
 
 class ProjectUpdateView(viewsets.ViewSet):
     queryset = Project.objects.all()
@@ -21,9 +22,38 @@ class ProjectUpdateView(viewsets.ViewSet):
             ).create_response()
 
         try:
-            serializer = ProjectSerializer(myproject, data=data, partial=True)  
+            serializer = ProjectSerializer(myproject, data=data, partial=True)
             if serializer.is_valid():
+                changes = {}
+                for field, value in serializer.validated_data.items():
+                    if field == 'stakeholder':
+                        old_value = list(myproject.stakeholder.values_list('id', flat=True))
+                        new_value = [s.id for s in value]
+                    elif hasattr(value, 'name'):
+                        old_value = getattr(myproject, field, None)
+                        new_value = getattr(value, 'name', str(value))
+                    else:
+                        old_value = getattr(myproject, field, None)
+                        new_value = value
+
+                    if old_value != new_value:
+                        if isinstance(old_value, (datetime.date, datetime.datetime)):
+                            old_value = old_value.isoformat()
+                        if isinstance(new_value, (datetime.date, datetime.datetime)):
+                            new_value = new_value.isoformat()
+                        changes[field] = {
+                            'old': old_value,
+                            'new': new_value,
+                        }
+
                 serializer.save()
+                if changes:
+                    ProjectUpdateLog.objects.create(
+                        project=myproject,
+                        updated_by=request.user if request.user.is_authenticated else None,
+                        changes=changes,
+                    )
+
                 return ApiResponse(
                     status=status.HTTP_200_OK,
                     message="Project updated successfully.",

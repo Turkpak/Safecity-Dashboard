@@ -17,6 +17,31 @@ class ProvinceDeleteView(viewsets.ViewSet):
                 message="Province not found.",
                 http_status=status.HTTP_404_NOT_FOUND
             ).create_response()       
+        if Project.objects.filter(province=myprovince).exists():
+            return ApiResponse(
+                status=status.HTTP_400_BAD_REQUEST,
+                message="Cannot delete this Province because it is linked to one or more projects.",
+                http_status=status.HTTP_400_BAD_REQUEST
+            ).create_response()
+        if Division.objects.filter(province=myprovince).exists():
+            return ApiResponse(
+                status=status.HTTP_400_BAD_REQUEST,
+                message="Cannot delete this Province because it has linked divisions.",
+                http_status=status.HTTP_400_BAD_REQUEST
+            ).create_response()
+        if District.objects.filter(province=myprovince).exists():
+            return ApiResponse(
+                status=status.HTTP_400_BAD_REQUEST,
+                message="Cannot delete this Province because it has linked districts.",
+                http_status=status.HTTP_400_BAD_REQUEST
+            ).create_response()
+        if Tehsil.objects.filter(province=myprovince).exists():
+            return ApiResponse(
+                status=status.HTTP_400_BAD_REQUEST,
+                message="Cannot delete this Province because it has linked tehsils.",
+                http_status=status.HTTP_400_BAD_REQUEST
+            ).create_response()
+
         try:
             myprovince.delete()
             return ApiResponse(

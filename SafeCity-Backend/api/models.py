@@ -498,7 +498,30 @@ class ProjectDocument(models.Model):
 
     def __str__(self):
         return self.title or f"Document {self.id}"
-    
+
+class ProjectUpdateLog(models.Model):
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name='update_logs'
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='project_update_logs'
+    )
+    changes = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        user_email = self.updated_by.email if self.updated_by else 'Unknown'
+        return f"{self.project.project_name} updated by {user_email} on {self.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
+
 class TaskDependency(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
     task = models.ForeignKey(ProjectActivity, related_name="successors", on_delete=models.CASCADE)

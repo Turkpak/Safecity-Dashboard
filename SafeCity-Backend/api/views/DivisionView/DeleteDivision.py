@@ -17,6 +17,25 @@ class DivisionDeleteView(viewsets.ViewSet):
                 message="Division not found.",
                 http_status=status.HTTP_404_NOT_FOUND
             ).create_response()       
+        if Project.objects.filter(division=mydivision).exists():
+            return ApiResponse(
+                status=status.HTTP_400_BAD_REQUEST,
+                message="Cannot delete this Division because it is linked to one or more projects.",
+                http_status=status.HTTP_400_BAD_REQUEST
+            ).create_response()
+        if District.objects.filter(division=mydivision).exists():
+            return ApiResponse(
+                status=status.HTTP_400_BAD_REQUEST,
+                message="Cannot delete this Division because it has linked districts.",
+                http_status=status.HTTP_400_BAD_REQUEST
+            ).create_response()
+        if Tehsil.objects.filter(division=mydivision).exists():
+            return ApiResponse(
+                status=status.HTTP_400_BAD_REQUEST,
+                message="Cannot delete this Division because it has linked tehsils.",
+                http_status=status.HTTP_400_BAD_REQUEST
+            ).create_response()
+
         try:
             mydivision.delete()
             return ApiResponse(

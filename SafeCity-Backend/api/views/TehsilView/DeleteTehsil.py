@@ -18,6 +18,13 @@ class TehsilDeleteView(viewsets.ViewSet):
                 message="Tehsil not found.",
                 http_status=status.HTTP_404_NOT_FOUND
             ).create_response()       
+        if Project.objects.filter(tehsil=mytehsil).exists():
+            return ApiResponse(
+                status=status.HTTP_400_BAD_REQUEST,
+                message="Cannot delete this Tehsil because it is linked to one or more projects.",
+                http_status=status.HTTP_400_BAD_REQUEST
+            ).create_response()
+
         try:
             mytehsil.delete()
             return ApiResponse(

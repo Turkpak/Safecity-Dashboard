@@ -50,6 +50,7 @@ router.register(r'list-project', ListProjectView, basename='list-project')
 router.register(r'update-project', ProjectUpdateView, basename='update-project') 
 router.register(r'delete-project', ProjectDeleteView, basename='delete-project')
 router.register(r'top-projects', TopProjectsView, basename='top-projects')
+router.register(r'project-update-logs', ProjectUpdateLogView, basename='project-update-logs')
 
 #---------------------------------- Project Activity View ----------------------------------
 router.register(r'create-project-activity', ProjectActivityCreateView, basename='create-project-activity')

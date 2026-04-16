@@ -17,6 +17,19 @@ class DistrictDeleteView(viewsets.ViewSet):
                 message="District not found.",
                 http_status=status.HTTP_404_NOT_FOUND
             ).create_response()       
+        if Project.objects.filter(district=mydistrict).exists():
+            return ApiResponse(
+                status=status.HTTP_400_BAD_REQUEST,
+                message="Cannot delete this District because it is linked to one or more projects.",
+                http_status=status.HTTP_400_BAD_REQUEST
+            ).create_response()
+        if Tehsil.objects.filter(district=mydistrict).exists():
+            return ApiResponse(
+                status=status.HTTP_400_BAD_REQUEST,
+                message="Cannot delete this District because it has linked tehsils.",
+                http_status=status.HTTP_400_BAD_REQUEST
+            ).create_response()
+
         try:
             mydistrict.delete()
             return ApiResponse(
@@ -24,7 +37,6 @@ class DistrictDeleteView(viewsets.ViewSet):
                 message="District deleted successfully.",
                 http_status=status.HTTP_200_OK
             ).create_response()
-        
         except ProtectedError:
             return ApiResponse(
                 status=status.HTTP_400_BAD_REQUEST,
