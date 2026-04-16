@@ -2500,7 +2500,7 @@ export default function Dashboard() {
 
           {/* Header Content Section - Collapsible */}
           <div
-            className={`relative flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 ease-in-out overflow-hidden order-1 md:order-2 ${
+            className={`relative flex flex-col md:flex-row md:items-start justify-between gap-4 transition-all duration-300 ease-in-out overflow-hidden order-1 md:order-2 ${
               isFilterBarExpanded
                 ? "max-h-[500px] opacity-100 px-4 md:px-6 pt-2 pb-4 md:pb-5"
                 : "max-h-0 opacity-0 p-0"
@@ -2521,7 +2521,9 @@ export default function Dashboard() {
                             ? "All Punjab Districts"
                             : viewType === "tehsils"
                               ? "All Punjab Tehsils"
-                              : "PSCA Progress Dashboard";
+                              : viewType === "projects"
+                                ? "All Projects"
+                                : "PSCA Progress Dashboard";
 
                 if (isLoading) {
                   return (
