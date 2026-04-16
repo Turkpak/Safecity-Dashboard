@@ -54,20 +54,53 @@ const PROJECT_STATUS_STYLE: Record<ProjectStatus, { color: string; fillColor: st
   pending: { color: "#d97706", fillColor: "#d97706" }, // amber-600
 };
 
+function getStatusSvg(status: ProjectStatus): string {
+  // Inline SVGs so Leaflet divIcon has no external deps.
+  // Styled with currentColor to inherit the marker's white text color.
+  if (status === "in_delay") {
+    // alert-triangle
+    return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M12 9v4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M12 17h.01" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+    </svg>`;
+  }
+  if (status === "in_progress") {
+    // play
+    return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M8 5v14l11-7L8 5Z" fill="currentColor"/>
+    </svg>`;
+  }
+  // clock
+  return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M12 22a10 10 0 1 0-10-10 10 10 0 0 0 10 10Z" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+}
+
 function getProjectStatusIcon(status: ProjectStatus) {
   const cfg = PROJECT_STATUS_STYLE[status] ?? PROJECT_STATUS_STYLE.pending;
-  const label = status === "in_delay" ? "!" : status === "in_progress" ? "▶" : "⏳";
+  const svg = getStatusSvg(status);
+  const statusClass =
+    status === "in_delay"
+      ? "project-status-icon--delay"
+      : status === "pending"
+        ? "project-status-icon--pending"
+        : "project-status-icon--progress";
   return L.divIcon({
-    className: "project-status-icon",
-    html: `<div style="
-      width: 26px; height: 26px;
-      border-radius: 9999px;
-      background: ${cfg.color};
-      border: 2px solid rgba(255,255,255,0.95);
-      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
-      display: flex; align-items: center; justify-content: center;
-      color: white; font-weight: 800; font-size: 13px; line-height: 1;
-    ">${label}</div>`,
+    className: `project-status-icon ${statusClass}`,
+    html: `<div class="project-status-icon__wrap ${statusClass}">
+      <span class="project-status-icon__ring" aria-hidden="true"></span>
+      <span class="project-status-icon__dot" style="
+        width: 26px; height: 26px;
+        border-radius: 9999px;
+        background: ${cfg.color};
+        border: 2px solid rgba(255,255,255,0.95);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+        display: flex; align-items: center; justify-content: center;
+        color: white; font-weight: 800; font-size: 13px; line-height: 1;
+      ">${svg}</span>
+    </div>`,
     iconSize: [26, 26],
     iconAnchor: [13, 13],
   });
@@ -506,11 +539,20 @@ export function CityMap({
                       const center = f.properties.__center as [number, number];
                       const status: ProjectStatus = f?.properties?.status ?? "pending";
                       const name = f?.properties?.project_name ?? "Project";
+                      const rawId = f?.properties?.id;
+                      const idNum = typeof rawId === "number" ? rawId : Number(rawId);
                       return (
                         <Marker
                           key={`proj-center-${f?.properties?.id ?? idx}`}
                           position={center}
                           icon={getProjectStatusIcon(status)}
+                          eventHandlers={
+                            onProjectSelect && Number.isFinite(idNum)
+                              ? {
+                                  click: () => onProjectSelect(idNum),
+                                }
+                              : undefined
+                          }
                         >
                           <Popup>
                             <div className="p-2 text-xs font-sans">
