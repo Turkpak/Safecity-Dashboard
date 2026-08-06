@@ -116,6 +116,10 @@ export async function getProjectGanttAll(): Promise<ProjectGanttAllSchedule[]> {
   return schedules as ProjectGanttAllSchedule[];
 }
 
+export async function getProjectProgressSummary(): Promise<Record<string, number>> {
+  const data = await get<any>("project-progress-summary/");
+  return data?.progress_by_project ?? {};
+}
 export async function getProjectGanttData(projectId: number): Promise<GanttTask[]> {
   if (!projectId) return [];
 

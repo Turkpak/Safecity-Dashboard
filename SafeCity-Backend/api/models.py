@@ -16,7 +16,7 @@ from django.contrib.auth.models import (
     BaseUserManager,
     PermissionsMixin
 )
-
+import os
 # --------------------------------------------------------
 # User Manager
 # --------------------------------------------------------
@@ -211,7 +211,7 @@ class Project(models.Model):
     budget_variance = models.CharField(max_length=200, null=True, blank=True)
     budget_remaining = models.CharField(max_length=200, null=True, blank=True)
     xer_file = models.FileField(upload_to=project_doc_file_path, validators=[FileExtensionValidator(allowed_extensions=['xer'])],null=True, blank=True, max_length=500) 
-
+    xer_file_name = models.CharField(max_length=255, null=True, blank=True)
     geom = gis_models.MultiPolygonField(srid=4326, null=True, blank=True)
 
     allocation_capital_cost = models.FloatField(default=0, null=True, blank=True)
@@ -306,6 +306,12 @@ class Project(models.Model):
             )
         else:
             self.percentage_utilization_revenue = 0
+
+        # ---------- XER File Name ----------
+        if self.xer_file:
+            self.xer_file_name = os.path.basename(self.xer_file.name)
+        # Do nothing if xer_file is None.
+        # This preserves xer_file_name set by the serializer.
 
         super().save(*args, **kwargs)
 

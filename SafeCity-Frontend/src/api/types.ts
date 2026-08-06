@@ -343,6 +343,7 @@ export interface Project {
   percentage_utilization_revenue?: string | null;
   percentage_utilization_total?: string | null;
   xer_file: string | null;
+  xer_file_name?: string | null; 
   boundary_file: string | null;
   geom?: unknown;
   created_at: string;

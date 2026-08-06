@@ -209,8 +209,12 @@ function WizardXerUploadSection({
           <FileText className="h-8 w-8 text-muted-foreground shrink-0" />
           <div className="flex-1 min-w-0 space-y-1">
             <p className="text-sm font-medium truncate">
-              Current: {editingProject.xer_file.split("/").pop() ?? editingProject.xer_file}
-            </p>
+  Current: {
+    editingProject.xer_file_name
+    || editingProject.xer_file?.split("/").pop()
+    || "Schedule file uploaded"
+  }
+</p>
             {existingXerHref ? (
               <a
                 href={existingXerHref}

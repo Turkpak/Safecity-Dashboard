@@ -245,7 +245,10 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         input_formats=["%Y-%m-%d", "%Y-%m-%d %H:%M"]
     )
     boundary_file = serializers.FileField(write_only=True, required=False)
-    xer_file = serializers.FileField(write_only=True, required=False)
+    xer_file = serializers.FileField(
+        write_only=True,
+        required=False
+    )
 
     class Meta:
         model = Project
@@ -259,7 +262,7 @@ class ProjectSerializer(GeoFeatureModelSerializer):
             'tehsil', 'tehsil_name',
             'total_budget_allocated', 'budget_utilized',
             'budget_variance', 'budget_remaining',
-            'xer_file', 'boundary_file', 'geom',
+            'xer_file', 'xer_file_name', 'boundary_file', 'geom',
             'allocation_capital_cost', 'allocation_revenue_cost', 'allocation_total_cost', 
             'pd_release_capital_cost', 'pd_release_cost', 'pd_release_total_cost',
             'spending_release_capital_cost', 'spending_release_revenue_cost', 'spending_release_total_cost',
@@ -301,6 +304,8 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         project.stakeholder.set(stakeholders)
 
         if xer_file:
+            project.xer_file = xer_file 
+            project.xer_file_name = xer_file.name 
             # Parse the uploaded XER in-memory and create activities without
             # persisting the file to local storage.
             try:
@@ -328,6 +333,8 @@ class ProjectSerializer(GeoFeatureModelSerializer):
             instance.stakeholder.set(stakeholders)
 
         if xer_file:
+            instance.xer_file = xer_file       
+            instance.xer_file_name = xer_file.name   
             # Rebuild activities from the uploaded XER without saving the file.
             instance.activities.all().delete()
             try:
@@ -533,3 +540,47 @@ class PictorialArchiveSerializer(serializers.ModelSerializer):
 
     def get_project_name(self, obj):
         return obj.project.project_name
+
+
+class ProjectListSerializer(serializers.ModelSerializer):
+    province_name = serializers.SerializerMethodField()
+    division_name = serializers.SerializerMethodField()
+    district_name = serializers.SerializerMethodField()
+    tehsil_name = serializers.SerializerMethodField()
+    stakeholder_details = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Project
+        fields = [
+            'id', 'stakeholder_details',
+            'project_name', 'project_description',
+            'project_starting_date', 'project_reference_no',
+            'province', 'province_name',
+            'division', 'division_name', 'district', 'district_name',
+            'tehsil', 'tehsil_name',
+            'total_budget_allocated', 'budget_utilized',
+            'budget_variance', 'budget_remaining',
+            'created_at', 'updated_at',
+            # deliberately no: activities, geom, xer_file, allocation/pd_release/spending/pifra cost breakdowns
+        ]
+
+    def get_province_name(self, obj):
+        return obj.province.province_name if obj.province else None
+
+    def get_division_name(self, obj):
+        return obj.division.division_name if obj.division else None
+
+    def get_district_name(self, obj):
+        return obj.district.district_name if obj.district else None
+
+    def get_tehsil_name(self, obj):
+        return obj.tehsil.tehsil_name
+
+    def get_stakeholder_details(self, obj):
+        return [
+            {
+                "stakeholder_type": s.stakeholder_type,
+                "stakeholder_title": s.stakeholder_title
+            }
+            for s in obj.stakeholder.all()
+        ]

@@ -6,3 +6,5 @@ from .ProjectGanttView import *
 from .UpdateTaskActualView import *
 from .ProjectGanttNestedView import *
 from .ProjectGanttNestedAll import *
+
+from .ProjectProgressSummeryView import *

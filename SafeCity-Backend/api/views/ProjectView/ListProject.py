@@ -11,14 +11,18 @@ class ListProjectView(viewsets.ViewSet):
             project_id = request.query_params.get("id")
 
             if project_id:
-                queryset = Project.objects.filter(id=project_id).first()
+                queryset = Project.objects.select_related(
+                    "province", "division", "district", "tehsil"
+                ).prefetch_related(
+                    "stakeholder", "activities"
+                ).filter(id=project_id).first()
                 if not queryset:
                     return ApiResponse(
                         status=status.HTTP_404_NOT_FOUND,
                         message="Project not found.",
                         http_status=status.HTTP_404_NOT_FOUND
                     ).create_response()
-                serializer = ProjectSerializer(queryset)
+                serializer = ProjectSerializer(queryset)   # full detail — unchanged
                 return ApiResponse(
                     status=status.HTTP_200_OK,
                     message="Project Found.",
@@ -30,9 +34,9 @@ class ListProjectView(viewsets.ViewSet):
                 queryset = Project.objects.select_related(
                     "province", "division", "district", "tehsil"
                 ).prefetch_related(
-                    "stakeholder", "activities"
+                    "stakeholder"          # dropped "activities" — list view doesn't need it
                 ).all()
-                serializer = ProjectSerializer(queryset, many=True)
+                serializer = ProjectListSerializer(queryset, many=True)   # ← lightweight serializer
                 return ApiResponse(
                     status=status.HTTP_200_OK,
                     message="All Projects Found.",

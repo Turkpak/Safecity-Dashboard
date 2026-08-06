@@ -21,7 +21,8 @@ import { useWindowSize } from "@/hooks/use-window-size";
 import { CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import {
-  getProjectGanttAll,
+  // getProjectGanttAll,
+getProjectProgressSummary,
   getProjectGanttData,
   listDivisions,
   listDistricts,
@@ -719,41 +720,20 @@ export default function Dashboard() {
   });
 
   // Fetch all gantt schedules once and use root task progress for each project card.
-  const { data: apiProjectGanttAll = [] } = useQuery({
-    queryKey: ["project-gantt-all"],
-    queryFn: () => getProjectGanttAll(),
-  });
+  const { data: progressSummary = {} } = useQuery({
+  queryKey: ["project-progress-summary"],
+  queryFn: () => getProjectProgressSummary(),
+});
 
-  const ganttProgressByProjectId = useMemo(() => {
-    const findNodeById = (
-      nodes: any[],
-      targetId: string,
-    ): { progress?: number } | null => {
-      for (const n of nodes) {
-        if (String(n?._id ?? n?.id ?? "") === targetId) return n;
-        const children: any[] = Array.isArray(n?.subtasks) ? n.subtasks : [];
-        const hit = children.length ? findNodeById(children, targetId) : null;
-        if (hit) return hit;
-      }
-      return null;
-    };
-
-    const clampPct = (n: number) => Math.max(0, Math.min(100, n));
-    const toPct = (v: unknown): number => {
-      const n = Number(v);
-      return Number.isFinite(n) ? clampPct(n) : 0;
-    };
-
-    const map = new Map<number, number>();
-    for (const s of apiProjectGanttAll as any[]) {
-      const pid = Number(s?._id);
-      if (!Number.isFinite(pid)) continue;
-      const tasks: any[] = Array.isArray(s?.tasks) ? s.tasks : [];
-      const root = findNodeById(tasks, "1") ?? tasks[0] ?? null;
-      map.set(pid, toPct(root?.progress));
-    }
-    return map;
-  }, [apiProjectGanttAll]);
+const ganttProgressByProjectId = useMemo(() => {
+  const clampPct = (n: number) => Math.max(0, Math.min(100, n));
+  const map = new Map<number, number>();
+  for (const [pid, progress] of Object.entries(progressSummary)) {
+    const n = Number(progress);
+    map.set(Number(pid), Number.isFinite(n) ? clampPct(n) : 0);
+  }
+  return map;
+}, [progressSummary]);
 
   // All Projects overall % (average of root task `_id:"1"` progress across projects)
   const allProjectsOverallFromGantt = useMemo(() => {

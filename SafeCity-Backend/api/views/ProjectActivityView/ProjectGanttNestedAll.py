@@ -2,9 +2,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from api.models import Project, ProjectActivity, ActivityDelayLog, ProgressImage
 from datetime import datetime
+from django.db.models import Prefetch
+
 
 def get_delay_info(activity):
-    delay = ActivityDelayLog.objects.filter(activity=activity).order_by('-created_at').first()
+    # Read from prefetched cache instead of querying.
+    delays = getattr(activity, "prefetched_delays", None)
+    delay = delays[0] if delays else None
     if delay:
         action_by_info = None
         if delay.action_by:
@@ -16,8 +20,8 @@ def get_delay_info(activity):
 
         return {
             "originator": delay.originator,
-            "category": delay.category,             
-            "action_by": action_by_info,           
+            "category": delay.category,
+            "action_by": action_by_info,
             "delay_days": delay.delay_days,
             "delay_start_date": delay.delay_start_date.isoformat() if delay.delay_start_date else None,
             "delay_end_date": delay.delay_end_date.isoformat() if delay.delay_end_date else None,
@@ -26,24 +30,25 @@ def get_delay_info(activity):
         }
     return None
 
+
 def get_activity_images(activity):
-    images = ProgressImage.objects.filter(activity=activity)
-    image_list = []
-    if images.exists():
-        image_list = [
-            {
-                "id": img.id,
-                "url": img.image.url if img.image else None,
-                "caption": img.caption,
-                "image_date": img.image_date.isoformat() if img.image_date else None,
-                "uploaded_at": img.uploaded_at.isoformat() if img.uploaded_at else None,
-            }
-            for img in images
-        ]
+    # Read from prefetched cache instead of querying.
+    images = getattr(activity, "prefetched_images", [])
+    image_list = [
+        {
+            "id": img.id,
+            "url": img.image.url if img.image else None,
+            "caption": img.caption,
+            "image_date": img.image_date.isoformat() if img.image_date else None,
+            "uploaded_at": img.uploaded_at.isoformat() if img.uploaded_at else None,
+        }
+        for img in images
+    ]
     return {
         "has_images": bool(image_list),
         "images": image_list
     }
+
 
 def check_task_delay(task):
     actual_end = task.get("actual_end")
@@ -58,6 +63,8 @@ def check_task_delay(task):
         return actual_start > start_date
 
     return False
+
+
 def has_delay(tasks):
     for task in tasks:
         if check_task_delay(task):
@@ -65,20 +72,40 @@ def has_delay(tasks):
         if task.get("subtasks") and has_delay(task["subtasks"]):
             return True
     return False
+
+
 class ProjectGanttAllView(APIView):
 
     def get(self, request):
 
-        projects = Project.objects.all()
+        project_id = request.query_params.get("project_id")
+        if project_id:
+            projects = Project.objects.filter(id=project_id)
+        else:
+            projects = Project.objects.all()
 
         all_schedules = []
         global_delay_flag = False
 
         for project in projects:
 
-            activities = ProjectActivity.objects.filter(
-                project=project
-            ).select_related('parent').order_by('id')
+            activities = list(
+                ProjectActivity.objects.filter(project=project)
+                .select_related('parent')
+                .prefetch_related(
+                    Prefetch(
+                        'delay_logs',
+                        queryset=ActivityDelayLog.objects.order_by('-created_at'),
+                        to_attr='prefetched_delays',
+                    ),
+                    Prefetch(
+                        'images',
+                        queryset=ProgressImage.objects.all(),
+                        to_attr='prefetched_images',
+                    ),
+                )
+                .order_by('id')
+            )
 
             # -----------------------------
             # group children
@@ -145,7 +172,7 @@ class ProjectGanttAllView(APIView):
                     activity_images = get_activity_images(act)
 
                     # -----------------------------
-                    # ✅ DATE FIX 
+                    # ✅ DATE FIX
                     # -----------------------------
                     if subtasks:
                         start_dates = [t["start_date"] for t in subtasks if t["start_date"]]

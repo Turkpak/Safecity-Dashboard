@@ -98,6 +98,8 @@ urlpatterns = [
     path("add-delay-log/", ActivityDelayLogCreateView.as_view()),
     path("list-delay-log/", ActivityDelayLogListView.as_view()),
     path("update-delay-log/<int:pk>/", ActivityDelayLogUpdateView.as_view()),
+
+    path("project-progress-summary/", ProjectProgressSummaryView.as_view()),
 ]
 
 if settings.DEBUG:
