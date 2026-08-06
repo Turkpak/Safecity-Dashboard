@@ -400,19 +400,19 @@ export function Sidebar() {
                     )}
                   >
                     <div className="h-10 w-10 rounded-full bg-secondary/20 flex items-center justify-center text-secondary font-bold border border-secondary/30 flex-shrink-0">
-                      {userRole === "Client" ? "CL" : "AD"}
+                      {user && (user.first_name || user.last_name)
+                        ? `${user.first_name?.[0] ?? ""}${user.last_name?.[0] ?? ""}`.toUpperCase()
+                        : "AD"}
                     </div>
                     {!collapsed && (
                       <div className="text-xs">
                         <p className="font-semibold text-white">
-                          {userRole === "Client"
-                            ? "Client Authority"
+                          {user && (user.first_name || user.last_name)
+                            ? `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim()
                             : "Admin Officer"}
                         </p>
-                        <p className="text-white/40 group-hover:text-white/60 transition-colors">
-                          {userRole === "Client"
-                            ? "Governance Wing"
-                            : "Command Center"}
+                        <p className="text-white/40 group-hover:text-white/60 transition-colors capitalize">
+                          {user?.role ? user.role.replace("_", " ") : "Command Center"}
                         </p>
                       </div>
                     )}
@@ -427,14 +427,12 @@ export function Sidebar() {
               <TooltipContent side="right">
                 <div className="text-xs">
                   <p className="font-semibold">
-                    {userRole === "Client"
-                      ? "Client Authority"
+                    {user && (user.first_name || user.last_name)
+                      ? `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim()
                       : "Admin Officer"}
                   </p>
-                  <p className="text-muted-foreground">
-                    {userRole === "Client"
-                      ? "Governance Wing"
-                      : "Command Center"}
+                  <p className="text-muted-foreground capitalize">
+                    {user?.role ? user.role.replace("_", " ") : "Command Center"}
                   </p>
                 </div>
               </TooltipContent>
