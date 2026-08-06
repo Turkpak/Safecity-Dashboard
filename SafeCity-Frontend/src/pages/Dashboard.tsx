@@ -997,10 +997,19 @@ const ganttProgressByProjectId = useMemo(() => {
   };
 
   const navigationFlow = useMemo<NavigationStep[]>(() => {
+    const rootLabel =
+      viewType === "districts"
+        ? "All Districts"
+        : viewType === "tehsils"
+        ? "All Tehsils"
+        : viewType === "projects"
+        ? "All Projects"
+        : "All Divisions";
+
     const flow: NavigationStep[] = [
       {
         key: "all",
-        label: "All Divisions",
+        label: rootLabel,
         clickable: selectedItemType !== null,
       },
     ];
@@ -1012,7 +1021,7 @@ const ganttProgressByProjectId = useMemo(() => {
         clickable: false,
       });
     } else if (selectedItemType === "district" && selectedItemName) {
-      if (parentDivisionName) {
+      if (viewType === "divisions" && parentDivisionName) {
         flow.push({
           key: "division",
           label: `${parentDivisionName} Division`,
@@ -1025,14 +1034,14 @@ const ganttProgressByProjectId = useMemo(() => {
         clickable: false,
       });
     } else if (selectedItemType === "tehsil" && selectedItemName) {
-      if (parentDivisionName) {
+      if (viewType === "divisions" && parentDivisionName) {
         flow.push({
           key: "division",
           label: `${parentDivisionName} Division`,
           clickable: true,
         });
       }
-      if (parentDistrictName) {
+      if ((viewType === "divisions" || viewType === "districts") && parentDistrictName) {
         flow.push({
           key: "district",
           label: `${parentDistrictName} District`,
@@ -1047,6 +1056,7 @@ const ganttProgressByProjectId = useMemo(() => {
     }
     return flow;
   }, [
+    viewType,
     selectedItemType,
     selectedItemName,
     parentDivisionId,
