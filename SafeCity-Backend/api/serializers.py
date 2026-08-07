@@ -6,6 +6,7 @@ import json
 from django.contrib.auth import get_user_model
 from .utils import parse_xer
 from datetime import datetime
+from rest_framework_gis.fields import GeometryField
 # --------------------------------------------------------
 # MyUser Serializer
 # --------------------------------------------------------
@@ -548,7 +549,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
     district_name = serializers.SerializerMethodField()
     tehsil_name = serializers.SerializerMethodField()
     stakeholder_details = serializers.SerializerMethodField()
-
+    geom = GeometryField() 
     class Meta:
         model = Project
         fields = [
@@ -557,10 +558,10 @@ class ProjectListSerializer(serializers.ModelSerializer):
             'project_starting_date', 'project_reference_no',
             'province', 'province_name',
             'division', 'division_name', 'district', 'district_name',
-            'tehsil', 'tehsil_name',
+            'tehsil', 'tehsil_name', 'geom',
             'total_budget_allocated', 'budget_utilized',
             'budget_variance', 'budget_remaining',
-            'created_at', 'updated_at',
+            'created_at', 'updated_at', 
             # deliberately no: activities, geom, xer_file, allocation/pd_release/spending/pifra cost breakdowns
         ]
 

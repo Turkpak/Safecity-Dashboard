@@ -11,7 +11,8 @@ import {
   listTehsils,
   getProjectById,
   getProjectGanttData,
-  getProjectGanttAll,
+  // getProjectGanttAll,
+  getProjectStatusSummary,  
 } from "@/api";
 import { FolderKanban, Loader2, AlertTriangle, CalendarCheck, Filter } from "lucide-react";
 import React, { useState, useMemo } from "react";
@@ -46,46 +47,46 @@ function normalizeProjectGeom(geom: unknown): object | null {
 
 type ProjectStatus = "pending" | "in_progress" | "in_delay";
 
-function walkNestedTasks(
-  tasks: Array<{ subtasks?: any[]; has_delay?: boolean; progress?: number; progress_status?: string | null }> | undefined,
-  visit: (t: { has_delay?: boolean; progress?: number; progress_status?: string | null }) => void,
-): void {
-  if (!Array.isArray(tasks) || tasks.length === 0) return;
-  for (const t of tasks) {
-    visit(t);
-    if (Array.isArray((t as any).subtasks) && (t as any).subtasks.length > 0) {
-      walkNestedTasks((t as any).subtasks, visit);
-    }
-  }
-}
+// function walkNestedTasks(
+//   tasks: Array<{ subtasks?: any[]; has_delay?: boolean; progress?: number; progress_status?: string | null }> | undefined,
+//   visit: (t: { has_delay?: boolean; progress?: number; progress_status?: string | null }) => void,
+// ): void {
+//   if (!Array.isArray(tasks) || tasks.length === 0) return;
+//   for (const t of tasks) {
+//     visit(t);
+//     if (Array.isArray((t as any).subtasks) && (t as any).subtasks.length > 0) {
+//       walkNestedTasks((t as any).subtasks, visit);
+//     }
+//   }
+// }
 
-function deriveProjectStatusFromNestedGantt(
-  tasks: Array<{ subtasks?: any[]; has_delay?: boolean; progress?: number; progress_status?: string | null }> | undefined,
-): ProjectStatus {
-  // Priority:
-  // 1) delayed if any node has_delay === true
-  // 2) in_progress if any node progress > 0
-  // 3) pending if ALL nodes progress_status === "Not Started" (or tasks empty)
-  if (!Array.isArray(tasks) || tasks.length === 0) return "pending";
+// function deriveProjectStatusFromNestedGantt(
+//   tasks: Array<{ subtasks?: any[]; has_delay?: boolean; progress?: number; progress_status?: string | null }> | undefined,
+// ): ProjectStatus {
+//   // Priority:
+//   // 1) delayed if any node has_delay === true
+//   // 2) in_progress if any node progress > 0
+//   // 3) pending if ALL nodes progress_status === "Not Started" (or tasks empty)
+//   if (!Array.isArray(tasks) || tasks.length === 0) return "pending";
 
-  let anyDelay = false;
-  let anyProgress = false;
-  let allNotStarted = true;
+//   let anyDelay = false;
+//   let anyProgress = false;
+//   let allNotStarted = true;
 
-  walkNestedTasks(tasks, (t) => {
-    if (t?.has_delay === true) anyDelay = true;
-    const p = Number((t as any)?.progress ?? 0);
-    if (Number.isFinite(p) && p > 0) anyProgress = true;
+//   walkNestedTasks(tasks, (t) => {
+//     if (t?.has_delay === true) anyDelay = true;
+//     const p = Number((t as any)?.progress ?? 0);
+//     if (Number.isFinite(p) && p > 0) anyProgress = true;
 
-    const ps = String((t as any)?.progress_status ?? "").trim();
-    if (ps !== "Not Started") allNotStarted = false;
-  });
+//     const ps = String((t as any)?.progress_status ?? "").trim();
+//     if (ps !== "Not Started") allNotStarted = false;
+//   });
 
-  if (anyDelay) return "in_delay";
-  if (anyProgress) return "in_progress";
-  if (allNotStarted) return "pending";
-  return "pending";
-}
+//   if (anyDelay) return "in_delay";
+//   if (anyProgress) return "in_progress";
+//   if (allNotStarted) return "pending";
+//   return "pending";
+// }
 
 function geometryBboxCenter(geometry: any): [number, number] | null {
   // Returns [lat, lng] (Leaflet order)
@@ -231,9 +232,15 @@ export default function GISLayers() {
 
   // NEW: fetch nested gantt for ALL projects in one request; used to derive
   // delay/pending/in-progress status for map boundaries + cards.
-  const { data: allProjectSchedules = [], isFetching: allGanttLoading } = useQuery({
-    queryKey: ["gis", "project-gantt-all"],
-    queryFn: getProjectGanttAll,
+  // const { data: allProjectSchedules = [], isFetching: allGanttLoading } = useQuery({
+  //   queryKey: ["gis", "project-gantt-all"],
+  //   queryFn: getProjectGanttAll,
+  //   staleTime: 30 * 1000,
+  // });
+
+  const { data: statusByProjectId = {}, isFetching: allGanttLoading } = useQuery({
+    queryKey: ["gis", "project-status-summary"],
+    queryFn: getProjectStatusSummary,
     staleTime: 30 * 1000,
   });
 
@@ -283,22 +290,31 @@ export default function GISLayers() {
     return list;
   }, [projects, divisionNumeric, districtNumeric, selectedTehsilId]);
 
-  const projectStatusById = useMemo(() => {
-    const statusByProjectId = new Map<number, ProjectStatus>();
-    for (const s of allProjectSchedules as any[]) {
-      const idNum = Number(s?._id);
-      if (!Number.isFinite(idNum)) continue;
-      const status = deriveProjectStatusFromNestedGantt(s?.tasks);
-      statusByProjectId.set(idNum, status);
-    }
+  // const projectStatusById = useMemo(() => {
+  //   const statusByProjectId = new Map<number, ProjectStatus>();
+  //   for (const s of allProjectSchedules as any[]) {
+  //     const idNum = Number(s?._id);
+  //     if (!Number.isFinite(idNum)) continue;
+  //     const status = deriveProjectStatusFromNestedGantt(s?.tasks);
+  //     statusByProjectId.set(idNum, status);
+  //   }
 
+  //   const map = new Map<number, ProjectStatus>();
+  //   for (const p of filteredProjects) {
+  //     const status: ProjectStatus = statusByProjectId.get(p.id) ?? "pending";
+  //     map.set(p.id, status);
+  //   }
+  //   return map;
+  // }, [filteredProjects, allProjectSchedules]);
+
+  const projectStatusById = useMemo(() => {
     const map = new Map<number, ProjectStatus>();
     for (const p of filteredProjects) {
-      const status: ProjectStatus = statusByProjectId.get(p.id) ?? "pending";
+      const status = (statusByProjectId[String(p.id)] as ProjectStatus) ?? "pending";
       map.set(p.id, status);
     }
     return map;
-  }, [filteredProjects, allProjectSchedules]);
+  }, [filteredProjects, statusByProjectId]);
 
   /**
    * Project status counts (no hardcoding) — SINGLE approach:

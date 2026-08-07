@@ -100,6 +100,7 @@ urlpatterns = [
     path("update-delay-log/<int:pk>/", ActivityDelayLogUpdateView.as_view()),
 
     path("project-progress-summary/", ProjectProgressSummaryView.as_view()),
+    path("project-status-summary/", ProjectStatusSummaryView.as_view()),
 ]
 
 if settings.DEBUG:

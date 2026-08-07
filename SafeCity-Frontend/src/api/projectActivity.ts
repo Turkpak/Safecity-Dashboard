@@ -120,6 +120,12 @@ export async function getProjectProgressSummary(): Promise<Record<string, number
   const data = await get<any>("project-progress-summary/");
   return data?.progress_by_project ?? {};
 }
+
+export async function getProjectStatusSummary(): Promise<Record<string, "pending" | "in_progress" | "in_delay">> {
+  const data = await get<any>("project-status-summary/");
+  return data?.status_by_project ?? {};
+}
+
 export async function getProjectGanttData(projectId: number): Promise<GanttTask[]> {
   if (!projectId) return [];
 
