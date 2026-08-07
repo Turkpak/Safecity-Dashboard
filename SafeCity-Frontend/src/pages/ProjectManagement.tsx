@@ -192,9 +192,9 @@ function WizardXerUploadSection({
       : mediaUrl(editingProject.xer_file.startsWith("/") ? editingProject.xer_file : `/${editingProject.xer_file}`));
 
   return (
-    <div className="space-y-3 min-w-0">
+    <div className="flex flex-col gap-3 min-w-0 h-full">
       <div>
-        <Label htmlFor={XER_FILE_INPUT_ID} className="text-base">
+        <Label htmlFor={XER_FILE_INPUT_ID} className="text-sm font-medium">
           Primavera schedule (XER){editingProject ? "" : " *"}
         </Label>
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
@@ -209,12 +209,12 @@ function WizardXerUploadSection({
           <FileText className="h-8 w-8 text-muted-foreground shrink-0" />
           <div className="flex-1 min-w-0 space-y-1">
             <p className="text-sm font-medium truncate">
-  Current: {
-    editingProject.xer_file_name
-    || editingProject.xer_file?.split("/").pop()
-    || "Schedule file uploaded"
-  }
-</p>
+              Current: {
+                editingProject.xer_file_name
+                || editingProject.xer_file?.split("/").pop()
+                || "Schedule file uploaded"
+              }
+            </p>
             {existingXerHref ? (
               <a
                 href={existingXerHref}
@@ -229,71 +229,69 @@ function WizardXerUploadSection({
         </div>
       )}
 
-      <div className="flex flex-col gap-3">
-        <div
-          className={`relative rounded-xl border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 text-center px-4 py-8 sm:py-10 min-h-[10.5rem] touch-manipulation ${
-            xerFile
-              ? "border-primary bg-primary/5"
-              : "border-muted-foreground/25 hover:border-primary/50 active:bg-muted/40 cursor-pointer"
-          }`}
-          onClick={openPicker}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              openPicker();
-            }
-          }}
-          role="button"
-          tabIndex={0}
-          aria-label="Select XER schedule file"
-        >
-          {xerFile ? (
-            <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-full">
-              <FileText className="h-10 w-10 text-primary shrink-0" />
-              <div className="flex-1 min-w-0 text-left w-full">
-                <p className="font-medium text-sm sm:text-base break-all">{xerFile.name}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {(xerFile.size / 1024).toFixed(2)} KB · ready to upload
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="shrink-0 h-11 w-11"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClearXer();
-                }}
-                aria-label="Remove XER file"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : (
-            <>
-              <Upload className="h-10 w-10 text-muted-foreground shrink-0" />
-              <p className="text-sm sm:text-base font-medium">Tap to choose from this device</p>
-              <p className="text-xs text-muted-foreground max-w-md">
-                .xer only — same file is sent to the server on Create for schedule import.
+      <div
+        className={`relative rounded-xl border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 text-center px-4 py-6 min-h-[13rem] flex-1 touch-manipulation ${
+          xerFile
+            ? "border-primary bg-primary/5"
+            : "border-muted-foreground/25 hover:border-primary/50 active:bg-muted/40 cursor-pointer"
+        }`}
+        onClick={openPicker}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openPicker();
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-label="Select XER schedule file"
+      >
+        {xerFile ? (
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-full">
+            <FileText className="h-10 w-10 text-primary shrink-0" />
+            <div className="flex-1 min-w-0 text-left w-full">
+              <p className="font-medium text-sm sm:text-base break-all">{xerFile.name}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {(xerFile.size / 1024).toFixed(2)} KB · ready to upload
               </p>
-            </>
-          )}
-        </div>
-
-        <Button type="button" variant="secondary" className="w-full sm:w-auto min-h-11 px-6" onClick={openPicker}>
-          <FolderKanban className="h-4 w-4 mr-2 shrink-0" />
-          Choose file…
-        </Button>
-
-        <Input
-          id={XER_FILE_INPUT_ID}
-          type="file"
-          accept=".xer,.XER,application/octet-stream"
-          onChange={onXerInputChange}
-          className="sr-only"
-        />
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="shrink-0 h-11 w-11"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClearXer();
+              }}
+              aria-label="Remove XER file"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <>
+            <Upload className="h-10 w-10 text-muted-foreground shrink-0" />
+            <p className="text-sm font-medium">Tap to choose from this device</p>
+            <p className="text-xs text-muted-foreground max-w-md">
+              .xer only — same file is sent to the server on Create for schedule import.
+            </p>
+          </>
+        )}
       </div>
+
+      <Button type="button" variant="secondary" className="w-full min-h-11 px-6" onClick={openPicker}>
+        <FolderKanban className="h-4 w-4 mr-2 shrink-0" />
+        Choose file…
+      </Button>
+
+      <Input
+        id={XER_FILE_INPUT_ID}
+        type="file"
+        accept=".xer,.XER,application/octet-stream"
+        onChange={onXerInputChange}
+        className="sr-only"
+      />
     </div>
   );
 }
@@ -1520,36 +1518,38 @@ export default function ProjectManagement() {
                         </div>
                       )}
 
-                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8 items-start">
+                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8 items-stretch">
                         <WizardXerUploadSection
                           editingProject={editingProject}
                           xerFile={xerFile}
                           onXerInputChange={handleXERFileChange}
                           onClearXer={() => setXerFile(null)}
                         />
-                        <div className="space-y-2 min-w-0">
-                          <Label>
-                            Project area (GeoJSON, Shapefile, KMZ, KML){" "}
-                            {editingProject ? "(optional – upload to replace)" : "*"}
-                          </Label>
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                            Boundary is converted in the browser when needed, then sent with the XER in the same create request.
-                          </p>
+                        <div className="flex flex-col gap-3 min-w-0 h-full">
+                          <div>
+                            <Label className="text-sm font-medium">
+                              Project area (GeoJSON, Shapefile, KMZ, KML){" "}
+                              {editingProject ? "(optional – upload to replace)" : "*"}
+                            </Label>
+                            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                              Boundary is converted in the browser when needed, then sent with the XER in the same create request.
+                            </p>
+                          </div>
                           <div
-                            className={`relative border-2 border-dashed rounded-lg p-6 sm:p-8 flex flex-col items-center justify-center transition-all min-h-[10.5rem] touch-manipulation ${
+                            className={`relative border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-2 text-center px-4 py-6 min-h-[13rem] flex-1 transition-colors touch-manipulation ${
                               areaFile
                                 ? "border-primary bg-primary/5"
-                                : "border-muted-foreground/20 hover:border-primary/50 cursor-pointer"
+                                : "border-muted-foreground/25 hover:border-primary/50 active:bg-muted/40 cursor-pointer"
                             }`}
                             onClick={() => document.getElementById("area-file-input")?.click()}
                           >
                             {areaFile ? (
-                              <div className="flex items-center gap-3 w-full">
-                                <MapPin className="h-8 w-8 text-primary shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium break-all">{areaFile.name}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {(areaFile.size / 1024).toFixed(2)} KB
+                              <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-full">
+                                <MapPin className="h-10 w-10 text-primary shrink-0" />
+                                <div className="flex-1 min-w-0 text-left w-full">
+                                  <p className="font-medium text-sm sm:text-base break-all">{areaFile.name}</p>
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    {(areaFile.size / 1024).toFixed(2)} KB · ready to upload
                                   </p>
                                 </div>
                                 <Button
@@ -1568,9 +1568,9 @@ export default function ProjectManagement() {
                               </div>
                             ) : (
                               <>
-                                <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                                <Upload className="h-10 w-10 text-muted-foreground shrink-0" />
                                 <p className="text-sm font-medium">Tap to upload area file</p>
-                                <p className="text-xs text-muted-foreground text-center px-2">
+                                <p className="text-xs text-muted-foreground max-w-md">
                                   GeoJSON, Shapefile, KMZ, or KML
                                 </p>
                               </>
@@ -1586,7 +1586,7 @@ export default function ProjectManagement() {
                           <Button
                             type="button"
                             variant="secondary"
-                            className="w-full sm:w-auto min-h-11"
+                            className="w-full min-h-11 px-6"
                             onClick={() => document.getElementById("area-file-input")?.click()}
                           >
                             Choose area file…
@@ -2764,36 +2764,38 @@ export default function ProjectManagement() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8 items-start">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8 items-stretch">
                   <WizardXerUploadSection
                     editingProject={editingProject}
                     xerFile={xerFile}
                     onXerInputChange={handleXERFileChange}
                     onClearXer={() => setXerFile(null)}
                   />
-                  <div className="space-y-2 min-w-0">
-                    <Label>
-                      Project area (GeoJSON, Shapefile, KMZ, KML){" "}
-                      {editingProject ? "(optional – upload to replace)" : "*"}
-                    </Label>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Sent together with the XER when you create the project (multipart request).
-                    </p>
+                  <div className="flex flex-col gap-3 min-w-0 h-full">
+                    <div>
+                      <Label className="text-sm font-medium">
+                        Project area (GeoJSON, Shapefile, KMZ, KML){" "}
+                        {editingProject ? "(optional – upload to replace)" : "*"}
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                        Sent together with the XER when you create the project (multipart request).
+                      </p>
+                    </div>
                     <div
-                      className={`relative border-2 border-dashed rounded-lg p-6 sm:p-8 flex flex-col items-center justify-center transition-all min-h-[10.5rem] touch-manipulation ${
+                      className={`relative border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-2 text-center px-4 py-6 min-h-[13rem] flex-1 transition-colors touch-manipulation ${
                         areaFile
                           ? "border-primary bg-primary/5"
-                          : "border-muted-foreground/20 hover:border-primary/50 cursor-pointer"
+                          : "border-muted-foreground/25 hover:border-primary/50 active:bg-muted/40 cursor-pointer"
                       }`}
                       onClick={() => document.getElementById("area-file-input")?.click()}
                     >
                       {areaFile ? (
-                        <div className="flex items-center gap-3 w-full">
-                          <MapPin className="h-8 w-8 text-primary shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium break-all">{areaFile.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {(areaFile.size / 1024).toFixed(2)} KB
+                        <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-full">
+                          <MapPin className="h-10 w-10 text-primary shrink-0" />
+                          <div className="flex-1 min-w-0 text-left w-full">
+                            <p className="font-medium text-sm sm:text-base break-all">{areaFile.name}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {(areaFile.size / 1024).toFixed(2)} KB · ready to upload
                             </p>
                           </div>
                           <Button
@@ -2812,9 +2814,9 @@ export default function ProjectManagement() {
                         </div>
                       ) : (
                         <>
-                          <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                          <Upload className="h-10 w-10 text-muted-foreground shrink-0" />
                           <p className="text-sm font-medium">Tap to upload area file</p>
-                          <p className="text-xs text-muted-foreground text-center px-2">
+                          <p className="text-xs text-muted-foreground max-w-md">
                             GeoJSON, Shapefile, KMZ, or KML
                           </p>
                         </>
@@ -2830,7 +2832,7 @@ export default function ProjectManagement() {
                     <Button
                       type="button"
                       variant="secondary"
-                      className="w-full sm:w-auto min-h-11"
+                      className="w-full min-h-11 px-6"
                       onClick={() => document.getElementById("area-file-input")?.click()}
                     >
                       Choose area file…
