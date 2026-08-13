@@ -304,6 +304,7 @@ export default function ProjectManagement() {
   const [currentStep, setCurrentStep] = useState(1);
   const [editingProject, setEditingProject] = useState<ApiProject | null>(null);
   const [selectedProjectForView, setSelectedProjectForView] = useState<ApiProject | null>(null);
+  const [loadingProjectView, setLoadingProjectView] = useState(false);
   const [projectsPage, setProjectsPage] = useState(1);
   const [locationSearch, setLocationSearch] = useState("");
 
@@ -843,10 +844,10 @@ export default function ProjectManagement() {
     }
     if (currentStep === 3) {
       if (!validateStep3()) return;
-      const totalBudget = totalBudgetAllocated.trim() ? Number(totalBudgetAllocated) : 0;
-      const utilized = budgetUtilized.trim() ? Number(budgetUtilized) : 0;
-      const variance = totalBudget - utilized;
-      const remaining = Math.max(0, totalBudget - utilized);
+      const totalBudget = totalBudgetAllocated.trim() ? Number(totalBudgetAllocated) : null;
+      const utilized = budgetUtilized.trim() ? Number(budgetUtilized) : null;
+      const variance = (totalBudget ?? 0) - (utilized ?? 0);
+      const remaining = Math.max(0, (totalBudget ?? 0) - (utilized ?? 0));
 
       const n = (v: string): number => Number(v);
       const allocationPayload = enableAllocation
@@ -992,6 +993,25 @@ export default function ProjectManagement() {
     if (window.confirm(`Are you sure you want to delete "${project?.project_name}"?`)) {
       deleteProjectMutation.mutate(id);
       setSelectedProjectForView((prev) => (prev?.id === id ? null : prev));
+    }
+  };
+
+  const handleViewProject = async (project: ApiProject) => {
+    // If the same project is already selected, toggle it off
+    if (selectedProjectForView?.id === project.id) {
+      setSelectedProjectForView(null);
+      return;
+    }
+    setLoadingProjectView(true);
+    try {
+      const fullProject = await getProjectById(project.id);
+      setSelectedProjectForView(fullProject ?? project);
+    } catch {
+      // Fallback to list data if the detail fetch fails
+      setSelectedProjectForView(project);
+      toast({ title: "Warning", description: "Could not load full project details. Showing partial data.", variant: "destructive" });
+    } finally {
+      setLoadingProjectView(false);
     }
   };
 
@@ -1938,7 +1958,8 @@ export default function ProjectManagement() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setSelectedProjectForView(isSelected ? null : project)}
+                        onClick={() => handleViewProject(project)}
+                        disabled={loadingProjectView}
                         className={`flex-1 gap-1.5 h-8 border-border bg-background hover:bg-muted/50 ${isSelected ? "ring-1 ring-primary/50 bg-muted/30" : ""}`}
                       >
                         <Eye className="h-3.5 w-3.5" />
@@ -2064,34 +2085,6 @@ export default function ProjectManagement() {
                       </div>
                     </div>
                   </div>
-
-                  {(selectedProjectForView.total_budget_allocated != null || selectedProjectForView.budget_utilized != null) && (
-                    <div className="rounded-lg border p-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 flex items-center justify-center">
-                          <Wallet className="h-4 w-4" />
-                        </div>
-                        <h4 className="text-sm font-medium">Budget</h4>
-                      </div>
-                      <div className="flex flex-wrap gap-4 text-sm">
-                        {selectedProjectForView.total_budget_allocated != null && selectedProjectForView.total_budget_allocated !== "" && (
-                          <span className="text-muted-foreground">
-                            Allocated: <strong className="text-foreground">{selectedProjectForView.total_budget_allocated}</strong>
-                          </span>
-                        )}
-                        {selectedProjectForView.budget_utilized != null && selectedProjectForView.budget_utilized !== "" && (
-                          <span className="text-muted-foreground">
-                            Utilized: <strong className="text-foreground">{selectedProjectForView.budget_utilized}</strong>
-                          </span>
-                        )}
-                        {selectedProjectForView.budget_remaining != null && selectedProjectForView.budget_remaining !== "" && (
-                          <span className="text-muted-foreground">
-                            Remaining: <strong className="text-foreground">{selectedProjectForView.budget_remaining}</strong>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
 
                   {selectedProjectForView.xer_file && (
                     <div className="rounded-lg border p-3 flex items-center gap-3">

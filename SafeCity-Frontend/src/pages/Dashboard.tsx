@@ -27,8 +27,9 @@ getProjectProgressSummary,
   listDivisions,
   listDistricts,
   listTehsils,
+  listTopProjects,
 } from "@/api";
-import type { Division, District, Tehsil, Project } from "@/api/types";
+import type { Division, District, Tehsil, Project, TopProject } from "@/api/types";
 import {
   ClipboardCheck,
   Building2,
@@ -717,6 +718,10 @@ export default function Dashboard() {
   const { data: apiProjects = [] } = useQuery({
     queryKey: ["projects"],
     queryFn: () => listProjects(),
+  });
+  const { data: apiTopProjects = [] } = useQuery({
+    queryKey: ["top-projects", selectedItemType === "division" ? selectedItemId : null],
+    queryFn: () => listTopProjects(selectedItemType === "division" && selectedItemId ? { division_id: selectedItemId, limit: 6 } : { limit: 6 }),
   });
 
   // Fetch all gantt schedules once and use root task progress for each project card.
@@ -1674,12 +1679,13 @@ const ganttProgressByProjectId = useMemo(() => {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
             {useProjectCards
-              ? projectsInGeography!.map((project, index) => {
+              ? apiTopProjects.map((project, index) => {
                   const percentage = Math.round(
-                    ganttProgressByProjectId.get(project.id) ?? 0,
+                    project.progress ?? 0,
                   );
                   const displayName =
                     project.project_name || `Project ${project.id}`;
+                  const fullProject = apiProjects.find((p) => p.id === project.id) || (project as unknown as Project);
                   return (
                     <InstallationCard
                       key={`${title}-project-${project.id}`}
@@ -1700,7 +1706,7 @@ const ganttProgressByProjectId = useMemo(() => {
                           ? () => {
                               setSelectedMilestoneKey(null);
                               setSelectedProjectForDetails((prev) =>
-                                prev?.id === project.id ? null : project,
+                                prev?.id === fullProject.id ? null : fullProject,
                               );
                             }
                           : undefined

@@ -56,8 +56,8 @@ export async function listProjects(): Promise<Project[]> {
 }
 
 /** GET /api/top-projects/ — returns list of top projects with progress % */
-export async function listTopProjects(): Promise<TopProject[]> {
-  const data = await get<TopProject[]>(TOP_PROJECTS);
+export async function listTopProjects(params?: { limit?: number; division_id?: number }): Promise<TopProject[]> {
+  const data = await get<TopProject[]>(TOP_PROJECTS, params as Record<string, string | number>);
   return Array.isArray(data) ? data : [];
 }
 

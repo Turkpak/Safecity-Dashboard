@@ -77,7 +77,7 @@ router.register(r'list-project-document', ListProjectDocumentView, basename='lis
 router.register(r'update-project-document', UpdateProjectDocumentView, basename='update-project-document')
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+
     path('api/', include(router.urls)),
 
     path('', include(router.urls)),
