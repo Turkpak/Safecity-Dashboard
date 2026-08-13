@@ -127,11 +127,8 @@ export default function UserManagement() {
     queryFn: listStakeholders,
   });
 
-  /** Role options: only Consultant and Contractor from list-stakeholder API */
-  const roleStakeholders = stakeholders.filter(
-    (s) =>
-      s.stakeholder_type === "Consultant" || s.stakeholder_type === "Contractor"
-  );
+  /** All stakeholders from list-stakeholder API */
+  const roleStakeholders = stakeholders;
 
   const { data: users = [], isLoading: usersLoading } = useQuery({
     queryKey: ["users"],
