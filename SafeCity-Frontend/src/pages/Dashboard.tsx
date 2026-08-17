@@ -672,6 +672,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const PROJECTS_PAGE_SIZE = 20;
   const [projectsPage, setProjectsPage] = useState(1);
+  const [projectsSearch, setProjectsSearch] = useState("");
   const [progressType, setProgressType] = useState<"physical" | "financial">(
     "physical",
   );
@@ -908,7 +909,7 @@ const ganttProgressByProjectId = useMemo(() => {
   // Reset pagination when switching to projects view or when the list changes.
   useEffect(() => {
     if (viewType === "projects") setProjectsPage(1);
-  }, [viewType, apiProjects.length]);
+  }, [viewType, apiProjects.length, projectsSearch]);
 
   // clear project selection when leaving tehsil view or projects view
   useEffect(() => {
@@ -3085,6 +3086,7 @@ const ganttProgressByProjectId = useMemo(() => {
                                 );
                               }}
                               color={CARD_COLORS[index % CARD_COLORS.length]}
+                              selected={selectedProjectForDetails?.id === project.id}
                             />
                           );
                         })}
@@ -3595,14 +3597,28 @@ const ganttProgressByProjectId = useMemo(() => {
                 </div>
 
                 {(() => {
+                  const filtered = apiProjects.filter((p) =>
+                    !projectsSearch.trim() ||
+                    (p.project_name ?? "").toLowerCase().includes(projectsSearch.trim().toLowerCase())
+                  );
                   const totalPages = Math.max(
                     1,
-                    Math.ceil(apiProjects.length / PROJECTS_PAGE_SIZE),
+                    Math.ceil(filtered.length / PROJECTS_PAGE_SIZE),
                   );
                   const canPrev = projectsPage > 1;
                   const canNext = projectsPage < totalPages;
                   return (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Search bar — right side, before pagination */}
+                      <div className="relative hidden sm:block w-56">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                          value={projectsSearch}
+                          onChange={(e) => setProjectsSearch(e.target.value)}
+                          placeholder="Search projects…"
+                          className="pl-8 h-9 text-sm"
+                        />
+                      </div>
                       <span className="text-xs text-muted-foreground hidden sm:inline">
                         Page {projectsPage} / {totalPages}
                       </span>
@@ -3633,23 +3649,45 @@ const ganttProgressByProjectId = useMemo(() => {
                     </div>
                   );
                 })()}
+                {/* Mobile: full-width search below title row */}
+                <div className="relative sm:hidden w-full">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    value={projectsSearch}
+                    onChange={(e) => setProjectsSearch(e.target.value)}
+                    placeholder="Search projects…"
+                    className="pl-8 h-9 text-sm w-full"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {(() => {
+                  const filtered = apiProjects.filter((p) =>
+                    !projectsSearch.trim() ||
+                    (p.project_name ?? "").toLowerCase().includes(projectsSearch.trim().toLowerCase())
+                  );
                   const totalPages = Math.max(
                     1,
-                    Math.ceil(apiProjects.length / PROJECTS_PAGE_SIZE),
+                    Math.ceil(filtered.length / PROJECTS_PAGE_SIZE),
                   );
                   const safePage = Math.min(
                     Math.max(1, projectsPage),
                     totalPages,
                   );
                   const start = (safePage - 1) * PROJECTS_PAGE_SIZE;
-                  const pageProjects = apiProjects.slice(
+                  const pageProjects = filtered.slice(
                     start,
                     start + PROJECTS_PAGE_SIZE,
                   );
+
+                  if (pageProjects.length === 0) {
+                    return (
+                      <div className="col-span-full py-12 text-center text-sm text-muted-foreground">
+                        No projects match "{projectsSearch}"
+                      </div>
+                    );
+                  }
 
                   return pageProjects.map((project, index) => {
                   const progress = Math.round(
@@ -3666,6 +3704,7 @@ const ganttProgressByProjectId = useMemo(() => {
                         )
                       }
                       color={CARD_COLORS[(start + index) % CARD_COLORS.length]}
+                      selected={selectedProjectForDetails?.id === project.id}
                     />
                   );
                   });

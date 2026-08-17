@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { TrendingUp, ArrowRight } from "lucide-react";
+import { TrendingUp, ArrowRight, CheckCircle2 } from "lucide-react";
 
 interface HierarchyCardProps {
   title: string;
@@ -8,9 +8,10 @@ interface HierarchyCardProps {
   onClick: () => void;
   className?: string;
   color?: string; // Color for the card theme
+  selected?: boolean; // Whether this card is currently selected
 }
 
-export function HierarchyCard({ title, overallProgress, onClick, className, color }: HierarchyCardProps) {
+export function HierarchyCard({ title, overallProgress, onClick, className, color, selected }: HierarchyCardProps) {
   const clampPct = (n: number) => Math.max(0, Math.min(100, n));
   const progress = clampPct(Number.isFinite(overallProgress) ? overallProgress : 0);
   const progressLabel = progress.toFixed(2);
@@ -114,6 +115,7 @@ export function HierarchyCard({ title, overallProgress, onClick, className, colo
         colors.border,
         "border-r border-t border-b border-border/40 hover:border-opacity-100",
         colors.bg,
+        selected && "ring-2 ring-primary shadow-lg -translate-y-0.5",
         className
       )}
       onClick={onClick}
@@ -137,7 +139,11 @@ export function HierarchyCard({ title, overallProgress, onClick, className, colo
               "p-2 rounded-lg transition-colors",
               colors.iconBg
             )}>
-              <TrendingUp className={cn("h-4 w-4", colors.text)} />
+              {selected ? (
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+              ) : (
+                <TrendingUp className={cn("h-4 w-4", colors.text)} />
+              )}
             </div>
           </div>
 
