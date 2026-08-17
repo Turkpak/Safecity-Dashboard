@@ -1,6 +1,6 @@
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { FolderKanban, Plus, Upload, FileText, MapPin, X, ChevronRight, ChevronLeft, CheckCircle2, Calendar, Eye, Pencil, ChevronDown, Building2, Wallet, Landmark, HandCoins, Percent, CalendarDays } from "lucide-react";
+import { FolderKanban, Plus, Upload, FileText, MapPin, X, ChevronRight, ChevronLeft, CheckCircle2, Calendar, Eye, Pencil, ChevronDown, Building2, Wallet, Landmark, HandCoins, Percent, CalendarDays, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -307,6 +307,7 @@ export default function ProjectManagement() {
   const [loadingProjectView, setLoadingProjectView] = useState(false);
   const [projectsPage, setProjectsPage] = useState(1);
   const [locationSearch, setLocationSearch] = useState("");
+  const [deleteConfirmProject, setDeleteConfirmProject] = useState<ApiProject | null>(null);
 
   const PROJECTS_PER_PAGE = 6;
   const { data: projectsData = [], isLoading: projectsLoading } = useQuery({
@@ -990,10 +991,19 @@ export default function ProjectManagement() {
 
   const handleDeleteProject = (id: number) => {
     const project = projectsData.find((p) => p.id === id);
-    if (window.confirm(`Are you sure you want to delete "${project?.project_name}"?`)) {
-      deleteProjectMutation.mutate(id);
-      setSelectedProjectForView((prev) => (prev?.id === id ? null : prev));
+    if (project) {
+      setDeleteConfirmProject(project);
     }
+  };
+
+  const confirmDeleteProject = () => {
+    if (!deleteConfirmProject) return;
+    deleteProjectMutation.mutate(deleteConfirmProject.id, {
+      onSettled: () => {
+        setSelectedProjectForView((prev) => (prev?.id === deleteConfirmProject.id ? null : prev));
+        setDeleteConfirmProject(null);
+      },
+    });
   };
 
   const handleViewProject = async (project: ApiProject) => {
@@ -1965,6 +1975,16 @@ export default function ProjectManagement() {
                         <Eye className="h-3.5 w-3.5" />
                         View
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteProject(project.id)}
+                        disabled={deleteProjectMutation.isPending && deleteConfirmProject?.id === project.id}
+                        className="h-8 w-8 p-0 border-border bg-background hover:bg-destructive/10 hover:border-destructive/50 hover:text-destructive text-muted-foreground"
+                        aria-label="Delete project"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -2279,6 +2299,52 @@ export default function ProjectManagement() {
         </>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={!!deleteConfirmProject}
+        onOpenChange={(open) => { if (!open) setDeleteConfirmProject(null); }}
+      >
+        <DialogContent className="w-[95vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Delete Project
+            </DialogTitle>
+            <DialogDescription className="pt-1">
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-foreground">
+                "{deleteConfirmProject?.project_name || "this project"}"
+              </span>
+              ? This action cannot be undone and will permanently remove the project along with all its activities, schedules, and related data.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmProject(null)}
+              disabled={deleteProjectMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteProject}
+              disabled={deleteProjectMutation.isPending}
+              className="gap-2"
+            >
+              {deleteProjectMutation.isPending ? (
+                <>Deleting…</>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4" />
+                  Delete Project
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Project Dialog (also used as full-page on /project-management/create) */}
       <Dialog
