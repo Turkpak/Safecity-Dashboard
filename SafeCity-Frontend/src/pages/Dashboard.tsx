@@ -2168,15 +2168,6 @@ const ganttProgressByProjectId = useMemo(() => {
             {/* Planned vs Actual Charts for Each Phase - Only show when specific item is selected (not aggregated view) */}
             {title.startsWith("All Punjab") ? null : (
               <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-bold font-heading mb-2">
-                    Planned vs Actual Progress
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Compare actual progress against planned milestones for each
-                    project phase
-                  </p>
-                </div>
                 <div className="grid gap-4 lg:grid-cols-2">
                   {installationPhases.map((phase) => {
                     const progress = data[phase.key];
