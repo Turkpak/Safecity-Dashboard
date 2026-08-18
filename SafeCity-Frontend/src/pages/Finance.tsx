@@ -492,75 +492,75 @@ export default function Finance() {
   };
 
   const stageBreakdownItems = useMemo(() => {
-  const alloc = {
-    capital: selectedProject
-      ? Number(selectedProject.allocation_capital_cost ?? 0)
-      : Number(projectSummary?.total_allocation_capital ?? 0),
+    const alloc = {
+      capital: selectedProject
+        ? Number(selectedProject.allocation_capital_cost ?? 0)
+        : Number(projectSummary?.total_allocation_capital ?? 0),
 
-    revenue: selectedProject
-      ? Number(selectedProject.allocation_revenue_cost ?? 0)
-      : Number(projectSummary?.total_allocation_revenue ?? 0),
+      revenue: selectedProject
+        ? Number(selectedProject.allocation_revenue_cost ?? 0)
+        : Number(projectSummary?.total_allocation_revenue ?? 0),
 
-    total: selectedProject
-      ? Number(selectedProject.allocation_total_cost ?? 0)
-      : Number(projectSummary?.total_allocation ?? 0),
-  };
+      total: selectedProject
+        ? Number(selectedProject.allocation_total_cost ?? 0)
+        : Number(projectSummary?.total_allocation ?? 0),
+    };
 
-  const pd = {
-    capital: selectedProject
-      ? Number(selectedProject.pd_release_capital_cost ?? 0)
-      : Number(projectSummary?.total_pd_release_capital ?? 0),
+    const pd = {
+      capital: selectedProject
+        ? Number(selectedProject.pd_release_capital_cost ?? 0)
+        : Number(projectSummary?.total_pd_release_capital ?? 0),
 
-    revenue: selectedProject
-      ? Number(selectedProject.pd_release_cost ?? 0)
-      : Number(projectSummary?.total_pd_release_revenue ?? 0),
+      revenue: selectedProject
+        ? Number(selectedProject.pd_release_cost ?? 0)
+        : Number(projectSummary?.total_pd_release_revenue ?? 0),
 
-    total: selectedProject
-      ? Number(selectedProject.pd_release_total_cost ?? 0)
-      : Number(projectSummary?.total_pd_release ?? 0),
-  };
+      total: selectedProject
+        ? Number(selectedProject.pd_release_total_cost ?? 0)
+        : Number(projectSummary?.total_pd_release ?? 0),
+    };
 
-  const spending = {
-    capital: selectedProject
-      ? Number(selectedProject.spending_release_capital_cost ?? 0)
-      : Number(projectSummary?.total_spending_release_capital ?? 0),
+    const spending = {
+      capital: selectedProject
+        ? Number(selectedProject.spending_release_capital_cost ?? 0)
+        : Number(projectSummary?.total_spending_release_capital ?? 0),
 
-    revenue: selectedProject
-      ? Number(selectedProject.spending_release_revenue_cost ?? 0)
-      : Number(projectSummary?.total_spending_release_revenue ?? 0),
+      revenue: selectedProject
+        ? Number(selectedProject.spending_release_revenue_cost ?? 0)
+        : Number(projectSummary?.total_spending_release_revenue ?? 0),
 
-    total: selectedProject
-      ? Number(selectedProject.spending_release_total_cost ?? 0)
-      : Number(projectSummary?.total_spending_release ?? 0),
-  };
+      total: selectedProject
+        ? Number(selectedProject.spending_release_total_cost ?? 0)
+        : Number(projectSummary?.total_spending_release ?? 0),
+    };
 
-  const pifra = {
-    capital: selectedProject
-      ? Number(selectedProject.pifra_utilization_capital_cost ?? 0)
-      : Number(projectSummary?.total_pifra_capital ?? 0),
+    const pifra = {
+      capital: selectedProject
+        ? Number(selectedProject.pifra_utilization_capital_cost ?? 0)
+        : Number(projectSummary?.total_pifra_capital ?? 0),
 
-    revenue: selectedProject
-      ? Number(selectedProject.pifra_utilization_revenue_cost ?? 0)
-      : Number(projectSummary?.total_pifra_revenue ?? 0),
+      revenue: selectedProject
+        ? Number(selectedProject.pifra_utilization_revenue_cost ?? 0)
+        : Number(projectSummary?.total_pifra_revenue ?? 0),
 
-    total: selectedProject
-      ? Number(selectedProject.pifra_utilization_total_cost ?? 0)
-      : Number(projectSummary?.total_pifra ?? 0),
-  };
+      total: selectedProject
+        ? Number(selectedProject.pifra_utilization_total_cost ?? 0)
+        : Number(projectSummary?.total_pifra ?? 0),
+    };
 
-  const base = alloc.total || 1;
+    const base = alloc.total || 1;
 
-  return [
-    { label: "Allocation", triple: alloc, color: STAGE_COLORS[1] },
-    { label: "P&D release", triple: pd, color: STAGE_COLORS[2] },
-    { label: "Spending release", triple: spending, color: STAGE_COLORS[3] },
-    { label: "PIFRA utilization", triple: pifra, color: STAGE_COLORS[4] },
-  ].map((item) => ({
-    ...item,
-    totalM: item.triple.total,
-    pctOfApproved: base > 0 ? (item.triple.total / base) * 100 : 0,
-  }));
-}, [selectedProject, projectSummary]);
+    return [
+      { label: "Allocation", triple: alloc, color: STAGE_COLORS[1] },
+      { label: "P&D release", triple: pd, color: STAGE_COLORS[2] },
+      { label: "Spending release", triple: spending, color: STAGE_COLORS[3] },
+      { label: "PIFRA utilization", triple: pifra, color: STAGE_COLORS[4] },
+    ].map((item) => ({
+      ...item,
+      totalM: item.triple.total,
+      pctOfApproved: base > 0 ? (item.triple.total / base) * 100 : 0,
+    }));
+  }, [selectedProject, projectSummary]);
 
   const stageBreakdownWithBarScale = useMemo(() => {
     const maxPct = Math.max(
@@ -637,7 +637,7 @@ export default function Finance() {
                     (selectedDivisionId === "all" ||
                       selectedDistrictId === "all" ||
                       tehsilsLoading) &&
-                      "opacity-50 cursor-not-allowed"
+                    "opacity-50 cursor-not-allowed"
                   )}
                 >
                   <SelectValue placeholder={tehsilsLoading ? "Loading…" : "All"} />
@@ -676,20 +676,20 @@ export default function Finance() {
             selectedDistrictId !== "all" ||
             selectedTehsilId !== "all" ||
             selectedProjectId !== "all") && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => {
-                setSelectedDivisionId("all");
-                setSelectedDistrictId("all");
-                setSelectedTehsilId("all");
-                setSelectedProjectId("all");
-              }}
-              className="h-8 px-3 text-xs font-medium text-white bg-red-600 hover:bg-red-700 border-0 shrink-0"
-            >
-              Clear
-            </Button>
-          )}
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => {
+                  setSelectedDivisionId("all");
+                  setSelectedDistrictId("all");
+                  setSelectedTehsilId("all");
+                  setSelectedProjectId("all");
+                }}
+                className="h-8 px-3 text-xs font-medium text-white bg-red-600 hover:bg-red-700 border-0 shrink-0"
+              >
+                Clear
+              </Button>
+            )}
         </div>
 
         {(selectedProjectId !== "all" && !selectedProject) || (isAllFilters && !projectSummary) ? (
@@ -828,55 +828,55 @@ export default function Finance() {
                     data={flowChartData}
                     margin={{ top: 16, right: 32, left: 16, bottom: isMobile ? 52 : 36 }}
                   >
-                      <defs>
-                        <linearGradient id="colorFlowTotal" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                      <XAxis
-                        dataKey="stage"
-                        tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                        interval={0}
-                        angle={isMobile ? -35 : 0}
-                        textAnchor={isMobile ? "end" : "middle"}
-                        height={isMobile ? 70 : 40}
+                    <defs>
+                      <linearGradient id="colorFlowTotal" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                    <XAxis
+                      dataKey="stage"
+                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                      interval={0}
+                      angle={isMobile ? -35 : 0}
+                      textAnchor={isMobile ? "end" : "middle"}
+                      height={isMobile ? 70 : 40}
+                    />
+                    <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${v}M`} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        borderColor: "hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                      formatter={(value: number, name: string) => {
+                        if (name === "Total (M)") return [`PKR ${Number(value).toFixed(2)} M`, name];
+                        return [`PKR ${Number(value).toFixed(2)} M`, name];
+                      }}
+                    />
+                    <Legend wrapperStyle={{ paddingTop: 8 }} />
+                    <Bar
+                      dataKey="totalM"
+                      fill="url(#colorFlowTotal)"
+                      radius={[4, 4, 0, 0]}
+                      name="Total (M)"
+                      barCategoryGap="18%"
+                    />
+                    {flowChartData.some((x) => Number((x as any).revenueM) > 0) && (
+                      <Line
+                        type="monotone"
+                        dataKey="revenueM"
+                        stroke="#10b981"
+                        strokeWidth={2}
+                        name="Revenue (M)"
+                        dot={{ fill: "#10b981", r: 3 }}
                       />
-                      <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${v}M`} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          borderColor: "hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                        formatter={(value: number, name: string) => {
-                          if (name === "Total (M)") return [`PKR ${Number(value).toFixed(2)} M`, name];
-                          return [`PKR ${Number(value).toFixed(2)} M`, name];
-                        }}
-                      />
-                      <Legend wrapperStyle={{ paddingTop: 8 }} />
-                      <Bar
-                        dataKey="totalM"
-                        fill="url(#colorFlowTotal)"
-                        radius={[4, 4, 0, 0]}
-                        name="Total (M)"
-                        barCategoryGap="18%"
-                      />
-                      {flowChartData.some((x) => Number((x as any).revenueM) > 0) && (
-                        <Line
-                          type="monotone"
-                          dataKey="revenueM"
-                          stroke="#10b981"
-                          strokeWidth={2}
-                          name="Revenue (M)"
-                          dot={{ fill: "#10b981", r: 3 }}
-                        />
-                      )}
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+                    )}
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
 
             {/* Project comparison — only projects with financial data; duplicate names disambiguated */}
             <Card className="border-2 transition-colors hover:border-[#101a3c]">
@@ -932,10 +932,7 @@ export default function Finance() {
             <Card>
               <CardHeader>
                 <CardTitle>Stage breakdown (totals)</CardTitle>
-                <CardDescription>
-                  Capital / revenue / total (PKR M). Bar length is relative across stages (longest = highest % vs
-                  approved); the percentage is vs approved allocation.
-                </CardDescription>
+
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">

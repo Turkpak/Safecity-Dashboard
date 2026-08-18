@@ -673,6 +673,8 @@ export default function Dashboard() {
   const PROJECTS_PAGE_SIZE = 20;
   const [projectsPage, setProjectsPage] = useState(1);
   const [projectsSearch, setProjectsSearch] = useState("");
+  const [divisionSearchQuery, setDivisionSearchQuery] = useState("");
+  const [districtSearchQuery, setDistrictSearchQuery] = useState("");
   const [progressType, setProgressType] = useState<"physical" | "financial">(
     "physical",
   );
@@ -1334,6 +1336,22 @@ const ganttProgressByProjectId = useMemo(() => {
       })
       .sort((a, b) => b.overall - a.overall);
   }, [apiDistricts, apiProjects]);
+
+  const filteredDivisionsData = useMemo(() => {
+    if (!divisionSearchQuery.trim()) return divisionsData;
+    const q = divisionSearchQuery.trim().toLowerCase();
+    return divisionsData.filter((d) =>
+      (d.name ?? "").toLowerCase().includes(q)
+    );
+  }, [divisionsData, divisionSearchQuery]);
+
+  const filteredDistrictsData = useMemo(() => {
+    if (!districtSearchQuery.trim()) return districtsData;
+    const q = districtSearchQuery.trim().toLowerCase();
+    return districtsData.filter((d) =>
+      (d.name ?? "").toLowerCase().includes(q)
+    );
+  }, [districtsData, districtSearchQuery]);
 
 
   // Tehsils data grouped by district name (API-driven)
@@ -2524,7 +2542,7 @@ const ganttProgressByProjectId = useMemo(() => {
                   return (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2 min-w-0">
-                        <h1 className="text-xl sm:text-3xl md:text-4xl font-bold font-heading bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent truncate sm:whitespace-normal">
+                        <h1 className="text-xl sm:text-3xl md:text-4xl font-bold font-heading bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent whitespace-normal">
                           {titleText}
                         </h1>
                         <Skeleton className="h-7 w-28 rounded-full shrink-0" />
@@ -2537,7 +2555,7 @@ const ganttProgressByProjectId = useMemo(() => {
                   return (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2 min-w-0">
-                        <h1 className="text-xl sm:text-3xl md:text-4xl font-bold font-heading bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent truncate sm:whitespace-normal">
+                        <h1 className="text-xl sm:text-3xl md:text-4xl font-bold font-heading bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent whitespace-normal">
                           {titleText}
                         </h1>
                       </div>
@@ -2611,7 +2629,7 @@ const ganttProgressByProjectId = useMemo(() => {
                   return (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2 min-w-0">
-                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold font-heading bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent truncate sm:whitespace-normal">
+                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold font-heading bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent whitespace-normal">
                           {titleText}
                         </h1>
                         <div className="flex items-center gap-1.5 shrink-0">
@@ -3150,47 +3168,67 @@ const ganttProgressByProjectId = useMemo(() => {
                   </h2>
                 </div>
 
-                {/* Show More/Less Button */}
-                {divisionsData.length > 4 && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setExpandedDivisions(!expandedDivisions)}
-                    className="rounded-xl h-9 whitespace-nowrap text-white border-[#101a3c] hover:border-[#101a3c] cursor-pointer"
-                    style={{ backgroundColor: "#101a3c" }}
-                  >
-                    {expandedDivisions ? (
-                      <>
-                        <ChevronUp className="h-4 w-4 mr-2 text-white" />
-                        Show Less ({divisionsData.length - 4} hidden)
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="h-4 w-4 mr-2 text-white" />
-                        Show More ({divisionsData.length - 4} more)
-                      </>
-                    )}
-                  </Button>
-                )}
+                <div className="flex flex-col sm:flex-row gap-3 items-end sm:items-center w-full sm:w-auto">
+                  {/* Search Input */}
+                  <div className="relative w-full sm:w-[250px]">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search divisions..."
+                      value={divisionSearchQuery}
+                      onChange={(e) => setDivisionSearchQuery(e.target.value)}
+                      className="pl-9 h-9 rounded-xl border-border/50 bg-background"
+                    />
+                  </div>
+
+                  {/* Show More/Less Button */}
+                  {filteredDivisionsData.length > 4 && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setExpandedDivisions(!expandedDivisions)}
+                      className="rounded-xl h-9 whitespace-nowrap text-white border-[#101a3c] hover:border-[#101a3c] cursor-pointer w-fit self-end sm:self-auto"
+                      style={{ backgroundColor: "#101a3c" }}
+                    >
+                      {expandedDivisions ? (
+                        <>
+                          <ChevronUp className="h-4 w-4 mr-2 text-white" />
+                          Show Less ({filteredDivisionsData.length - 4} hidden)
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-4 w-4 mr-2 text-white" />
+                          Show More ({filteredDivisionsData.length - 4} more)
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {/* Division Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {(expandedDivisions
-                  ? divisionsData
-                  : divisionsData.slice(0, 4)
-                ).map((div) => (
-                  <HierarchyCard
-                    key={div.id}
-                    title={div.name}
-                    overallProgress={div.overall}
-                    color={div.color}
-                    onClick={() => {
-                      setSelectedItemId(div.id);
-                      setSelectedItemName(div.name);
-                      setSelectedItemType("division");
-                    }}
-                  />
-                ))}
+                {filteredDivisionsData.length === 0 ? (
+                  <div className="col-span-full text-center py-6 text-muted-foreground">
+                    No divisions found matching "{divisionSearchQuery}"
+                  </div>
+                ) : (
+                  (expandedDivisions
+                    ? filteredDivisionsData
+                    : filteredDivisionsData.slice(0, 4)
+                  ).map((div) => (
+                    <HierarchyCard
+                      key={div.id}
+                      title={div.name}
+                      overallProgress={div.overall}
+                      color={div.color}
+                      onClick={() => {
+                        setSelectedItemId(div.id);
+                        setSelectedItemName(div.name);
+                        setSelectedItemType("division");
+                      }}
+                    />
+                  ))
+                )}
               </div>
 
               {/* Aggregated Charts Section - Same as detail view */}
@@ -3235,52 +3273,72 @@ const ganttProgressByProjectId = useMemo(() => {
                   </h2>
                 </div>
 
-                {/* Show More/Less Button */}
-                {districtsData.length > 4 && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setExpandedDistricts(!expandedDistricts)}
-                    className="rounded-xl h-9 whitespace-nowrap text-white border-[#101a3c] hover:border-[#101a3c] cursor-pointer"
-                    style={{ backgroundColor: "#101a3c" }}
-                  >
-                    {expandedDistricts ? (
-                      <>
-                        <ChevronUp className="h-4 w-4 mr-2 text-white" />
-                        Show Less ({districtsData.length - 4} hidden)
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="h-4 w-4 mr-2 text-white" />
-                        Show More ({districtsData.length - 4} more)
-                      </>
-                    )}
-                  </Button>
-                )}
+                <div className="flex flex-col sm:flex-row gap-3 items-end sm:items-center w-full sm:w-auto">
+                  {/* Search Input */}
+                  <div className="relative w-full sm:w-[250px]">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search districts..."
+                      value={districtSearchQuery}
+                      onChange={(e) => setDistrictSearchQuery(e.target.value)}
+                      className="pl-9 h-9 rounded-xl border-border/50 bg-background"
+                    />
+                  </div>
+
+                  {/* Show More/Less Button */}
+                  {filteredDistrictsData.length > 4 && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setExpandedDistricts(!expandedDistricts)}
+                      className="rounded-xl h-9 whitespace-nowrap text-white border-[#101a3c] hover:border-[#101a3c] cursor-pointer w-fit self-end sm:self-auto"
+                      style={{ backgroundColor: "#101a3c" }}
+                    >
+                      {expandedDistricts ? (
+                        <>
+                          <ChevronUp className="h-4 w-4 mr-2 text-white" />
+                          Show Less ({filteredDistrictsData.length - 4} hidden)
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-4 w-4 mr-2 text-white" />
+                          Show More ({filteredDistrictsData.length - 4} more)
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {/* District Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {(expandedDistricts
-                  ? districtsData
-                  : districtsData.slice(0, 4)
-                ).map((dist) => (
-                  <HierarchyCard
-                    key={dist.id}
-                    title={dist.name}
-                    overallProgress={dist.overall}
-                    color={dist.color}
-                    onClick={() => {
-                      const parentDiv = divisionsData.find(
-                        (d) => d.id === dist.divisionId,
-                      );
-                      setParentDivisionId(dist.divisionId);
-                      setParentDivisionName(parentDiv?.name ?? null);
-                      setSelectedItemId(dist.id);
-                      setSelectedItemName(dist.name);
-                      setSelectedItemType("district");
-                    }}
-                  />
-                ))}
+                {filteredDistrictsData.length === 0 ? (
+                  <div className="col-span-full text-center py-6 text-muted-foreground">
+                    No districts found matching "{districtSearchQuery}"
+                  </div>
+                ) : (
+                  (expandedDistricts
+                    ? filteredDistrictsData
+                    : filteredDistrictsData.slice(0, 4)
+                  ).map((dist) => (
+                    <HierarchyCard
+                      key={dist.id}
+                      title={dist.name}
+                      overallProgress={dist.overall}
+                      color={dist.color}
+                      onClick={() => {
+                        const parentDiv = divisionsData.find(
+                          (d) => d.id === dist.divisionId,
+                        );
+                        setParentDivisionId(dist.divisionId);
+                        setParentDivisionName(parentDiv?.name ?? null);
+                        setSelectedItemId(dist.id);
+                        setSelectedItemName(dist.name);
+                        setSelectedItemType("district");
+                      }}
+                    />
+                  ))
+                )}
               </div>
 
               {/* Aggregated Charts Section */}
