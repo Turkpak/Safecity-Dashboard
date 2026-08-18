@@ -695,6 +695,9 @@ const { data: pageData, isLoading: isPageLoading } = useQuery({
   const [isLoading, setIsLoading] = useState(true);
   const PROJECTS_PAGE_SIZE = 20;
   const [projectsPage, setProjectsPage] = useState(1);
+  const [projectsSearch, setProjectsSearch] = useState("");
+  const [divisionSearchQuery, setDivisionSearchQuery] = useState("");
+  const [districtSearchQuery, setDistrictSearchQuery] = useState("");
   const [progressType, setProgressType] = useState<"physical" | "financial">(
     "physical",
   );
@@ -1018,7 +1021,7 @@ const ganttProgressByProjectId = useMemo(() => {
   // Reset pagination when switching to projects view or when the list changes.
   useEffect(() => {
     if (viewType === "projects") setProjectsPage(1);
-  }, [viewType, apiProjects.length]);
+  }, [viewType, apiProjects.length, projectsSearch]);
 
   // clear project selection when leaving tehsil view or projects view
   useEffect(() => {
@@ -1468,7 +1471,23 @@ const ganttProgressByProjectId = useMemo(() => {
         };
       })
       .sort((a, b) => b.overall - a.overall);
-  }, [apiDistricts]);
+  }, [apiDistricts, apiProjects]);
+
+  const filteredDivisionsData = useMemo(() => {
+    if (!divisionSearchQuery.trim()) return divisionsData;
+    const q = divisionSearchQuery.trim().toLowerCase();
+    return divisionsData.filter((d) =>
+      (d.name ?? "").toLowerCase().includes(q)
+    );
+  }, [divisionsData, divisionSearchQuery]);
+
+  const filteredDistrictsData = useMemo(() => {
+    if (!districtSearchQuery.trim()) return districtsData;
+    const q = districtSearchQuery.trim().toLowerCase();
+    return districtsData.filter((d) =>
+      (d.name ?? "").toLowerCase().includes(q)
+    );
+  }, [districtsData, districtSearchQuery]);
 
 
   // Tehsils data grouped by district name (API-driven)
@@ -2310,15 +2329,6 @@ const ganttProgressByProjectId = useMemo(() => {
             {/* Planned vs Actual Charts for Each Phase - Only show when specific item is selected (not aggregated view) */}
             {title.startsWith("All Punjab") ? null : (
               <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-bold font-heading mb-2">
-                    Planned vs Actual Progress
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Compare actual progress against planned milestones for each
-                    project phase
-                  </p>
-                </div>
                 <div className="grid gap-4 lg:grid-cols-2">
                   {installationPhases.map((phase) => {
                     const progress = data[phase.key];
@@ -2674,7 +2684,7 @@ const ganttProgressByProjectId = useMemo(() => {
                   return (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2 min-w-0">
-                        <h1 className="text-xl sm:text-3xl md:text-4xl font-bold font-heading bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent truncate sm:whitespace-normal">
+                        <h1 className="text-xl sm:text-3xl md:text-4xl font-bold font-heading bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent whitespace-normal">
                           {titleText}
                         </h1>
                         <Skeleton className="h-7 w-28 rounded-full shrink-0" />
@@ -2687,7 +2697,7 @@ const ganttProgressByProjectId = useMemo(() => {
                   return (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2 min-w-0">
-                        <h1 className="text-xl sm:text-3xl md:text-4xl font-bold font-heading bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent truncate sm:whitespace-normal">
+                        <h1 className="text-xl sm:text-3xl md:text-4xl font-bold font-heading bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent whitespace-normal">
                           {titleText}
                         </h1>
                       </div>
@@ -2761,7 +2771,7 @@ const ganttProgressByProjectId = useMemo(() => {
                   return (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2 min-w-0">
-                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold font-heading bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent truncate sm:whitespace-normal">
+                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold font-heading bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent whitespace-normal">
                           {titleText}
                         </h1>
                         <div className="flex items-center gap-1.5 shrink-0">
@@ -3236,6 +3246,7 @@ const ganttProgressByProjectId = useMemo(() => {
                                 );
                               }}
                               color={CARD_COLORS[index % CARD_COLORS.length]}
+                              selected={selectedProjectForDetails?.id === project.id}
                             />
                           );
                         })}
@@ -3299,47 +3310,67 @@ const ganttProgressByProjectId = useMemo(() => {
                   </h2>
                 </div>
 
-                {/* Show More/Less Button */}
-                {divisionsData.length > 4 && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setExpandedDivisions(!expandedDivisions)}
-                    className="rounded-xl h-9 whitespace-nowrap text-white border-[#101a3c] hover:border-[#101a3c] cursor-pointer"
-                    style={{ backgroundColor: "#101a3c" }}
-                  >
-                    {expandedDivisions ? (
-                      <>
-                        <ChevronUp className="h-4 w-4 mr-2 text-white" />
-                        Show Less ({divisionsData.length - 4} hidden)
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="h-4 w-4 mr-2 text-white" />
-                        Show More ({divisionsData.length - 4} more)
-                      </>
-                    )}
-                  </Button>
-                )}
+                <div className="flex flex-col sm:flex-row gap-3 items-end sm:items-center w-full sm:w-auto">
+                  {/* Search Input */}
+                  <div className="relative w-full sm:w-[250px]">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search divisions..."
+                      value={divisionSearchQuery}
+                      onChange={(e) => setDivisionSearchQuery(e.target.value)}
+                      className="pl-9 h-9 rounded-xl border-border/50 bg-background"
+                    />
+                  </div>
+
+                  {/* Show More/Less Button */}
+                  {filteredDivisionsData.length > 4 && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setExpandedDivisions(!expandedDivisions)}
+                      className="rounded-xl h-9 whitespace-nowrap text-white border-[#101a3c] hover:border-[#101a3c] cursor-pointer w-fit self-end sm:self-auto"
+                      style={{ backgroundColor: "#101a3c" }}
+                    >
+                      {expandedDivisions ? (
+                        <>
+                          <ChevronUp className="h-4 w-4 mr-2 text-white" />
+                          Show Less ({filteredDivisionsData.length - 4} hidden)
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-4 w-4 mr-2 text-white" />
+                          Show More ({filteredDivisionsData.length - 4} more)
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {/* Division Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {(expandedDivisions
-                  ? divisionsData
-                  : divisionsData.slice(0, 4)
-                ).map((div) => (
-                  <HierarchyCard
-                    key={div.id}
-                    title={div.name ?? "Unnamed Division"}
-                    overallProgress={div.overall}
-                    color={div.color}
-                    onClick={() => {
-                      setSelectedItemId(div.id);
-                      setSelectedItemName(div.name ?? "Unnamed Division");
-                      setSelectedItemType("division");
-                    }}
-                  />
-                ))}
+                {filteredDivisionsData.length === 0 ? (
+                  <div className="col-span-full text-center py-6 text-muted-foreground">
+                    No divisions found matching "{divisionSearchQuery}"
+                  </div>
+                ) : (
+                  (expandedDivisions
+                    ? filteredDivisionsData
+                    : filteredDivisionsData.slice(0, 4)
+                  ).map((div) => (
+                    <HierarchyCard
+                      key={div.id}
+                      title={div.name}
+                      overallProgress={div.overall}
+                      color={div.color}
+                      onClick={() => {
+                        setSelectedItemId(div.id);
+                        setSelectedItemName(div.name);
+                        setSelectedItemType("division");
+                      }}
+                    />
+                  ))
+                )}
               </div>
 
               {/* Aggregated Charts Section - Same as detail view */}
@@ -3384,52 +3415,72 @@ const ganttProgressByProjectId = useMemo(() => {
                   </h2>
                 </div>
 
-                {/* Show More/Less Button */}
-                {districtsData.length > 4 && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setExpandedDistricts(!expandedDistricts)}
-                    className="rounded-xl h-9 whitespace-nowrap text-white border-[#101a3c] hover:border-[#101a3c] cursor-pointer"
-                    style={{ backgroundColor: "#101a3c" }}
-                  >
-                    {expandedDistricts ? (
-                      <>
-                        <ChevronUp className="h-4 w-4 mr-2 text-white" />
-                        Show Less ({districtsData.length - 4} hidden)
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="h-4 w-4 mr-2 text-white" />
-                        Show More ({districtsData.length - 4} more)
-                      </>
-                    )}
-                  </Button>
-                )}
+                <div className="flex flex-col sm:flex-row gap-3 items-end sm:items-center w-full sm:w-auto">
+                  {/* Search Input */}
+                  <div className="relative w-full sm:w-[250px]">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search districts..."
+                      value={districtSearchQuery}
+                      onChange={(e) => setDistrictSearchQuery(e.target.value)}
+                      className="pl-9 h-9 rounded-xl border-border/50 bg-background"
+                    />
+                  </div>
+
+                  {/* Show More/Less Button */}
+                  {filteredDistrictsData.length > 4 && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setExpandedDistricts(!expandedDistricts)}
+                      className="rounded-xl h-9 whitespace-nowrap text-white border-[#101a3c] hover:border-[#101a3c] cursor-pointer w-fit self-end sm:self-auto"
+                      style={{ backgroundColor: "#101a3c" }}
+                    >
+                      {expandedDistricts ? (
+                        <>
+                          <ChevronUp className="h-4 w-4 mr-2 text-white" />
+                          Show Less ({filteredDistrictsData.length - 4} hidden)
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-4 w-4 mr-2 text-white" />
+                          Show More ({filteredDistrictsData.length - 4} more)
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {/* District Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {(expandedDistricts
-                  ? districtsData
-                  : districtsData.slice(0, 4)
-                ).map((dist) => (
-                  <HierarchyCard
-                    key={dist.id}
-                    title={dist.name ?? "Unnamed District"}
-                    overallProgress={dist.overall}
-                    color={dist.color}
-                    onClick={() => {
-                      const parentDiv = divisionsData.find(
-                        (d) => d.id === dist.divisionId,
-                      );
-                      setParentDivisionId(dist.divisionId ?? null);
-                      setParentDivisionName(parentDiv?.name ?? null);
-                      setSelectedItemId(dist.id);
-                      setSelectedItemName(dist.name ?? "Unnamed District");
-                      setSelectedItemType("district");
-                    }}
-                  />
-                ))}
+                {filteredDistrictsData.length === 0 ? (
+                  <div className="col-span-full text-center py-6 text-muted-foreground">
+                    No districts found matching "{districtSearchQuery}"
+                  </div>
+                ) : (
+                  (expandedDistricts
+                    ? filteredDistrictsData
+                    : filteredDistrictsData.slice(0, 4)
+                  ).map((dist) => (
+                    <HierarchyCard
+                      key={dist.id}
+                      title={dist.name}
+                      overallProgress={dist.overall}
+                      color={dist.color}
+                      onClick={() => {
+                        const parentDiv = divisionsData.find(
+                          (d) => d.id === dist.divisionId,
+                        );
+                        setParentDivisionId(dist.divisionId);
+                        setParentDivisionName(parentDiv?.name ?? null);
+                        setSelectedItemId(dist.id);
+                        setSelectedItemName(dist.name);
+                        setSelectedItemType("district");
+                      }}
+                    />
+                  ))
+                )}
               </div>
 
               {/* Aggregated Charts Section */}
@@ -3746,14 +3797,28 @@ const ganttProgressByProjectId = useMemo(() => {
                 </div>
 
                 {(() => {
+                  const filtered = apiProjects.filter((p) =>
+                    !projectsSearch.trim() ||
+                    (p.project_name ?? "").toLowerCase().includes(projectsSearch.trim().toLowerCase())
+                  );
                   const totalPages = Math.max(
                     1,
-                    Math.ceil(apiProjects.length / PROJECTS_PAGE_SIZE),
+                    Math.ceil(filtered.length / PROJECTS_PAGE_SIZE),
                   );
                   const canPrev = projectsPage > 1;
                   const canNext = projectsPage < totalPages;
                   return (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Search bar — right side, before pagination */}
+                      <div className="relative hidden sm:block w-56">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                          value={projectsSearch}
+                          onChange={(e) => setProjectsSearch(e.target.value)}
+                          placeholder="Search projects…"
+                          className="pl-8 h-9 text-sm"
+                        />
+                      </div>
                       <span className="text-xs text-muted-foreground hidden sm:inline">
                         Page {projectsPage} / {totalPages}
                       </span>
@@ -3784,23 +3849,45 @@ const ganttProgressByProjectId = useMemo(() => {
                     </div>
                   );
                 })()}
+                {/* Mobile: full-width search below title row */}
+                <div className="relative sm:hidden w-full">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    value={projectsSearch}
+                    onChange={(e) => setProjectsSearch(e.target.value)}
+                    placeholder="Search projects…"
+                    className="pl-8 h-9 text-sm w-full"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {(() => {
+                  const filtered = apiProjects.filter((p) =>
+                    !projectsSearch.trim() ||
+                    (p.project_name ?? "").toLowerCase().includes(projectsSearch.trim().toLowerCase())
+                  );
                   const totalPages = Math.max(
                     1,
-                    Math.ceil(apiProjects.length / PROJECTS_PAGE_SIZE),
+                    Math.ceil(filtered.length / PROJECTS_PAGE_SIZE),
                   );
                   const safePage = Math.min(
                     Math.max(1, projectsPage),
                     totalPages,
                   );
                   const start = (safePage - 1) * PROJECTS_PAGE_SIZE;
-                  const pageProjects = apiProjects.slice(
+                  const pageProjects = filtered.slice(
                     start,
                     start + PROJECTS_PAGE_SIZE,
                   );
+
+                  if (pageProjects.length === 0) {
+                    return (
+                      <div className="col-span-full py-12 text-center text-sm text-muted-foreground">
+                        No projects match "{projectsSearch}"
+                      </div>
+                    );
+                  }
 
                   return pageProjects.map((project, index) => {
                   const progress = Math.round(
@@ -3817,6 +3904,7 @@ const ganttProgressByProjectId = useMemo(() => {
                         )
                       }
                       color={CARD_COLORS[(start + index) % CARD_COLORS.length]}
+                      selected={selectedProjectForDetails?.id === project.id}
                     />
                   );
                   });

@@ -107,6 +107,16 @@ export default function UserManagement() {
   const USERS_PER_PAGE = 6;
   const [nameComboboxOpen, setNameComboboxOpen] = useState(false);
 
+  // States for confirming permission change
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [pendingPermissionChange, setPendingPermissionChange] = useState<{
+    sidebar_label: string;
+    sub_label: string | null;
+    key: "can_view" | "can_create" | "can_update" | "can_delete";
+    value: boolean;
+    displayLabel: string;
+  } | null>(null);
+
   // Expand/collapse groups in permission tables
   const [expandedGroups, setExpandedGroups] = useState<{ area: boolean; projects: boolean }>({
     area: true,
@@ -127,11 +137,8 @@ export default function UserManagement() {
     queryFn: listStakeholders,
   });
 
-  /** Role options: only Consultant and Contractor from list-stakeholder API */
-  const roleStakeholders = stakeholders.filter(
-    (s) =>
-      s.stakeholder_type === "Consultant" || s.stakeholder_type === "Contractor"
-  );
+  /** All stakeholders from list-stakeholder API */
+  const roleStakeholders = stakeholders;
 
   const { data: users = [], isLoading: usersLoading } = useQuery({
     queryKey: ["users"],
@@ -377,6 +384,25 @@ export default function UserManagement() {
       setIsUpdatingPermission(false);
     }
   }
+
+  const requestPermissionToggle = (
+    sidebar_label: string,
+    sub_label: string | null,
+    key: "can_view" | "can_create" | "can_update" | "can_delete",
+    value: boolean,
+    displayLabel: string
+  ) => {
+    setPendingPermissionChange({ sidebar_label, sub_label, key, value, displayLabel });
+    setConfirmDialogOpen(true);
+  };
+
+  const executePermissionToggle = async () => {
+    if (!pendingPermissionChange) return;
+    const { sidebar_label, sub_label, key, value } = pendingPermissionChange;
+    setConfirmDialogOpen(false);
+    setPendingPermissionChange(null);
+    await handlePermissionToggle(sidebar_label, sub_label, key, value);
+  };
 
   if (!isSuperAdmin) {
     return (
@@ -872,7 +898,7 @@ export default function UserManagement() {
                                   checked={canView}
                                   disabled={disabled}
                                   onCheckedChange={(c) =>
-                                    handlePermissionToggle(row.sidebar_label, row.sub_label, "can_view", !!c)
+                                    requestPermissionToggle(row.sidebar_label, row.sub_label, "can_view", !!c, row.displayLabel)
                                   }
                                 />
                               ) : null}
@@ -885,7 +911,7 @@ export default function UserManagement() {
                                   checked={canCreate}
                                   disabled={disabled}
                                   onCheckedChange={(c) =>
-                                    handlePermissionToggle(row.sidebar_label, row.sub_label, "can_create", !!c)
+                                    requestPermissionToggle(row.sidebar_label, row.sub_label, "can_create", !!c, row.displayLabel)
                                   }
                                 />
                               ) : null}
@@ -898,7 +924,7 @@ export default function UserManagement() {
                                   checked={canUpdate}
                                   disabled={disabled}
                                   onCheckedChange={(c) =>
-                                    handlePermissionToggle(row.sidebar_label, row.sub_label, "can_update", !!c)
+                                    requestPermissionToggle(row.sidebar_label, row.sub_label, "can_update", !!c, row.displayLabel)
                                   }
                                 />
                               ) : null}
@@ -911,7 +937,7 @@ export default function UserManagement() {
                                   checked={canDelete}
                                   disabled={disabled}
                                   onCheckedChange={(c) =>
-                                    handlePermissionToggle(row.sidebar_label, row.sub_label, "can_delete", !!c)
+                                    requestPermissionToggle(row.sidebar_label, row.sub_label, "can_delete", !!c, row.displayLabel)
                                   }
                                 />
                               ) : null}
@@ -926,6 +952,58 @@ export default function UserManagement() {
             )}
           </CardContent>
         </Card>
+
+        {/* Confirmation Dialog for permission update */}
+        <Dialog
+          open={confirmDialogOpen}
+          onOpenChange={(open) => {
+            setConfirmDialogOpen(open);
+            if (!open) setPendingPermissionChange(null);
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Confirm Permission Change</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to {pendingPermissionChange?.value ? "grant" : "revoke"}{" "}
+                <strong className="text-foreground">
+                  {pendingPermissionChange?.key === "can_view"
+                    ? "Read"
+                    : pendingPermissionChange?.key === "can_create"
+                    ? "Create"
+                    : pendingPermissionChange?.key === "can_update"
+                    ? "Update"
+                    : "Delete"}
+                </strong>{" "}
+                permission for{" "}
+                <strong className="text-foreground">{pendingPermissionChange?.displayLabel}</strong> to{" "}
+                <strong className="text-foreground">
+                  {selectedUserWithPermissions?.full_name || selectedUserWithPermissions?.email || "this user"}
+                </strong>
+                ?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setConfirmDialogOpen(false);
+                  setPendingPermissionChange(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={executePermissionToggle}
+                className="bg-primary text-primary-foreground"
+              >
+                Confirm
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

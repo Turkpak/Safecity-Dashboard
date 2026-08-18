@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useWindowSize } from "@/hooks/use-window-size";
 
 interface CityCompletionChartProps {
+  title?: string;
   cityData: {
     city: string;
     completion: number;
@@ -17,19 +18,19 @@ const getColor = (completion: number): string => {
   return "#ef4444"; // red
 };
 
-export function CityCompletionChart({ cityData, description = "District Wise Progress" }: CityCompletionChartProps) {
+export function CityCompletionChart({ title = "Division Wise Progress", cityData, description = "Overview of Progress" }: CityCompletionChartProps) {
   const { width } = useWindowSize();
   const sortedData = [...cityData].sort((a, b) => b.completion - a.completion);
   const isMobile = width < 640;
   const isTablet = width >= 640 && width < 1024;
   // Keep bar width visually consistent even when the number of divisions changes.
   const barSize = isMobile ? 28 : isTablet ? 34 : 42;
-  const tickLabel = (s: string) => (s || "").replace(/\s*Division\s*$/i, "");
+  const tickLabel = (s: string) => (s || "").replace(/\s*(Division|District)\s*$/i, "");
 
   return (
     <Card className="shadow-lg border-border/50 border-2 transition-colors hover:border-[#101a3c]">
       <CardHeader className="pb-4">
-        <CardTitle className="font-heading text-lg sm:text-xl font-bold leading-tight">Divison Wise Progress</CardTitle>
+        <CardTitle className="font-heading text-lg sm:text-xl font-bold leading-tight">{title}</CardTitle>
         <CardDescription className="text-sm">{description}</CardDescription>
       </CardHeader>
       <CardContent>
