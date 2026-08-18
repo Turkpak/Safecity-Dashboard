@@ -230,6 +230,47 @@ export default function GISLayers() {
     queryFn: listProjects,
   });
 
+  const projectLookupById = useMemo(
+    () => new Map(projects.map((project) => [project.id, project])),
+    [projects],
+  );
+
+  const projectsByDivisionId = useMemo(() => {
+    const map = new Map<number, Project[]>();
+    for (const project of projects) {
+      const divisionId = Number(project.division ?? 0);
+      if (!divisionId) continue;
+      const list = map.get(divisionId) ?? [];
+      list.push(project);
+      map.set(divisionId, list);
+    }
+    return map;
+  }, [projects]);
+
+  const projectsByDistrictId = useMemo(() => {
+    const map = new Map<number, Project[]>();
+    for (const project of projects) {
+      const districtId = Number(project.district ?? 0);
+      if (!districtId) continue;
+      const list = map.get(districtId) ?? [];
+      list.push(project);
+      map.set(districtId, list);
+    }
+    return map;
+  }, [projects]);
+
+  const projectsByTehsilId = useMemo(() => {
+    const map = new Map<number, Project[]>();
+    for (const project of projects) {
+      const tehsilId = Number(project.tehsil ?? 0);
+      if (!tehsilId) continue;
+      const list = map.get(tehsilId) ?? [];
+      list.push(project);
+      map.set(tehsilId, list);
+    }
+    return map;
+  }, [projects]);
+
   // NEW: fetch nested gantt for ALL projects in one request; used to derive
   // delay/pending/in-progress status for map boundaries + cards.
   // const { data: allProjectSchedules = [], isFetching: allGanttLoading } = useQuery({
@@ -275,20 +316,25 @@ export default function GISLayers() {
     });
 
   const filteredProjects = useMemo((): Project[] => {
-    let list = projects;
+    let list: Project[] = projects;
+
     if (divisionNumeric != null && Number.isFinite(divisionNumeric)) {
-      list = list.filter((p) => p.division === divisionNumeric);
+      list = projectsByDivisionId.get(divisionNumeric) ?? [];
     }
+
     if (districtNumeric != null && Number.isFinite(districtNumeric)) {
-      list = list.filter((p) => p.district === districtNumeric);
+      const districtSet = new Set((projectsByDistrictId.get(districtNumeric) ?? []).map((p) => p.id));
+      list = list.filter((project) => districtSet.has(project.id));
     }
-    const tehsilNumeric =
-      selectedTehsilId !== "all" ? Number(selectedTehsilId) : null;
+
+    const tehsilNumeric = selectedTehsilId !== "all" ? Number(selectedTehsilId) : null;
     if (tehsilNumeric != null && Number.isFinite(tehsilNumeric)) {
-      list = list.filter((p) => p.tehsil === tehsilNumeric);
+      const tehsilSet = new Set((projectsByTehsilId.get(tehsilNumeric) ?? []).map((p) => p.id));
+      list = list.filter((project) => tehsilSet.has(project.id));
     }
+
     return list;
-  }, [projects, divisionNumeric, districtNumeric, selectedTehsilId]);
+  }, [projects, divisionNumeric, districtNumeric, selectedTehsilId, projectsByDivisionId, projectsByDistrictId, projectsByTehsilId]);
 
   // const projectStatusById = useMemo(() => {
   //   const statusByProjectId = new Map<number, ProjectStatus>();
@@ -366,9 +412,9 @@ export default function GISLayers() {
   const selectedProject = useMemo(
     () =>
       selectedProjectId && selectedProjectId !== "all"
-        ? filteredProjects.find((p) => String(p.id) === selectedProjectId) ?? null
+        ? projectLookupById.get(Number(selectedProjectId)) ?? null
         : null,
-    [filteredProjects, selectedProjectId]
+    [projectLookupById, selectedProjectId],
   );
 
   // Use selected-project details (from /api/list-project/?id=...) when available.

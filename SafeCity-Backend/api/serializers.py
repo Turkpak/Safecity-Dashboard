@@ -305,10 +305,9 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         project.stakeholder.set(stakeholders)
 
         if xer_file:
-            project.xer_file = xer_file 
-            project.xer_file_name = xer_file.name 
-            # Parse the uploaded XER in-memory and create activities without
-            # persisting the file to local storage.
+            # Keep only the filename — do NOT assign to project.xer_file,
+            # or Django will persist the upload to media storage on save().
+            project.xer_file_name = xer_file.name
             try:
                 self._save_activities(project, xer_file)
             except Exception:
@@ -334,9 +333,8 @@ class ProjectSerializer(GeoFeatureModelSerializer):
             instance.stakeholder.set(stakeholders)
 
         if xer_file:
-            instance.xer_file = xer_file       
-            instance.xer_file_name = xer_file.name   
-            # Rebuild activities from the uploaded XER without saving the file.
+            # Same as create(): filename only, never assign the FileField itself.
+            instance.xer_file_name = xer_file.name
             instance.activities.all().delete()
             try:
                 self._save_activities(instance, xer_file)
@@ -584,4 +582,121 @@ class ProjectListSerializer(serializers.ModelSerializer):
                 "stakeholder_title": s.stakeholder_title
             }
             for s in obj.stakeholder.all()
+        ]
+class ProjectDashboardSerializer(serializers.ModelSerializer):
+    # Keep the old field names for compatibility with the legacy dashboard contract,
+    # but map them to the actual Project relations in this project.
+    division = serializers.SerializerMethodField()
+    division_name = serializers.SerializerMethodField()
+    district = serializers.SerializerMethodField()
+    district_name = serializers.SerializerMethodField()
+    actual_district = serializers.IntegerField(source="district_id", read_only=True)
+    actual_district_name = serializers.SerializerMethodField()
+    tehsil = serializers.SerializerMethodField()
+    tehsil_name = serializers.SerializerMethodField()
+    latitude = serializers.SerializerMethodField()
+    longitude = serializers.SerializerMethodField()
+    total_budget = serializers.SerializerMethodField()
+    total_consume = serializers.SerializerMethodField()
+    project_category = serializers.SerializerMethodField()
+    stakeholder_details = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Project
+        fields = [
+            "id",
+            "stakeholder_details",
+
+            "project_name",
+            "project_description",
+            "project_starting_date",
+            "project_reference_no",
+            "project_category",
+
+            "division",
+            "division_name",
+
+            "district",
+            "district_name",
+
+            "actual_district",
+            "actual_district_name",
+
+            "tehsil",
+            "tehsil_name",
+
+            "latitude",
+            "longitude",
+
+            "total_budget",
+            "total_consume",
+
+            "allocation_capital_cost",
+            "allocation_revenue_cost",
+            "allocation_total_cost",
+
+            "pd_release_capital_cost",
+            "pd_release_cost",
+            "pd_release_total_cost",
+
+            "spending_release_capital_cost",
+            "spending_release_revenue_cost",
+            "spending_release_total_cost",
+
+            "pifra_utilization_capital_cost",
+            "pifra_utilization_revenue_cost",
+            "pifra_utilization_total_cost",
+            "pifra_utilization_date",
+
+            "percentage_utilization_capital",
+            "percentage_utilization_revenue",
+            "percentage_utilization_total",
+
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_division(self, obj):
+        return obj.division_id
+
+    def get_division_name(self, obj):
+        return obj.division.division_name if obj.division_id else None
+
+    def get_district(self, obj):
+        return obj.district_id
+
+    def get_district_name(self, obj):
+        return obj.district.district_name if obj.district_id else None
+
+    def get_actual_district_name(self, obj):
+        return obj.district.district_name if obj.district_id else None
+
+    def get_tehsil(self, obj):
+        return obj.tehsil_id
+
+    def get_tehsil_name(self, obj):
+        return obj.tehsil.tehsil_name if obj.tehsil_id else None
+
+    def get_latitude(self, obj):
+        return obj.geom.centroid.y if obj.geom else None
+
+    def get_longitude(self, obj):
+        return obj.geom.centroid.x if obj.geom else None
+
+    def get_total_budget(self, obj):
+        return float(obj.total_budget_allocated or 0)
+
+    def get_total_consume(self, obj):
+        return float(obj.budget_utilized or 0)
+
+    def get_project_category(self, obj):
+        return None
+
+    def get_stakeholder_details(self, obj):
+        return [
+            {
+                "stakeholder_type": stakeholder.stakeholder_type,
+                "stakeholder_title": stakeholder.stakeholder_title,
+            }
+            for stakeholder in obj.stakeholder.all()
         ]

@@ -59,6 +59,8 @@ export interface GanttTask {
   actual_start?: string | null;
   /** Actual end date from backend (YYYY-MM-DD). */
   actual_end?: string | null;
+  /** Progress date emitted in nested Gantt payloads. */
+  progress_date?: string | null;
   progress: number;
   parent?: string;
   /** Stable ordering index to preserve API/XER sibling order. */

@@ -4,6 +4,7 @@ from django.conf.urls.static import static
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from api.views import *
+from api.views.DashboardView import DashboardPageDataView
 
 router = DefaultRouter()
 
@@ -101,6 +102,15 @@ urlpatterns = [
 
     path("project-progress-summary/", ProjectProgressSummaryView.as_view()),
     path("project-status-summary/", ProjectStatusSummaryView.as_view()),
+
+    path(
+        "dashboard/<str:page>/", DashboardPageDataView.as_view(), name="dashboard-page-data",
+    ),
+    path(
+        "dashboard-page/<str:page>/",
+        DashboardPageDataView.as_view(),
+        name="dashboard-page-data",
+    ),
 ]
 
 if settings.DEBUG:

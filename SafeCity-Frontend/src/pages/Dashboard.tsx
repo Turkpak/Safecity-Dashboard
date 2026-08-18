@@ -22,14 +22,18 @@ import { CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import {
   // getProjectGanttAll,
-getProjectProgressSummary,
+  getProjectProgressSummary,
   getProjectGanttData,
   listDivisions,
   listDistricts,
   listTehsils,
   listTopProjects,
 } from "@/api";
+
 import type { Division, District, Tehsil, Project, TopProject } from "@/api/types";
+import { getDashboardPageData, type DashboardView } from "@/api/dashboard";
+
+
 import {
   ClipboardCheck,
   Building2,
@@ -655,6 +659,25 @@ export default function Dashboard() {
   const [selectedItemType, setSelectedItemType] = useState<
     "division" | "district" | "tehsil" | null
   >(null);
+const dashboardPage = (viewType || "divisions") as "divisions" | "districts" | "tehsils" | "projects";
+
+// Keep the dashboard page names aligned to the canonical backend pages.
+// Legacy aliases remain supported on the backend for compatibility.
+const DASHBOARD_VIEW_TO_API_PAGE: Record< "divisions" | "districts" | "tehsils" | "projects",
+  DashboardView
+> = {
+  divisions: "divisions",
+  districts: "districts",
+  tehsils: "tehsils",
+  projects: "projects",
+};
+
+const { data: pageData, isLoading: isPageLoading } = useQuery({
+  queryKey: ["dashboard-page", dashboardPage],
+  queryFn: () => getDashboardPageData(DASHBOARD_VIEW_TO_API_PAGE[dashboardPage]),
+});
+
+
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [expandedDivisions, setExpandedDivisions] = useState(false);
@@ -701,44 +724,104 @@ export default function Dashboard() {
     null,
   );
   const skipNextUrlSyncRef = useRef(false);
+  const lastHydratedSelectionRef = useRef<string | null>(null);
+  const lastSyncedUrlRef = useRef<string | null>(null);
 
   // API queries
-  const { data: apiDivisions = [] } = useQuery({
-    queryKey: ["divisions"],
-    queryFn: () => listDivisions(),
-  });
-  const { data: apiDistricts = [] } = useQuery({
-    queryKey: ["districts"],
-    queryFn: () => listDistricts(),
-  });
-  const { data: apiTehsils = [] } = useQuery({
-    queryKey: ["tehsils"],
-    queryFn: () => listTehsils(),
-  });
-  const { data: apiProjects = [] } = useQuery({
-    queryKey: ["projects"],
-    queryFn: () => listProjects(),
-  });
-  const { data: apiTopProjects = [] } = useQuery({
-    queryKey: ["top-projects", selectedItemType === "division" ? selectedItemId : null],
-    queryFn: () => listTopProjects(selectedItemType === "division" && selectedItemId ? { division_id: selectedItemId, limit: 6 } : { limit: 6 }),
-  });
+  // const { data: apiDivisions = [] } = useQuery({
+  //   queryKey: ["divisions"],
+  //   queryFn: () => listDivisions(),
+  // });
+  // const { data: apiDistricts = [] } = useQuery({
+  //   queryKey: ["districts"],
+  //   queryFn: () => listDistricts(),
+  // });
+  // const { data: apiTehsils = [] } = useQuery({
+  //   queryKey: ["tehsils"],
+  //   queryFn: () => listTehsils(),
+  // });
+  // const { data: apiProjects = [] } = useQuery({
+  //   queryKey: ["projects"],
+  //   queryFn: () => listProjects(),
+  // });
+  const apiDivisions = pageData?.divisions ?? [];
+  const apiDistricts = pageData?.districts ?? [];
+  const apiTehsils = pageData?.tehsils ?? [];
+  const apiProjects = (pageData?.projects ?? []) as unknown as Project[];
+
+  const projectLookupById = useMemo(
+    () => new Map(apiProjects.map((project) => [project.id, project])),
+    [apiProjects],
+  );
+
+  const projectsByDivisionId = useMemo(() => {
+    const map = new Map<number, Project[]>();
+    for (const project of apiProjects) {
+      const divisionId = Number(project.division ?? 0);
+      if (!divisionId) continue;
+      const list = map.get(divisionId) ?? [];
+      list.push(project);
+      map.set(divisionId, list);
+    }
+    return map;
+  }, [apiProjects]);
+
+  const projectsByDistrictId = useMemo(() => {
+    const map = new Map<number, Project[]>();
+    for (const project of apiProjects) {
+      const districtId = Number(project.district ?? 0);
+      if (!districtId) continue;
+      const list = map.get(districtId) ?? [];
+      list.push(project);
+      map.set(districtId, list);
+    }
+    return map;
+  }, [apiProjects]);
+
+  const projectsByTehsilId = useMemo(() => {
+    const map = new Map<number, Project[]>();
+    for (const project of apiProjects) {
+      const tehsilId = Number(project.tehsil ?? 0);
+      if (!tehsilId) continue;
+      const list = map.get(tehsilId) ?? [];
+      list.push(project);
+      map.set(tehsilId, list);
+    }
+    return map;
+  }, [apiProjects]);
+
+  // const { data: apiTopProjects = [] } = useQuery({
+  //   queryKey: ["top-projects", selectedItemType === "division" ? selectedItemId : null],
+  //   queryFn: () => listTopProjects(selectedItemType === "division" && selectedItemId ? { division_id: selectedItemId, limit: 6 } : { limit: 6 }),
+  // });
+
+  const apiTopProjects = pageData?.bestPerformingProjects ?? [];
 
   // Fetch all gantt schedules once and use root task progress for each project card.
-  const { data: progressSummary = {} } = useQuery({
-  queryKey: ["project-progress-summary"],
-  queryFn: () => getProjectProgressSummary(),
-});
+//   const { data: progressSummary = {} } = useQuery({
+//   queryKey: ["project-progress-summary"],
+//   queryFn: () => getProjectProgressSummary(),
+// });
+
+// const ganttProgressByProjectId = useMemo(() => {
+//   const clampPct = (n: number) => Math.max(0, Math.min(100, n));
+//   const map = new Map<number, number>();
+//   for (const [pid, progress] of Object.entries(progressSummary)) {
+//     const n = Number(progress);
+//     map.set(Number(pid), Number.isFinite(n) ? clampPct(n) : 0);
+//   }
+//   return map;
+// }, [progressSummary]);
 
 const ganttProgressByProjectId = useMemo(() => {
-  const clampPct = (n: number) => Math.max(0, Math.min(100, n));
   const map = new Map<number, number>();
-  for (const [pid, progress] of Object.entries(progressSummary)) {
-    const n = Number(progress);
-    map.set(Number(pid), Number.isFinite(n) ? clampPct(n) : 0);
+  for (const row of pageData?.projects ?? []) {
+    const id = Number((row as any).id);
+    const v = Number((row as any).physical_progress ?? 0);
+    map.set(id, Number.isFinite(v) ? v : 0);
   }
   return map;
-}, [progressSummary]);
+}, [pageData]);
 
   // All Projects overall % (average of root task `_id:"1"` progress across projects)
   const allProjectsOverallFromGantt = useMemo(() => {
@@ -769,63 +852,85 @@ const ganttProgressByProjectId = useMemo(() => {
     const level = urlParams.get("level");
     const viewParam = urlParams.get("view");
     if (viewParam === "divisions" || viewParam === "districts" || viewParam === "tehsils" || viewParam === "projects") {
-      setViewType(viewParam);
+      setViewType((prev) => (prev === viewParam ? prev : viewParam));
     }
 
     const divisionSlug = urlParams.get("division");
     const districtSlug = urlParams.get("district");
     const tehsilSlug = urlParams.get("tehsil");
+    const nextSelectionKey = `${level ?? "root"}|${viewParam ?? "view"}|${divisionSlug ?? ""}|${districtSlug ?? ""}|${tehsilSlug ?? ""}`;
+
+    if (lastHydratedSelectionRef.current === nextSelectionKey) {
+      return;
+    }
 
     if (level === "tehsil" && tehsilSlug) {
       const foundTehsil = apiTehsils.find((t) => {
-        if (toSlug(t.tehsil_name) !== tehsilSlug) return false;
-        if (districtSlug && toSlug(t.district_name) !== districtSlug) return false;
-        if (divisionSlug && toSlug(t.division_name) !== divisionSlug) return false;
+        const tehsilName = t.tehsil_name ?? "";
+        const districtName = t.district_name ?? "";
+        const divisionName = t.division_name ?? "";
+        if (toSlug(tehsilName) !== tehsilSlug) return false;
+        if (districtSlug && toSlug(districtName) !== districtSlug) return false;
+        if (divisionSlug && toSlug(divisionName) !== divisionSlug) return false;
         return true;
       });
       if (foundTehsil) {
+        const tehsilName = foundTehsil.tehsil_name ?? null;
+        const districtName = foundTehsil.district_name ?? null;
+        const divisionName = foundTehsil.division_name ?? null;
+        if (!tehsilName) return;
         skipNextUrlSyncRef.current = true;
-        setSelectedItemType("tehsil");
-        setSelectedItemId(foundTehsil.id);
-        setSelectedItemName(foundTehsil.tehsil_name);
-        setParentDistrictId(foundTehsil.district);
-        setParentDistrictName(foundTehsil.district_name);
-        setParentDivisionId(foundTehsil.division);
-        setParentDivisionName(foundTehsil.division_name);
+        setSelectedItemType((prev) => (prev === "tehsil" && selectedItemId === foundTehsil.id && selectedItemName === tehsilName ? prev : "tehsil"));
+        setSelectedItemId((prev) => (prev === foundTehsil.id ? prev : foundTehsil.id));
+        setSelectedItemName((prev) => (prev === tehsilName ? prev : tehsilName));
+        setParentDistrictId((prev) => (prev === (foundTehsil.district ?? null) ? prev : (foundTehsil.district ?? null)));
+        setParentDistrictName((prev) => (prev === districtName ? prev : districtName));
+        setParentDivisionId((prev) => (prev === (foundTehsil.division ?? null) ? prev : (foundTehsil.division ?? null)));
+        setParentDivisionName((prev) => (prev === divisionName ? prev : divisionName));
+        lastHydratedSelectionRef.current = nextSelectionKey;
       }
       return;
     }
 
     if (level === "district" && districtSlug) {
       const foundDistrict = apiDistricts.find((d) => {
-        if (toSlug(d.district_name) !== districtSlug) return false;
-        if (divisionSlug && toSlug(d.division_name) !== divisionSlug) return false;
+        const districtName = d.district_name ?? "";
+        const divisionName = d.division_name ?? "";
+        if (toSlug(districtName) !== districtSlug) return false;
+        if (divisionSlug && toSlug(divisionName) !== divisionSlug) return false;
         return true;
       });
       if (foundDistrict) {
+        const districtName = foundDistrict.district_name ?? null;
+        const divisionName = foundDistrict.division_name ?? null;
+        if (!districtName) return;
         skipNextUrlSyncRef.current = true;
-        setSelectedItemType("district");
-        setSelectedItemId(foundDistrict.id);
-        setSelectedItemName(foundDistrict.district_name);
-        setParentDivisionId(foundDistrict.division);
-        setParentDivisionName(foundDistrict.division_name);
+        setSelectedItemType((prev) => (prev === "district" && selectedItemId === foundDistrict.id && selectedItemName === districtName ? prev : "district"));
+        setSelectedItemId((prev) => (prev === foundDistrict.id ? prev : foundDistrict.id));
+        setSelectedItemName((prev) => (prev === districtName ? prev : districtName));
+        setParentDivisionId((prev) => (prev === (foundDistrict.division ?? null) ? prev : (foundDistrict.division ?? null)));
+        setParentDivisionName((prev) => (prev === divisionName ? prev : divisionName));
         setParentDistrictId(null);
         setParentDistrictName(null);
+        lastHydratedSelectionRef.current = nextSelectionKey;
       }
       return;
     }
 
     if (level === "division" && divisionSlug) {
-      const foundDivision = apiDivisions.find((d) => toSlug(d.division_name) === divisionSlug);
+      const foundDivision = apiDivisions.find((d) => toSlug(d.division_name ?? "") === divisionSlug);
       if (foundDivision) {
+        const divisionName = foundDivision.division_name ?? null;
+        if (!divisionName) return;
         skipNextUrlSyncRef.current = true;
-        setSelectedItemType("division");
-        setSelectedItemId(foundDivision.id);
-        setSelectedItemName(foundDivision.division_name);
+        setSelectedItemType((prev) => (prev === "division" && selectedItemId === foundDivision.id && selectedItemName === divisionName ? prev : "division"));
+        setSelectedItemId((prev) => (prev === foundDivision.id ? prev : foundDivision.id));
+        setSelectedItemName((prev) => (prev === divisionName ? prev : divisionName));
         setParentDivisionId(null);
         setParentDivisionName(null);
         setParentDistrictId(null);
         setParentDistrictName(null);
+        lastHydratedSelectionRef.current = nextSelectionKey;
       }
       return;
     }
@@ -833,21 +938,25 @@ const ganttProgressByProjectId = useMemo(() => {
     // Backward compatibility with old ?tehsil=<name> link format.
     const tehsilParam = urlParams.get("tehsil");
     if (tehsilParam) {
-      const found = apiTehsils.find(
-        (t) => t.tehsil_name.toLowerCase() === decodeURIComponent(tehsilParam).toLowerCase(),
-      );
+      const found = apiTehsils.find((t) => {
+        const name = t.tehsil_name ?? "";
+        return name.toLowerCase() === decodeURIComponent(tehsilParam).toLowerCase();
+      });
       if (found) {
+        const tehsilName = found.tehsil_name ?? null;
+        if (!tehsilName) return;
         skipNextUrlSyncRef.current = true;
-        setSelectedItemName(found.tehsil_name);
-        setSelectedItemType("tehsil");
-        setSelectedItemId(found.id);
-        setParentDistrictId(found.district);
-        setParentDistrictName(found.district_name);
-        setParentDivisionId(found.division);
-        setParentDivisionName(found.division_name);
+        setSelectedItemName((prev) => (prev === tehsilName ? prev : tehsilName));
+        setSelectedItemType((prev) => (prev === "tehsil" && selectedItemId === found.id && selectedItemName === tehsilName ? prev : "tehsil"));
+        setSelectedItemId((prev) => (prev === found.id ? prev : found.id));
+        setParentDistrictId((prev) => (prev === (found.district ?? null) ? prev : (found.district ?? null)));
+        setParentDistrictName((prev) => (prev === (found.district_name ?? null) ? prev : (found.district_name ?? null)));
+        setParentDivisionId((prev) => (prev === (found.division ?? null) ? prev : (found.division ?? null)));
+        setParentDivisionName((prev) => (prev === (found.division_name ?? null) ? prev : (found.division_name ?? null)));
+        lastHydratedSelectionRef.current = nextSelectionKey;
       }
     }
-  }, [location, apiDivisions, apiDistricts, apiTehsils]);
+  }, [location, apiDivisions, apiDistricts, apiTehsils, selectedItemId, selectedItemName]);
 
   // Keep URL in sync with drilldown selection.
   useEffect(() => {
@@ -881,7 +990,8 @@ const ganttProgressByProjectId = useMemo(() => {
 
     const nextUrl = params.toString() ? `/?${params.toString()}` : "/";
     const currentUrl = `${window.location.pathname}${window.location.search}`;
-    if (currentUrl !== nextUrl) {
+    if (currentUrl !== nextUrl && lastSyncedUrlRef.current !== nextUrl) {
+      lastSyncedUrlRef.current = nextUrl;
       setLocation(nextUrl);
     }
   }, [
@@ -1139,7 +1249,7 @@ const ganttProgressByProjectId = useMemo(() => {
     if (selectedItemType === "division") {
       const divDistricts = apiDistricts.filter((d) => d.division === selectedItemId);
       const rows = divDistricts.map((d) => ({
-        phase: d.district_name,
+        phase: d.district_name ?? "Unknown District",
         percentage: roundPct(districtOverallFromTehsils(d.id)),
       }));
       return {
@@ -1152,7 +1262,7 @@ const ganttProgressByProjectId = useMemo(() => {
     if (selectedItemType === "district") {
       const distTehsils = apiTehsils.filter((t) => t.district === selectedItemId);
       const rows = distTehsils.map((t) => ({
-        phase: t.tehsil_name,
+        phase: t.tehsil_name ?? "Unknown Tehsil",
         percentage: roundPct(tehsilOverall(t.id)),
       }));
       return {
@@ -1172,29 +1282,24 @@ const ganttProgressByProjectId = useMemo(() => {
     ganttProgressByProjectId,
   ]);
 
-  // Calculate aggregated data from a list of projects
-  const getAggregatedDataFromProjects = (
-    projects: Project[],
-  ): CityInstallationData => {
-    const overall = calcProjectsOverall(projects);
-    return generateCityDataFromOverall(overall);
-  };
-
-  // Get single item data from API projects by ID
+  // Get single item data from hierarchy rows (using backend's pre-calculated values)
   const getSingleItemData = (
     itemId: number | null,
     itemType: "division" | "district" | "tehsil",
   ): CityInstallationData | null => {
     if (!itemId) return null;
-    let filtered: Project[];
+    
     if (itemType === "division") {
-      filtered = apiProjects.filter((p) => p.division === itemId);
+      const found = apiDivisions.find((d) => d.id === itemId);
+      if (found) return generateCityDataFromOverall(found.overall_progress ?? 0);
     } else if (itemType === "district") {
-      filtered = apiProjects.filter((p) => p.district === itemId);
+      const found = apiDistricts.find((d) => d.id === itemId);
+      if (found) return generateCityDataFromOverall(found.overall_progress ?? 0);
     } else {
-      filtered = apiProjects.filter((p) => p.tehsil === itemId);
+      const found = apiTehsils.find((t) => t.id === itemId);
+      if (found) return generateCityDataFromOverall(found.overall_progress ?? 0);
     }
-    return getAggregatedDataFromProjects(filtered);
+    return null;
   };
 
   // Get single item data
@@ -1203,65 +1308,98 @@ const ganttProgressByProjectId = useMemo(() => {
       return getSingleItemData(selectedItemId, selectedItemType);
     }
     return null;
-  }, [selectedItemId, selectedItemType, apiProjects]);
+  }, [selectedItemId, selectedItemType, apiDivisions, apiDistricts, apiTehsils]);
 
   // Projects in the currently selected geography (division / district / tehsil) for "Best Performing Projects" cards
   const projectsInSelectedGeography = useMemo((): Project[] => {
     if (!selectedItemId || !selectedItemType) return [];
     if (selectedItemType === "division") {
-      return apiProjects.filter((p) => p.division === selectedItemId);
+      return projectsByDivisionId.get(selectedItemId) ?? [];
     }
     if (selectedItemType === "district") {
-      return apiProjects.filter((p) => p.district === selectedItemId);
+      return projectsByDistrictId.get(selectedItemId) ?? [];
     }
-    return apiProjects.filter((p) => p.tehsil === selectedItemId);
-  }, [selectedItemId, selectedItemType, apiProjects]);
+    return projectsByTehsilId.get(selectedItemId) ?? [];
+  }, [selectedItemId, selectedItemType, projectsByDivisionId, projectsByDistrictId, projectsByTehsilId]);
+
+  const bestProjectsForCurrentScope = useMemo(() => {
+    const baseProjects =
+      selectedItemId && selectedItemType
+        ? projectsInSelectedGeography.length > 0
+          ? projectsInSelectedGeography
+          : apiProjects
+        : apiProjects;
+
+    const sortedProjects = [...baseProjects].sort(
+      (a, b) =>
+        Number((b as any).overall_progress ?? 0) - Number((a as any).overall_progress ?? 0),
+    );
+
+    const qaFallbackProjects = sortedProjects.slice(0, 6);
+    const qualifiedProjects = sortedProjects.filter(
+      (project) => Number((project as any).overall_progress ?? 0) >= 80,
+    );
+
+    return qualifiedProjects.length > 0 ? qualifiedProjects.slice(0, 6) : qaFallbackProjects;
+  }, [apiProjects, projectsInSelectedGeography, selectedItemId, selectedItemType]);
+
+  const visibleTopProjects =
+    bestProjectsForCurrentScope.length > 0 ? bestProjectsForCurrentScope : apiTopProjects;
 
   // Get aggregated data based on view type (all projects)
   const aggregatedData = useMemo(() => {
-    return getAggregatedDataFromProjects(apiProjects);
-  }, [apiProjects]);
+    // Use the backend's pre-calculated progress for all items in the current view
+    if (viewType === "divisions" && apiDivisions.length > 0) {
+      const allProgress = apiDivisions.map((d) => d.overall_progress ?? 0);
+      const avg = allProgress.length > 0 ? allProgress.reduce((a, b) => a + b) / allProgress.length : 0;
+      return generateCityDataFromOverall(avg);
+    }
+    if (viewType === "districts" && apiDistricts.length > 0) {
+      const allProgress = apiDistricts.map((d) => d.overall_progress ?? 0);
+      const avg = allProgress.length > 0 ? allProgress.reduce((a, b) => a + b) / allProgress.length : 0;
+      return generateCityDataFromOverall(avg);
+    }
+    if (viewType === "tehsils" && apiTehsils.length > 0) {
+      const allProgress = apiTehsils.map((t) => t.overall_progress ?? 0);
+      const avg = allProgress.length > 0 ? allProgress.reduce((a, b) => a + b) / allProgress.length : 0;
+      return generateCityDataFromOverall(avg);
+    }
+    // Default: all projects
+    return generateCityDataFromOverall(allProjectsOverallFromGantt);
+  }, [viewType, apiDivisions, apiDistricts, apiTehsils, allProjectsOverallFromGantt]);
 
   /** Top projects by budget utilization for root "All Punjab *" views (real API data, not duplicate phase placeholders). */
   const topProjectsForAggregateViews = useMemo((): Project[] => {
     if (apiProjects.length === 0) return [];
     return [...apiProjects]
-      .map((p) => {
-        const total = parseFloat(p.total_budget_allocated || "0") || 0;
-        const utilized = parseFloat(p.budget_utilized || "0") || 0;
+      .map((project) => {
+        const total = Number.parseFloat(String(project.total_budget_allocated ?? "0")) || 0;
+        const utilized = Number.parseFloat(String(project.budget_utilized ?? "0")) || 0;
         const ratio = total > 0 ? utilized / total : 0;
-        return { p, ratio };
+        return { project, ratio };
       })
       .sort((a, b) => b.ratio - a.ratio)
-      .map((x) => x.p)
+      .map(({ project }) => project)
       .slice(0, 6);
   }, [apiProjects]);
 
   // Overall for All Punjab Divisions (average of division overalls)
   const allDivisionsOverall = useMemo(() => {
     if (apiDivisions.length === 0) return 0;
-    let sum = 0;
-    let count = 0;
-    for (const div of apiDivisions) {
-      const projects = apiProjects.filter((p) => p.division === div.id);
-      sum += calcProjectsOverall(projects);
-      count++;
-    }
-    return count > 0 ? sum / count : 0;
-  }, [apiDivisions, apiProjects]);
+    const activeWithProgress = apiDivisions.filter((d) => (d.overall_progress ?? 0) > 0 || d.project_count > 0);
+    if (activeWithProgress.length === 0) return 0;
+    const sum = activeWithProgress.reduce((acc, d) => acc + (d.overall_progress ?? 0), 0);
+    return sum / activeWithProgress.length;
+  }, [apiDivisions]);
 
   // Overall for All Punjab Districts (average of district overalls)
   const allDistrictsOverall = useMemo(() => {
     if (apiDistricts.length === 0) return 0;
-    let sum = 0;
-    let count = 0;
-    for (const dist of apiDistricts) {
-      const projects = apiProjects.filter((p) => p.district === dist.id);
-      sum += calcProjectsOverall(projects);
-      count++;
-    }
-    return count > 0 ? sum / count : 0;
-  }, [apiDistricts, apiProjects]);
+    const activeWithProgress = apiDistricts.filter((d) => (d.overall_progress ?? 0) > 0 || d.project_count > 0);
+    if (activeWithProgress.length === 0) return 0;
+    const sum = activeWithProgress.reduce((acc, d) => acc + (d.overall_progress ?? 0), 0);
+    return sum / activeWithProgress.length;
+  }, [apiDistricts]);
 
   // Context theme: follow the currently visible/selected area overall %
   const contextOverall = useMemo(() => {
@@ -1303,8 +1441,7 @@ const ganttProgressByProjectId = useMemo(() => {
   const divisionsData = useMemo(() => {
     return apiDivisions
       .map((div, index) => {
-        const projects = apiProjects.filter((p) => p.division === div.id);
-        const overall = calcProjectsOverall(projects);
+        const overall = div.overall_progress ?? 0;
         return {
           id: div.id,
           name: div.division_name,
@@ -1314,14 +1451,13 @@ const ganttProgressByProjectId = useMemo(() => {
         };
       })
       .sort((a, b) => b.overall - a.overall);
-  }, [apiDivisions, apiProjects]);
+  }, [apiDivisions]);
 
   // Districts data for cards view (API-driven)
   const districtsData = useMemo(() => {
     return apiDistricts
       .map((dist, index) => {
-        const projects = apiProjects.filter((p) => p.district === dist.id);
-        const overall = calcProjectsOverall(projects);
+        const overall = dist.overall_progress ?? 0;
         return {
           id: dist.id,
           name: dist.district_name,
@@ -1332,7 +1468,7 @@ const ganttProgressByProjectId = useMemo(() => {
         };
       })
       .sort((a, b) => b.overall - a.overall);
-  }, [apiDistricts, apiProjects]);
+  }, [apiDistricts]);
 
 
   // Tehsils data grouped by district name (API-driven)
@@ -1349,14 +1485,13 @@ const ganttProgressByProjectId = useMemo(() => {
       }>
     > = {};
     apiTehsils.forEach((teh, index) => {
-      const districtName = teh.district_name;
+      const districtName = teh.district_name ?? "Unknown District";
       if (!result[districtName]) result[districtName] = [];
-      const projects = apiProjects.filter((p) => p.tehsil === teh.id);
-      const overall = calcProjectsOverall(projects);
+      const overall = teh.overall_progress ?? 0;
       result[districtName].push({
         id: teh.id,
-        name: teh.tehsil_name,
-        districtId: teh.district,
+        name: teh.tehsil_name ?? "Unnamed Tehsil",
+        districtId: teh.district ?? 0,
         overall,
         data: generateCityDataFromOverall(overall),
         color: CARD_COLORS[index % CARD_COLORS.length],
@@ -1367,7 +1502,7 @@ const ganttProgressByProjectId = useMemo(() => {
       result[district].sort((a, b) => b.overall - a.overall);
     });
     return result;
-  }, [apiTehsils, apiProjects]);
+  }, [apiTehsils]);
 
   // Skeleton loader component
   const renderSkeletonLoader = () => (
@@ -1496,9 +1631,12 @@ const ganttProgressByProjectId = useMemo(() => {
     "blue" | "green" | "orange" | "purple" | "red" | "yellow"
   > = ["blue", "green", "orange", "purple", "red", "yellow"];
 
-  // Only show this section on the main (no-filter) All Divisions view.
+  // Show the top-project section in the main division and all-project views so the best KPI list is visible
+  // directly under the summary cards instead of being hidden behind the root-view condition.
   const showBestPerformingSection =
-    viewType === "divisions" && !selectedItemType && !selectedItemName;
+    (viewType === "divisions" || viewType === "projects") &&
+    !selectedItemType &&
+    !selectedItemName;
 
   // Render aggregated charts function
   const renderAggregatedCharts = (
@@ -1677,44 +1815,43 @@ const ganttProgressByProjectId = useMemo(() => {
               </button>
             )}
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-            {useProjectCards
-              ? apiTopProjects.map((project, index) => {
-                  const percentage = Math.round(
-                    project.progress ?? 0,
-                  );
-                  const displayName =
-                    project.project_name || `Project ${project.id}`;
-                  const fullProject = apiProjects.find((p) => p.id === project.id) || (project as unknown as Project);
-                  return (
-                    <InstallationCard
-                      key={`${title}-project-${project.id}`}
-                      title={displayName}
-                      percentage={percentage}
-                      icon={FolderKanban}
-                      color={PROJECT_CARD_COLORS[index % PROJECT_CARD_COLORS.length]}
-                      // Don't show planned/actual until backend exists.
-                      actualProgress={undefined}
-                      plannedProgress={undefined}
-                      selected={
-                        projectCardsInteractive &&
-                        selectedProjectForDetails?.id === project.id
-                      }
-                      nonInteractive={!projectCardsInteractive}
-                      onClick={
-                        projectCardsInteractive
-                          ? () => {
-                              setSelectedMilestoneKey(null);
-                              setSelectedProjectForDetails((prev) =>
-                                prev?.id === fullProject.id ? null : fullProject,
-                              );
-                            }
-                          : undefined
-                      }
-                    />
-                  );
-                })
-              : installationPhases.map((phase) => {
+          {visibleTopProjects.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+              {useProjectCards
+                ? visibleTopProjects.map((project, index) => {
+                    const percentage = Math.round((project as any).overall_progress ?? 0);
+                    const displayName =
+                      project.project_name || `Project ${project.id}`;
+                    const fullProject = projectLookupById.get(project.id) ?? (project as unknown as Project);
+                    return (
+                      <InstallationCard
+                        key={`${title}-project-${project.id}`}
+                        title={displayName}
+                        percentage={percentage}
+                        icon={FolderKanban}
+                        color={PROJECT_CARD_COLORS[index % PROJECT_CARD_COLORS.length]}
+                        // Don't show planned/actual until backend exists.
+                        actualProgress={undefined}
+                        plannedProgress={undefined}
+                        selected={
+                          projectCardsInteractive &&
+                          selectedProjectForDetails?.id === project.id
+                        }
+                        nonInteractive={!projectCardsInteractive}
+                        onClick={
+                          projectCardsInteractive
+                            ? () => {
+                                setSelectedMilestoneKey(null);
+                                setSelectedProjectForDetails((prev) =>
+                                  prev?.id === fullProject.id ? null : fullProject,
+                                );
+                              }
+                            : undefined
+                        }
+                      />
+                    );
+                  })
+                : installationPhases.map((phase) => {
                   const progress = data[phase.key];
                   const hasDetails = hasDetailedProgress(progress);
                   const progressValue = hasDetails
@@ -1739,7 +1876,12 @@ const ganttProgressByProjectId = useMemo(() => {
                     />
                   );
                 })}
-          </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+              No project is currently above the 80% best-performing threshold for this dashboard view.
+            </div>
+          )}
 
           {/* Selected project details (Gantt / WBS) for Division/District views */}
           {isSelectedProjectInThisScope && (
@@ -2157,7 +2299,7 @@ const ganttProgressByProjectId = useMemo(() => {
                   data={
                     distributionChart?.data ??
                     installationPhases.map((phase) => ({
-                      phase: phase.title,
+                      phase: String(phase.title ?? "Unknown Phase"),
                       percentage: getProgressValue(data[phase.key]),
                     }))
                   }
@@ -2874,14 +3016,14 @@ const ganttProgressByProjectId = useMemo(() => {
                         {divisionDistrictsData.map((dist) => (
                           <HierarchyCard
                             key={dist.id}
-                            title={dist.name}
+                            title={dist.name ?? "Unnamed District"}
                             overallProgress={dist.overall}
                             color={dist.color}
                             onClick={() => {
                               setParentDivisionId(selectedItemId);
                               setParentDivisionName(selectedItemName);
                               setSelectedItemId(dist.id);
-                              setSelectedItemName(dist.name);
+                              setSelectedItemName(dist.name ?? "Unnamed District");
                               setSelectedItemType("district");
                             }}
                           />
@@ -2975,14 +3117,14 @@ const ganttProgressByProjectId = useMemo(() => {
                         {districtTehsilsData.map((teh) => (
                           <HierarchyCard
                             key={teh.id}
-                            title={teh.name}
+                            title={teh.name ?? "Unnamed Tehsil"}
                             overallProgress={teh.overall}
                             color={teh.color}
                             onClick={() => {
                               setParentDistrictId(selectedItemId);
                               setParentDistrictName(selectedItemName);
                               setSelectedItemId(teh.id);
-                              setSelectedItemName(teh.name);
+                              setSelectedItemName(teh.name ?? "Unnamed Tehsil");
                               setSelectedItemType("tehsil");
                             }}
                           />
@@ -3188,12 +3330,12 @@ const ganttProgressByProjectId = useMemo(() => {
                 ).map((div) => (
                   <HierarchyCard
                     key={div.id}
-                    title={div.name}
+                    title={div.name ?? "Unnamed Division"}
                     overallProgress={div.overall}
                     color={div.color}
                     onClick={() => {
                       setSelectedItemId(div.id);
-                      setSelectedItemName(div.name);
+                      setSelectedItemName(div.name ?? "Unnamed Division");
                       setSelectedItemType("division");
                     }}
                   />
@@ -3273,17 +3415,17 @@ const ganttProgressByProjectId = useMemo(() => {
                 ).map((dist) => (
                   <HierarchyCard
                     key={dist.id}
-                    title={dist.name}
+                    title={dist.name ?? "Unnamed District"}
                     overallProgress={dist.overall}
                     color={dist.color}
                     onClick={() => {
                       const parentDiv = divisionsData.find(
                         (d) => d.id === dist.divisionId,
                       );
-                      setParentDivisionId(dist.divisionId);
+                      setParentDivisionId(dist.divisionId ?? null);
                       setParentDivisionName(parentDiv?.name ?? null);
                       setSelectedItemId(dist.id);
-                      setSelectedItemName(dist.name);
+                      setSelectedItemName(dist.name ?? "Unnamed District");
                       setSelectedItemType("district");
                     }}
                   />

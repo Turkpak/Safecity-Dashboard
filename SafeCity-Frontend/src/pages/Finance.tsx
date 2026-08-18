@@ -42,6 +42,47 @@ export default function Finance() {
     queryFn: listProjects,
   });
 
+  const projectLookupById = useMemo(
+    () => new Map(projects.map((project) => [project.id, project])),
+    [projects],
+  );
+
+  const projectsByDivisionId = useMemo(() => {
+    const map = new Map<number, Project[]>();
+    for (const project of projects) {
+      const divisionId = Number(project.division ?? 0);
+      if (!divisionId) continue;
+      const list = map.get(divisionId) ?? [];
+      list.push(project);
+      map.set(divisionId, list);
+    }
+    return map;
+  }, [projects]);
+
+  const projectsByDistrictId = useMemo(() => {
+    const map = new Map<number, Project[]>();
+    for (const project of projects) {
+      const districtId = Number(project.district ?? 0);
+      if (!districtId) continue;
+      const list = map.get(districtId) ?? [];
+      list.push(project);
+      map.set(districtId, list);
+    }
+    return map;
+  }, [projects]);
+
+  const projectsByTehsilId = useMemo(() => {
+    const map = new Map<number, Project[]>();
+    for (const project of projects) {
+      const tehsilId = Number(project.tehsil ?? 0);
+      if (!tehsilId) continue;
+      const list = map.get(tehsilId) ?? [];
+      list.push(project);
+      map.set(tehsilId, list);
+    }
+    return map;
+  }, [projects]);
+
   const { data: divisions = [], isLoading: divisionsLoading } = useQuery({
     queryKey: ["finance", "list-division"],
     queryFn: () => listDivisions(),
@@ -82,47 +123,26 @@ export default function Finance() {
   const filteredProjects = useMemo((): Project[] => {
     if (selectedDivisionId === "all") return projects;
 
-    const divName =
-      divisions.find((d) => String(d.id) === selectedDivisionId)?.division_name ?? null;
-    const distName =
-      selectedDistrictId !== "all"
-        ? districts.find((d) => String(d.id) === selectedDistrictId)?.district_name ?? null
-        : null;
-    const tehName =
-      selectedTehsilId !== "all"
-        ? tehsils.find((t) => String(t.id) === selectedTehsilId)?.tehsil_name ?? null
-        : null;
-
     const divNum = Number(selectedDivisionId);
     const distNum = selectedDistrictId !== "all" ? Number(selectedDistrictId) : null;
     const tehNum = selectedTehsilId !== "all" ? Number(selectedTehsilId) : null;
 
-    let list = projects.filter((p) => {
-      const byId = typeof p.division === "number" && p.division === divNum;
-      const byName =
-        divName != null &&
-        p.division_name?.trim().toLowerCase() === divName.trim().toLowerCase();
-      return byId || byName;
-    });
+    let list: Project[] = [];
 
-    if (selectedDistrictId !== "all") {
-      list = list.filter((p) => {
-        const byId = distNum != null && typeof p.district === "number" && p.district === distNum;
-        const byName =
-          distName != null &&
-          p.district_name?.trim().toLowerCase() === distName.trim().toLowerCase();
-        return byId || byName;
-      });
+    if (divNum > 0) {
+      list = projectsByDivisionId.get(divNum) ?? [];
     }
 
-    if (selectedTehsilId !== "all") {
-      list = list.filter((p) => {
-        const byId = tehNum != null && typeof p.tehsil === "number" && p.tehsil === tehNum;
-        const byName =
-          tehName != null &&
-          p.tehsil_name?.trim().toLowerCase() === tehName.trim().toLowerCase();
-        return byId || byName;
-      });
+    if (selectedDistrictId !== "all" && distNum != null) {
+      const districtList = projectsByDistrictId.get(distNum) ?? [];
+      const districtSet = new Set(districtList.map((project) => project.id));
+      list = list.filter((project) => districtSet.has(project.id));
+    }
+
+    if (selectedTehsilId !== "all" && tehNum != null) {
+      const tehsilList = projectsByTehsilId.get(tehNum) ?? [];
+      const tehsilSet = new Set(tehsilList.map((project) => project.id));
+      list = list.filter((project) => tehsilSet.has(project.id));
     }
 
     return list;
@@ -131,9 +151,9 @@ export default function Finance() {
     selectedDivisionId,
     selectedDistrictId,
     selectedTehsilId,
-    divisions,
-    districts,
-    tehsils,
+    projectsByDivisionId,
+    projectsByDistrictId,
+    projectsByTehsilId,
   ]);
 
   const aggregatedFinancials = useMemo(() => {
@@ -166,15 +186,10 @@ export default function Finance() {
   }, [filteredProjects]);
 
   const selectedProjectNumericId = selectedProjectId !== "all" ? Number(selectedProjectId) : null;
-  const { data: selectedProject } = useQuery({
-    queryKey: ["project-by-id", selectedProjectNumericId],
-    queryFn: async () => {
-      if (!selectedProjectNumericId) return null;
-      return await getProjectById(selectedProjectNumericId);
-    },
-    enabled: selectedProjectNumericId != null && Number.isFinite(selectedProjectNumericId),
-    staleTime: 30 * 1000,
-  });
+  const selectedProject = useMemo(() => {
+    if (selectedProjectNumericId == null || !Number.isFinite(selectedProjectNumericId)) return null;
+    return projectLookupById.get(selectedProjectNumericId) ?? null;
+  }, [projectLookupById, selectedProjectNumericId]);
 
   // When a project is selected first, list-project/?id=… fills division/district/tehsil (ids + names).
   useEffect(() => {
@@ -861,7 +876,6 @@ export default function Finance() {
                         fill="url(#colorFlowTotal)"
                         radius={[4, 4, 0, 0]}
                         name="Total (M)"
-                        barCategoryGap="18%"
                       />
                       {flowChartData.some((x) => Number((x as any).revenueM) > 0) && (
                         <Line
@@ -894,7 +908,6 @@ export default function Finance() {
                     <ComposedChart
                       data={divisionComparisonData}
                       margin={{ top: 10, right: 24, left: 8, bottom: divisionComparisonData.length > 6 ? 72 : 56 }}
-                      barCategoryGap="12%"
                       barGap={4}
                     >
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />

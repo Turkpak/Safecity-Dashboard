@@ -122,4 +122,4 @@ class TopProjectsView(viewsets.ViewSet):
             total += res["progress"] * d
             weight += d
 
-        return (total / weight) * 100 if weight else 0
+        return (total / weight) if weight else 0
