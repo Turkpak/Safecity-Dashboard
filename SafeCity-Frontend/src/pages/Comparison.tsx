@@ -14,9 +14,13 @@ export default function Comparison() {
     queryFn: () => getDashboardPageData("divisions"),
   });
 
+  const divisions = pageData?.divisions ?? [];
+  const districts = pageData?.districts ?? [];
+  const tehsils = pageData?.tehsils ?? [];
+  const projects = pageData?.projects ?? [];
+
   const divisionCompletionData = useMemo(() => {
     if (isLoading) return [];
-    const divisions = pageData?.divisions ?? [];
     if (divisions.length === 0) return [];
 
     return divisions
@@ -32,29 +36,10 @@ export default function Comparison() {
         };
       })
       .sort((a, b) => b.completion - a.completion);
-  }, [
-    divisionsLoading,
-    districtsLoading,
-    tehsilsLoading,
-    projectsLoading,
-    ganttLoading,
-    divisions,
-    districts,
-    tehsils,
-    projects,
-    ganttProgressByProjectId,
-  ]);
+  }, [divisions, isLoading]);
 
   const districtCompletionData = useMemo(() => {
-    if (
-      divisionsLoading ||
-      districtsLoading ||
-      tehsilsLoading ||
-      projectsLoading ||
-      ganttLoading
-    )
-      return [];
-    if (!Array.isArray(districts) || districts.length === 0) return [];
+    if (isLoading || districts.length === 0) return [];
 
     const avg = (values: number[]): number => {
       if (values.length === 0) return 0;
@@ -62,49 +47,34 @@ export default function Comparison() {
       return sum / values.length;
     };
 
-    const calcProjectsOverall = (ps: Project[]): number => {
-      let sum = 0;
-      let count = 0;
-      for (const p of ps) {
-        const v = ganttProgressByProjectId.get(p.id);
-        if (v === undefined) continue;
-        sum += v;
-        count++;
-      }
-      return count > 0 ? Math.max(0, Math.min(100, sum / count)) : 0;
-    };
-
     return districts
-      .map((dist) => {
-        const distTehsils = tehsils.filter((t) => t.district === dist.id);
+      .map((dist: any) => {
+        const distTehsils = tehsils.filter((t: any) => Number(t.district ?? t.district_id) === Number(dist.id));
         const tehsilOveralls: number[] = [];
 
         for (const tehsil of distTehsils) {
-          const tehsilProjects = projects.filter((p) => p.tehsil === tehsil.id);
-          const overall = calcProjectsOverall(tehsilProjects);
-          if (tehsilProjects.length > 0) tehsilOveralls.push(overall);
+          const tehsilProjects = projects.filter((p: any) => Number(p.tehsil ?? p.tehsil_id) === Number(tehsil.id));
+          if (tehsilProjects.length === 0) continue;
+
+          const tehsilAverage =
+            tehsilProjects.reduce(
+              (sum: number, p: any) => sum + Number(p.overall_progress ?? p.physical_progress ?? 0),
+              0,
+            ) / tehsilProjects.length;
+
+          tehsilOveralls.push(tehsilAverage);
         }
 
         const completion = tehsilOveralls.length > 0 ? Math.round(avg(tehsilOveralls)) : 0;
 
         return {
-          city: `${dist.district_name} District`,
+          city: `${dist.district_name ?? dist.name ?? "District"} District`,
           completion: Math.min(100, Math.max(0, completion)),
         };
       })
       .sort((a, b) => b.completion - a.completion)
       .slice(0, 10);
-  }, [
-    divisionsLoading,
-    districtsLoading,
-    tehsilsLoading,
-    projectsLoading,
-    ganttLoading,
-    districts,
-    tehsils,
-    projects,
-    ganttProgressByProjectId,
-  ]);
+  }, [districts, tehsils, projects, isLoading]);
 
   return (
     <Layout title={isMobile ? "CITY COMPARISON" : "City Comparison - Smart Safe Cities"}>
