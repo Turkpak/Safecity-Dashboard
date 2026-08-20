@@ -283,26 +283,27 @@ class Project(models.Model):
         # 🔥 PERCENTAGE FORMULAS (FINAL CORRECT VERSION)
         # =====================================================
 
-        # ---------- TOTAL % ----------
-        if self.allocation_total_cost and self.allocation_total_cost > 0:
+        # ---------- UTILIZATION AGAINST SPENDING RELEASE ----------
+        # These fields are labelled "% Utilization against Spending Release"
+        # in the project finance UI, so Spending Release is the authoritative
+        # denominator (not Allocation).
+        if self.spending_release_total_cost and self.spending_release_total_cost > 0:
             self.percentage_utilization_total = round(
-                (self.pifra_utilization_total_cost / self.allocation_total_cost) * 100, 2
+                (self.pifra_utilization_total_cost / self.spending_release_total_cost) * 100, 2
             )
         else:
             self.percentage_utilization_total = 0
 
-        # ---------- CAPITAL % ----------
-        if self.allocation_capital_cost and self.allocation_capital_cost > 0:
+        if self.spending_release_capital_cost and self.spending_release_capital_cost > 0:
             self.percentage_utilization_capital = round(
-                (self.pifra_utilization_capital_cost / self.allocation_capital_cost) * 100, 2
+                (self.pifra_utilization_capital_cost / self.spending_release_capital_cost) * 100, 2
             )
         else:
             self.percentage_utilization_capital = 0
 
-        # ---------- REVENUE % ----------
-        if self.allocation_revenue_cost and self.allocation_revenue_cost > 0:
+        if self.spending_release_revenue_cost and self.spending_release_revenue_cost > 0:
             self.percentage_utilization_revenue = round(
-                (self.pifra_utilization_revenue_cost / self.allocation_revenue_cost) * 100, 2
+                (self.pifra_utilization_revenue_cost / self.spending_release_revenue_cost) * 100, 2
             )
         else:
             self.percentage_utilization_revenue = 0

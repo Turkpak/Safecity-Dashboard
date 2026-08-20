@@ -22,7 +22,7 @@ import { CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import {
   // getProjectGanttAll,
-getProjectProgressSummary,
+  getDashboardProgressSummary,
   getProjectGanttData,
   listDivisions,
   listDistricts,
@@ -70,6 +70,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { listProjects, getProjectById } from "@/api/project";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { cn } from "@/lib/utils";
+import { calculateFinancialMetrics } from "@/utils/financialProgress";
 
 // Enhanced installation progress data with sub-projects and planned vs actual
 interface PhaseProgress {
@@ -566,26 +567,6 @@ const convertToPhaseProgress = (
 
 // ---- API helpers (file-level, no component dependencies) ----
 
-/** Calculate overall financial progress % from a list of projects */
-const calcOverallProgress = (projects: Project[]): number => {
-  const num = (v: unknown): number => {
-    if (v === null || v === undefined) return 0;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : 0;
-  };
-  const clampPct = (n: number) => Math.max(0, Math.min(100, n));
-
-  const allocated = projects.reduce(
-    (acc, p) => acc + num((p as any)?.total_budget_allocated),
-    0,
-  );
-  const utilized = projects.reduce(
-    (acc, p) => acc + num((p as any)?.budget_utilized),
-    0,
-  );
-  return allocated > 0 ? clampPct((utilized / allocated) * 100) : 0;
-};
-
 /** Build CityInstallationData from an overall financial progress number (API-only; no synthetic phase or timeline data). */
 const generateCityDataFromOverall = (
   overall: number,
@@ -725,35 +706,27 @@ export default function Dashboard() {
     queryFn: () => listTopProjects(selectedItemType === "division" && selectedItemId ? { division_id: selectedItemId, limit: 6 } : { limit: 6 }),
   });
 
-  // Fetch all gantt schedules once and use root task progress for each project card.
-  const { data: progressSummary = {} } = useQuery({
-  queryKey: ["project-progress-summary"],
-  queryFn: () => getProjectProgressSummary(),
-});
+  // Authoritative Dashboard progress summary. Physical calculations and hierarchy
+  // rollups come from Django; financial calculations use real project finance data.
+  const { data: dashboardProgress } = useQuery({
+    queryKey: ["dashboard-progress-summary"],
+    queryFn: () => getDashboardProgressSummary(),
+  });
 
-const ganttProgressByProjectId = useMemo(() => {
-  const clampPct = (n: number) => Math.max(0, Math.min(100, n));
-  const map = new Map<number, number>();
-  for (const [pid, progress] of Object.entries(progressSummary)) {
-    const n = Number(progress);
-    map.set(Number(pid), Number.isFinite(n) ? clampPct(n) : 0);
-  }
-  return map;
-}, [progressSummary]);
-
-  // All Projects overall % (average of root task `_id:"1"` progress across projects)
-  const allProjectsOverallFromGantt = useMemo(() => {
-    if (apiProjects.length === 0) return 0;
-    let sum = 0;
-    let count = 0;
-    for (const p of apiProjects) {
-      const v = ganttProgressByProjectId.get(p.id);
-      if (v === undefined) continue;
-      sum += v;
-      count++;
+  const progressSummary = dashboardProgress?.physical.projects ?? {};
+  const ganttProgressByProjectId = useMemo(() => {
+    const clampPct = (n: number) => Math.max(0, Math.min(100, n));
+    const map = new Map<number, number>();
+    for (const [pid, progress] of Object.entries(progressSummary)) {
+      const n = Number(progress);
+      map.set(Number(pid), Number.isFinite(n) ? clampPct(n) : 0);
     }
-    return count > 0 ? sum / count : 0;
-  }, [apiProjects, ganttProgressByProjectId]);
+    return map;
+  }, [progressSummary]);
+
+  const allProjectsOverallFromGantt = dashboardProgress?.physical.overall_projects
+    ?? dashboardProgress?.physical.overall
+    ?? 0;
 
   const toSlug = (value: string) =>
     value
@@ -1097,55 +1070,24 @@ const ganttProgressByProjectId = useMemo(() => {
     }
   };
 
-  // Helper: calculate overall financial progress from a set of projects
-  const calcProjectsOverall = (projects: Project[]): number => {
-    const clampPct = (n: number) => Math.max(0, Math.min(100, n));
-
-    // Required source of truth: nested gantt root task `_id:"1"` progress per project.
-    let sum = 0;
-    let count = 0;
-    for (const p of projects) {
-      const v = ganttProgressByProjectId.get(p.id);
-      if (v === undefined) continue;
-      sum += v;
-      count++;
-    }
-    return count > 0 ? clampPct(sum / count) : 0;
-  };
 
   const distributionChart = useMemo(() => {
     if (!selectedItemType || !selectedItemId) return null;
 
-    const avg = (values: number[]): number => {
-      if (values.length === 0) return 0;
-      const sum = values.reduce((acc, v) => acc + v, 0);
-      return sum / values.length;
-    };
-
-    const roundPct = (n: number) => Math.max(0, Math.min(100, Number(n.toFixed(2))));
-
-    const tehsilOverall = (tehsilId: number): number => {
-      const tehsilProjects = apiProjects.filter((p) => p.tehsil === tehsilId);
-      if (tehsilProjects.length === 0) return 0;
-      return calcProjectsOverall(tehsilProjects);
-    };
-
-    const districtOverallFromTehsils = (districtId: number): number => {
-      const distTehsils = apiTehsils.filter((t) => t.district === districtId);
-      if (distTehsils.length === 0) return 0;
-      const tehsilOveralls = distTehsils.map((t) => tehsilOverall(t.id));
-      return avg(tehsilOveralls);
-    };
+    const roundPct = (n: number): number =>
+      Math.max(0, Math.min(100, Number(n.toFixed(2))));
 
     if (selectedItemType === "division") {
       const divDistricts = apiDistricts.filter((d) => d.division === selectedItemId);
       const rows = divDistricts.map((d) => ({
         phase: d.district_name,
-        percentage: roundPct(districtOverallFromTehsils(d.id)),
+        percentage: roundPct(
+          dashboardProgress?.physical.districts?.[String(d.id)] ?? 0,
+        ),
       }));
       return {
         title: "District Progress Distribution",
-        description: "Progress % of all districts within the selected division",
+        description: "Backend-calculated physical progress of districts within the selected division",
         data: rows.sort((a, b) => b.percentage - a.percentage),
       };
     }
@@ -1154,11 +1096,13 @@ const ganttProgressByProjectId = useMemo(() => {
       const distTehsils = apiTehsils.filter((t) => t.district === selectedItemId);
       const rows = distTehsils.map((t) => ({
         phase: t.tehsil_name,
-        percentage: roundPct(tehsilOverall(t.id)),
+        percentage: roundPct(
+          dashboardProgress?.physical.tehsils?.[String(t.id)] ?? 0,
+        ),
       }));
       return {
         title: "Tehsil Progress Distribution",
-        description: "Progress % of all tehsils within the selected district",
+        description: "Backend-calculated physical progress of tehsils within the selected district",
         data: rows.sort((a, b) => b.percentage - a.percentage),
       };
     }
@@ -1169,33 +1113,23 @@ const ganttProgressByProjectId = useMemo(() => {
     selectedItemId,
     apiDistricts,
     apiTehsils,
-    apiProjects,
-    ganttProgressByProjectId,
+    dashboardProgress,
   ]);
 
-  // Calculate aggregated data from a list of projects
-  const getAggregatedDataFromProjects = (
-    projects: Project[],
-  ): CityInstallationData => {
-    const overall = calcProjectsOverall(projects);
-    return generateCityDataFromOverall(overall);
-  };
-
-  // Get single item data from API projects by ID
+  // Get one hierarchy item's physical progress from the authoritative backend summary.
   const getSingleItemData = (
     itemId: number | null,
     itemType: "division" | "district" | "tehsil",
   ): CityInstallationData | null => {
     if (!itemId) return null;
-    let filtered: Project[];
-    if (itemType === "division") {
-      filtered = apiProjects.filter((p) => p.division === itemId);
-    } else if (itemType === "district") {
-      filtered = apiProjects.filter((p) => p.district === itemId);
-    } else {
-      filtered = apiProjects.filter((p) => p.tehsil === itemId);
-    }
-    return getAggregatedDataFromProjects(filtered);
+    const key = String(itemId);
+    const overall =
+      itemType === "division"
+        ? dashboardProgress?.physical.divisions?.[key]
+        : itemType === "district"
+          ? dashboardProgress?.physical.districts?.[key]
+          : dashboardProgress?.physical.tehsils?.[key];
+    return generateCityDataFromOverall(overall ?? 0);
   };
 
   // Get single item data
@@ -1204,7 +1138,7 @@ const ganttProgressByProjectId = useMemo(() => {
       return getSingleItemData(selectedItemId, selectedItemType);
     }
     return null;
-  }, [selectedItemId, selectedItemType, apiProjects]);
+  }, [selectedItemId, selectedItemType, dashboardProgress]);
 
   // Projects in the currently selected geography (division / district / tehsil) for "Best Performing Projects" cards
   const projectsInSelectedGeography = useMemo((): Project[] => {
@@ -1218,10 +1152,13 @@ const ganttProgressByProjectId = useMemo(() => {
     return apiProjects.filter((p) => p.tehsil === selectedItemId);
   }, [selectedItemId, selectedItemType, apiProjects]);
 
-  // Get aggregated data based on view type (all projects)
-  const aggregatedData = useMemo(() => {
-    return getAggregatedDataFromProjects(apiProjects);
-  }, [apiProjects]);
+  // All-project physical data from the authoritative backend summary.
+  const aggregatedData = useMemo(
+    () => generateCityDataFromOverall(
+      dashboardProgress?.physical.overall_projects ?? dashboardProgress?.physical.overall ?? 0,
+    ),
+    [dashboardProgress],
+  );
 
   /** Top projects by budget utilization for root "All Punjab *" views (real API data, not duplicate phase placeholders). */
   const topProjectsForAggregateViews = useMemo((): Project[] => {
@@ -1238,31 +1175,10 @@ const ganttProgressByProjectId = useMemo(() => {
       .slice(0, 6);
   }, [apiProjects]);
 
-  // Overall for All Punjab Divisions (average of division overalls)
-  const allDivisionsOverall = useMemo(() => {
-    if (apiDivisions.length === 0) return 0;
-    let sum = 0;
-    let count = 0;
-    for (const div of apiDivisions) {
-      const projects = apiProjects.filter((p) => p.division === div.id);
-      sum += calcProjectsOverall(projects);
-      count++;
-    }
-    return count > 0 ? sum / count : 0;
-  }, [apiDivisions, apiProjects]);
+  // Backend-owned hierarchy physical summaries (preserves existing averaging rule).
+  const allDivisionsOverall = dashboardProgress?.physical.overall_divisions ?? 0;
 
-  // Overall for All Punjab Districts (average of district overalls)
-  const allDistrictsOverall = useMemo(() => {
-    if (apiDistricts.length === 0) return 0;
-    let sum = 0;
-    let count = 0;
-    for (const dist of apiDistricts) {
-      const projects = apiProjects.filter((p) => p.district === dist.id);
-      sum += calcProjectsOverall(projects);
-      count++;
-    }
-    return count > 0 ? sum / count : 0;
-  }, [apiDistricts, apiProjects]);
+  const allDistrictsOverall = dashboardProgress?.physical.overall_districts ?? 0;
 
   // Context theme: follow the currently visible/selected area overall %
   const contextOverall = useMemo(() => {
@@ -1304,8 +1220,7 @@ const ganttProgressByProjectId = useMemo(() => {
   const divisionsData = useMemo(() => {
     return apiDivisions
       .map((div, index) => {
-        const projects = apiProjects.filter((p) => p.division === div.id);
-        const overall = calcProjectsOverall(projects);
+        const overall = dashboardProgress?.physical.divisions?.[String(div.id)] ?? 0;
         return {
           id: div.id,
           name: div.division_name,
@@ -1315,14 +1230,13 @@ const ganttProgressByProjectId = useMemo(() => {
         };
       })
       .sort((a, b) => b.overall - a.overall);
-  }, [apiDivisions, apiProjects]);
+  }, [apiDivisions, dashboardProgress]);
 
   // Districts data for cards view (API-driven)
   const districtsData = useMemo(() => {
     return apiDistricts
       .map((dist, index) => {
-        const projects = apiProjects.filter((p) => p.district === dist.id);
-        const overall = calcProjectsOverall(projects);
+        const overall = dashboardProgress?.physical.districts?.[String(dist.id)] ?? 0;
         return {
           id: dist.id,
           name: dist.district_name,
@@ -1333,7 +1247,7 @@ const ganttProgressByProjectId = useMemo(() => {
         };
       })
       .sort((a, b) => b.overall - a.overall);
-  }, [apiDistricts, apiProjects]);
+  }, [apiDistricts, dashboardProgress]);
 
 
   // Tehsils data grouped by district name (API-driven)
@@ -1352,8 +1266,7 @@ const ganttProgressByProjectId = useMemo(() => {
     apiTehsils.forEach((teh, index) => {
       const districtName = teh.district_name;
       if (!result[districtName]) result[districtName] = [];
-      const projects = apiProjects.filter((p) => p.tehsil === teh.id);
-      const overall = calcProjectsOverall(projects);
+      const overall = dashboardProgress?.physical.tehsils?.[String(teh.id)] ?? 0;
       result[districtName].push({
         id: teh.id,
         name: teh.tehsil_name,
@@ -1368,7 +1281,7 @@ const ganttProgressByProjectId = useMemo(() => {
       result[district].sort((a, b) => b.overall - a.overall);
     });
     return result;
-  }, [apiTehsils, apiProjects]);
+  }, [apiTehsils, dashboardProgress]);
 
   // Skeleton loader component
   const renderSkeletonLoader = () => (
@@ -1439,59 +1352,6 @@ const ganttProgressByProjectId = useMemo(() => {
     </div>
   );
 
-  // Convert physical progress to financial progress
-  const convertToFinancialProgress = (
-    physicalPhase: PhaseProgress,
-  ): PhaseProgress => {
-    const financialMultiplier = 0.92; // Financial is typically 92% of physical
-    const varianceAdjustment = 0.85; // Financial variance is typically 85% of physical variance
-
-    const financialActual = Math.min(
-      100,
-      physicalPhase.actual * financialMultiplier,
-    );
-    const variance = physicalPhase.actual - physicalPhase.planned;
-    const financialVariance = variance * varianceAdjustment;
-    const financialPlanned = financialActual - financialVariance;
-
-    // Convert sub-projects to financial
-    const financialSubProjects: SubProject[] = (
-      physicalPhase.subProjects || []
-    ).map((sub) => {
-      const subFinancialActual = Math.min(
-        100,
-        sub.actualProgress * financialMultiplier,
-      );
-      const subVariance = sub.actualProgress - sub.plannedProgress;
-      const subFinancialVariance = subVariance * varianceAdjustment;
-      const subFinancialPlanned = subFinancialActual - subFinancialVariance;
-
-      return {
-        ...sub,
-        name: sub.name.replace(
-          /(Survey|Assessment|Collection|Measurements|Study|Documentation|Feasibility|Installation|Laying|Renovations|Go Live)/g,
-          "$1 Budget",
-        ),
-        actualProgress: subFinancialActual,
-        plannedProgress: Math.max(0, subFinancialPlanned),
-      };
-    });
-
-    // Convert timeline to financial
-    const financialTimeline = (physicalPhase.timeline || []).map((t) => ({
-      month: t.month,
-      actual: Math.min(100, t.actual * financialMultiplier),
-      planned: Math.min(100, t.planned * financialMultiplier),
-    }));
-
-    return {
-      actual: financialActual,
-      planned: Math.max(0, financialPlanned),
-      subProjects: financialSubProjects,
-      timeline: financialTimeline,
-    };
-  };
-
   // Valid InstallationCard colors for project cards
   const PROJECT_CARD_COLORS: Array<
     "blue" | "green" | "orange" | "purple" | "red" | "yellow"
@@ -1518,42 +1378,31 @@ const ganttProgressByProjectId = useMemo(() => {
         : apiProjects;
 
     const clamp01 = (n: number) => Math.max(0, Math.min(100, n));
-    const num = (v: unknown): number => {
-      if (v === null || v === undefined) return 0;
-      const n = Number(v);
-      return Number.isFinite(n) ? n : 0;
-    };
-    const getActivityProgress = (a: any): number =>
-      clamp01(num(a?.progress ?? a?.percent_complete ?? 0));
 
-    // Financial utilization % (All divisions / scoped)
-    const sumBudgetAllocated = scopeProjects.reduce(
-      (acc, p) => acc + num((p as any)?.total_budget_allocated),
-      0,
-    );
-    const sumBudgetUtilized = scopeProjects.reduce(
-      (acc, p) => acc + num((p as any)?.budget_utilized),
-      0,
-    );
-    const utilizationPct =
-      sumBudgetAllocated > 0 ? clamp01((sumBudgetUtilized / sumBudgetAllocated) * 100) : 0;
-
-    // Physical progress %: average of activity progresses (project-level avg, then avg across projects)
-    const physicalPct = (() => {
-      if (!scopeProjects.length) return 0;
-      let sum = 0;
-      for (const p of scopeProjects) {
-        const acts: any[] = Array.isArray((p as any)?.activities) ? (p as any).activities : [];
-        if (acts.length === 0) {
-          sum += 0;
-          continue;
-        }
-        const projAvg =
-          acts.reduce((acc, a) => acc + getActivityProgress(a), 0) / Math.max(1, acts.length);
-        sum += projAvg;
+    // Prefer the backend-owned financial summary for known scopes. The frontend
+    // helper remains only as a safe fallback using the same ratio-of-sums rule.
+    const backendFinancialMetrics = (() => {
+      if (scopeProjects.length === 1) {
+        return dashboardProgress?.financial.projects?.[String(scopeProjects[0].id)];
       }
-      return clamp01(sum / Math.max(1, scopeProjects.length));
+      if (selectedItemType === "division" && selectedItemId) {
+        return dashboardProgress?.financial.divisions?.[String(selectedItemId)];
+      }
+      if (selectedItemType === "district" && selectedItemId) {
+        return dashboardProgress?.financial.districts?.[String(selectedItemId)];
+      }
+      if (selectedItemType === "tehsil" && selectedItemId) {
+        return dashboardProgress?.financial.tehsils?.[String(selectedItemId)];
+      }
+      if (isAggregatedView) return dashboardProgress?.financial.overall;
+      return undefined;
     })();
+    const financialMetrics = backendFinancialMetrics ?? calculateFinancialMetrics(scopeProjects);
+    const utilizationPct = financialMetrics.financial_progress ?? 0;
+
+    // The physical overall displayed by this scope was built from the backend
+    // hierarchy/project physical summary; do not recalculate from project.activities.
+    const physicalPct = clamp01(Number(data.overall ?? 0));
 
     // Calculate overall planned and actual from all phases
     let totalPlanned = 0;
@@ -2106,30 +1955,74 @@ const ganttProgressByProjectId = useMemo(() => {
                   </span>
                 </div>
               </div>
-              <MilestoneDetailsPanel
-                milestoneTitle={
-                  progressType === "financial"
-                    ? `${selectedPhaseMeta.title} - Financial Progress`
-                    : selectedPhaseMeta.title
-                }
-                phase={
-                  progressType === "financial"
-                    ? convertToFinancialProgress({
-                        actual: selectedProgress.actual,
-                        planned: selectedProgress.planned,
-                        subProjects: selectedProgress.subProjects,
-                        timeline: selectedProgress.timeline,
-                      })
-                    : {
-                        actual: selectedProgress.actual,
-                        planned: selectedProgress.planned,
-                        subProjects: selectedProgress.subProjects,
-                        timeline: selectedProgress.timeline,
-                      }
-                }
-                phaseColor={colorMap[selectedPhaseMeta.color] || "#6b7280"}
-                onClear={() => setSelectedMilestoneKey(null)}
-              />
+              {progressType === "financial" ? (
+                <Card className="border-border/70">
+                  <CardHeader>
+                    <CardTitle>Project Financial Status</CardTitle>
+                    <CardDescription>
+                      Real project-level finance for the current scope. Financial values are not inferred from WBS physical progress.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-5">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      {[
+                        ["Allocation", financialMetrics.allocation, 100],
+                        ["P&D Release", financialMetrics.pd_release, financialMetrics.pd_release_vs_allocation],
+                        ["Spending Release", financialMetrics.spending_release, financialMetrics.spending_release_vs_allocation],
+                        ["PIFRA Utilization", financialMetrics.pifra, financialMetrics.pifra_vs_allocation],
+                      ].map(([label, amount, percentage]) => (
+                        <div key={String(label)} className="rounded-lg border bg-muted/20 p-4">
+                          <div className="text-xs font-medium text-muted-foreground">{String(label)}</div>
+                          <div className="mt-1 text-lg font-bold">
+                            {Number(amount).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                          </div>
+                          <div className="mt-2 text-sm text-muted-foreground">
+                            {percentage == null ? "N/A" : `${Number(percentage).toFixed(1)}% of Allocation`}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="rounded-lg border-2 border-primary/20 p-4">
+                      <div className="flex items-end justify-between gap-4">
+                        <div>
+                          <div className="text-sm font-semibold">Financial Progress</div>
+                          <div className="text-xs text-muted-foreground">PIFRA Utilization / Spending Release</div>
+                        </div>
+                        <div className="text-2xl font-bold text-primary">
+                          {financialMetrics.financial_progress == null
+                            ? "N/A"
+                            : `${financialMetrics.financial_progress.toFixed(1)}%`}
+                        </div>
+                      </div>
+                      <div className="mt-3 h-3 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{
+                            width: `${Math.min(100, Math.max(0, financialMetrics.financial_progress ?? 0))}%`,
+                          }}
+                        />
+                      </div>
+                      {financialMetrics.financial_progress != null && financialMetrics.financial_progress > 100 ? (
+                        <p className="mt-2 text-xs text-destructive">
+                          PIFRA utilization exceeds the recorded Spending Release. Please verify the financial data.
+                        </p>
+                      ) : null}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <MilestoneDetailsPanel
+                  milestoneTitle={selectedPhaseMeta.title}
+                  phase={{
+                    actual: selectedProgress.actual,
+                    planned: selectedProgress.planned,
+                    subProjects: selectedProgress.subProjects,
+                    timeline: selectedProgress.timeline,
+                  }}
+                  phaseColor={colorMap[selectedPhaseMeta.color] || "#6b7280"}
+                  onClear={() => setSelectedMilestoneKey(null)}
+                />
+              )}
             </div>
           )}
 
@@ -2931,10 +2824,8 @@ const ganttProgressByProjectId = useMemo(() => {
               const districtTehsilsData = apiTehsils
                 .filter((t) => t.district === selectedItemId)
                 .map((teh, index) => {
-                  const projects = apiProjects.filter(
-                    (p) => p.tehsil === teh.id,
-                  );
-                  const overall = calcProjectsOverall(projects);
+                  const overall =
+                    dashboardProgress?.physical.tehsils?.[String(teh.id)] ?? 0;
                   return {
                     id: teh.id,
                     name: teh.tehsil_name,

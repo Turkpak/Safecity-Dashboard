@@ -240,3 +240,39 @@ export async function updateTaskActual(
     payload as any
   );
 }
+export interface FinancialProgressMetrics {
+  allocation: number;
+  pd_release: number;
+  spending_release: number;
+  pifra: number;
+  pd_release_vs_allocation: number | null;
+  spending_release_vs_allocation: number | null;
+  pifra_vs_allocation: number | null;
+  financial_progress: number | null;
+}
+
+export interface DashboardProgressSummary {
+  physical: {
+    overall: number;
+    overall_projects?: number;
+    overall_divisions?: number;
+    overall_districts?: number;
+    overall_tehsils?: number;
+    projects: Record<string, number>;
+    divisions: Record<string, number>;
+    districts: Record<string, number>;
+    tehsils: Record<string, number>;
+  };
+  financial: {
+    overall: FinancialProgressMetrics;
+    projects: Record<string, FinancialProgressMetrics>;
+    divisions: Record<string, FinancialProgressMetrics>;
+    districts: Record<string, FinancialProgressMetrics>;
+    tehsils: Record<string, FinancialProgressMetrics>;
+  };
+}
+
+/** GET /api/dashboard-progress-summary/ — authoritative physical + financial Dashboard progress. */
+export async function getDashboardProgressSummary(): Promise<DashboardProgressSummary> {
+  return get<DashboardProgressSummary>("dashboard-progress-summary/");
+}

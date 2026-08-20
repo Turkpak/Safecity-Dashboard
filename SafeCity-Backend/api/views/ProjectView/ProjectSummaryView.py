@@ -52,6 +52,8 @@ class ProjectSummaryView(APIView):
 
             # ---------- SAFE VALUES ----------
             allocation = data['total_allocation'] or 0
+            pd_release = data['total_pd_release'] or 0
+            spending_release = data['total_spending_release'] or 0
             pifra = data['total_pifra'] or 0
 
             allocation_capital = data['total_allocation_capital'] or 0
@@ -67,9 +69,17 @@ class ProjectSummaryView(APIView):
             spending_release_revenue = data['total_spending_release_revenue'] or 0
 
             # ---------- PERCENTAGES ----------
-            percentage_total = (pifra / allocation * 100) if allocation > 0 else 0
-            percentage_capital = (pifra_capital / allocation_capital * 100) if allocation_capital > 0 else 0
-            percentage_revenue = (pifra_revenue / allocation_revenue * 100) if allocation_revenue > 0 else 0
+            # Primary utilization percentage follows the UI definition:
+            # PIFRA utilization against Spending Release.
+            spending_total = spending_release
+            percentage_total = (pifra / spending_total * 100) if spending_total > 0 else 0
+            percentage_capital = (pifra_capital / spending_release_capital * 100) if spending_release_capital > 0 else 0
+            percentage_revenue = (pifra_revenue / spending_release_revenue * 100) if spending_release_revenue > 0 else 0
+
+            # Supporting financial funnel KPIs.
+            pd_release_vs_allocation = (pd_release / allocation * 100) if allocation > 0 else 0
+            spending_release_vs_allocation = (spending_release / allocation * 100) if allocation > 0 else 0
+            pifra_vs_allocation = (pifra / allocation * 100) if allocation > 0 else 0
 
             # ----------------------------------------
             # RESPONSE
@@ -100,6 +110,10 @@ class ProjectSummaryView(APIView):
                 "percentage_total": round(percentage_total, 2),
                 "percentage_capital": round(percentage_capital, 2),
                 "percentage_revenue": round(percentage_revenue, 2),
+                "financial_progress": round(percentage_total, 2),
+                "pd_release_vs_allocation": round(pd_release_vs_allocation, 2),
+                "spending_release_vs_allocation": round(spending_release_vs_allocation, 2),
+                "pifra_vs_allocation": round(pifra_vs_allocation, 2),
             }
 
             return ApiResponse(

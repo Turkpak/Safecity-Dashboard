@@ -100,6 +100,7 @@ urlpatterns = [
     path("update-delay-log/<int:pk>/", ActivityDelayLogUpdateView.as_view()),
 
     path("project-progress-summary/", ProjectProgressSummaryView.as_view()),
+    path("dashboard-progress-summary/", DashboardProgressSummaryView.as_view(), name="dashboard-progress-summary"),
     path("project-status-summary/", ProjectStatusSummaryView.as_view()),
 ]
 
