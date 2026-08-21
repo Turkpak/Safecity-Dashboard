@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .common_imports import *
+from api.progress_calculations import calculate_project_physical_progress_map
 
 CACHE_TIMEOUT_SECONDS = 60
 
@@ -189,17 +190,18 @@ def _calculate_project_physical_progress(activities):
 # Project Metrics
 # ============================================================
 
-def _project_metrics(project):
+def _project_metrics(project, physical_progress=None, has_physical_data=None):
 
     activities = list(
         project.activities.all()
     )
 
-    physical_progress = (
-        _calculate_project_physical_progress(
-            activities
-        )
-    )
+    if physical_progress is None:
+        project_progress_map = calculate_project_physical_progress_map([project.id])
+        has_physical_data = project.id in project_progress_map
+        physical_progress = project_progress_map.get(project.id, 0.0)
+    elif has_physical_data is None:
+        has_physical_data = True
 
     # --------------------------------------------------------
     # Financial
@@ -355,6 +357,9 @@ def _project_metrics(project):
         "overall_progress":
             overall_progress,
 
+        # Physical-data validity (0% can still be valid)
+        "has_physical_data": bool(has_physical_data),
+
         # Status
         "status":
             status,
@@ -495,28 +500,36 @@ def _project_scope_summary(project_rows):
 # ============================================================
 
 def _average_metric_rows(rows):
-    """Average progress equally across the supplied child rows."""
+    """Average immediate children while preserving physical-data validity.
+
+    Physical progress excludes children with no valid Primavera physical data,
+    but includes genuine 0% children. Legacy financial/overall fields retain
+    their previous simple-average behavior.
+    """
     if not rows:
         return {
             "project_count": 0,
             "physical_progress": 0.0,
+            "has_physical_data": False,
             "financial_progress": 0.0,
             "overall_progress": 0.0,
         }
 
+    physical_rows = [row for row in rows if row.get("has_physical_data") is True]
+    physical_progress = (
+        round(sum(row.get("physical_progress", 0.0) for row in physical_rows) / len(physical_rows), 2)
+        if physical_rows else 0.0
+    )
+
     return {
         "project_count": sum(row.get("project_count", 1) for row in rows),
-        "physical_progress": round(
-            sum(row.get("physical_progress", 0.0) for row in rows) / len(rows),
-            2,
-        ),
+        "physical_progress": physical_progress,
+        "has_physical_data": bool(physical_rows),
         "financial_progress": round(
-            sum(row.get("financial_progress", 0.0) for row in rows) / len(rows),
-            2,
+            sum(row.get("financial_progress", 0.0) for row in rows) / len(rows), 2
         ),
         "overall_progress": round(
-            sum(row.get("overall_progress", 0.0) for row in rows) / len(rows),
-            2,
+            sum(row.get("overall_progress", 0.0) for row in rows) / len(rows), 2
         ),
     }
 
@@ -589,6 +602,8 @@ def _all_hierarchy_rows(
                 "project_count": 1,
                 "physical_progress":
                     row["physical_progress"],
+                "has_physical_data":
+                    row.get("has_physical_data", False),
                 "financial_progress":
                     row["financial_progress"],
                 "overall_progress":
@@ -673,6 +688,7 @@ def _all_hierarchy_rows(
             "name": getattr(obj, name_attr),
             "project_count": summary["project_count"],
             "physical_progress": summary["physical_progress"],
+            "has_physical_data": summary.get("has_physical_data", False),
             "financial_progress": summary["financial_progress"],
             "overall_progress": summary["overall_progress"],
         }
@@ -709,31 +725,25 @@ def _page_summary(
 ):
 
     active = [
-        row
-        for row in hierarchy_rows
-        if row.get(
-            "project_count",
-            0
-        ) > 0
+        row for row in hierarchy_rows
+        if row.get("project_count", 0) > 0
+    ]
+    physical_active = [
+        row for row in hierarchy_rows
+        if row.get("has_physical_data") is True
     ]
 
-    if not active:
+    if not active and not physical_active:
         return _project_scope_summary([])
 
     physical = (
-        sum(
-            row["physical_progress"]
-            for row in active
-        ) /
-        len(active)
+        sum(row["physical_progress"] for row in physical_active) / len(physical_active)
+        if physical_active else 0.0
     )
 
     financial = (
-        sum(
-            row["financial_progress"]
-            for row in active
-        ) /
-        len(active)
+        sum(row["financial_progress"] for row in active) / len(active)
+        if active else 0.0
     )
 
     total_budget = sum(
@@ -925,8 +935,16 @@ class DashboardPageDataView(APIView):
         # Calculate project metrics
         # ----------------------------------------------------
 
+        physical_progress_map = calculate_project_physical_progress_map(
+            [project.id for project in projects]
+        )
+
         project_rows = [
-            _project_metrics(project)
+            _project_metrics(
+                project,
+                physical_progress_map.get(project.id, 0.0),
+                project.id in physical_progress_map,
+            )
             for project in projects
         ]
 
@@ -1008,6 +1026,12 @@ class DashboardPageDataView(APIView):
                     metrics.get(
                         "physical_progress",
                         0
+                    ),
+
+                "has_physical_data":
+                    metrics.get(
+                        "has_physical_data",
+                        False
                     ),
 
                 "financial_progress":

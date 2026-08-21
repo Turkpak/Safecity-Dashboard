@@ -2369,7 +2369,6 @@ const ganttProgressByProjectId = useMemo(() => {
           : null;
 
       await exportProgressReport({
-        pageData,
         view: DASHBOARD_VIEW_TO_API_PAGE[dashboardPage],
         selection,
       });

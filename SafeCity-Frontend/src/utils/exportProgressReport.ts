@@ -1,55 +1,29 @@
 import jsPDF from "jspdf";
-import type {
-  DashboardPageData,
-  DashboardProject,
-  DashboardView,
-} from "@/api/dashboard";
-
-type Selection = {
-  type: "division" | "district" | "tehsil" | "project";
-  id: number;
-  name: string;
-} | null;
+import type { DashboardView } from "@/api/dashboard";
+import {
+  getPhysicalProgressReport,
+  type PhysicalReportData,
+  type PhysicalReportSelection,
+} from "@/api/physicalReport";
 
 type ExportProgressReportOptions = {
-  pageData: DashboardPageData;
   view: DashboardView;
-  selection?: Selection;
-};
-
-type ReportRow = {
-  id: number;
-  name: string;
-  physical: number;
-  financial: number;
-  projectCount: number;
+  selection?: PhysicalReportSelection;
 };
 
 const NAVY = [17, 31, 70] as const;
 const BLUE = [30, 58, 138] as const;
 const RED = [185, 28, 28] as const;
-const LIGHT = [247, 249, 252] as const;
-const BORDER = [224, 229, 239] as const;
-const TEXT = [26, 36, 58] as const;
-const MUTED = [100, 116, 139] as const;
 const GREEN = [22, 163, 74] as const;
 const AMBER = [217, 119, 6] as const;
+const SLATE = [71, 85, 105] as const;
+const LIGHT = [247, 249, 252] as const;
+const BORDER = [221, 228, 239] as const;
+const TEXT = [26, 36, 58] as const;
+const MUTED = [100, 116, 139] as const;
+type Color = readonly [number, number, number];
 
-const n = (value: unknown) => {
-  const parsed = Number(value ?? 0);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const pct = (value: unknown) => Math.max(0, Math.min(100, n(value)));
-
-const money = (value: unknown) => {
-  const amount = n(value);
-  const abs = Math.abs(amount);
-  if (abs >= 1_000_000_000) return `Rs ${(amount / 1_000_000_000).toFixed(2)} B`;
-  if (abs >= 1_000_000) return `Rs ${(amount / 1_000_000).toFixed(2)} M`;
-  if (abs >= 1_000) return `Rs ${(amount / 1_000).toFixed(2)} K`;
-  return `Rs ${amount.toFixed(2)}`;
-};
+const clampPct = (value: number) => Math.max(0, Math.min(100, Number(value) || 0));
 
 async function imageUrlToDataUrl(url: string): Promise<string | null> {
   try {
@@ -67,367 +41,230 @@ async function imageUrlToDataUrl(url: string): Promise<string | null> {
   }
 }
 
-function projectName(p: DashboardProject) {
-  return p.project_name?.trim() || `Project ${p.id}`;
+function fmtDate(value: string | null | undefined) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function filterProjects(pageData: DashboardPageData, selection?: Selection): DashboardProject[] {
-  if (!selection) return pageData.projects;
-  if (selection.type === "project") {
-    return pageData.projects.filter((p) => Number(p.id) === selection.id);
-  }
-  if (selection.type === "tehsil") {
-    return pageData.projects.filter((p) => Number(p.tehsil) === selection.id);
-  }
-  if (selection.type === "district") {
-    return pageData.projects.filter((p) => Number(p.district) === selection.id);
-  }
-  return pageData.projects.filter((p) => Number(p.zone ?? (p as any).division) === selection.id);
+function drawChrome(doc: jsPDF, pageNo: number, report: PhysicalReportData, logo: string | null) {
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  doc.setFillColor(...LIGHT); doc.rect(0, 0, W, H, "F");
+  doc.setFillColor(...NAVY); doc.rect(0, 0, W, 22, "F");
+  doc.setFillColor(...RED); doc.rect(0, 22, W, 1.3, "F");
+  if (logo) { try { doc.addImage(logo, "PNG", 10, 3.2, 15, 15); } catch { /* no-op */ } }
+  doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(12.5);
+  doc.text("PSCA PHYSICAL PROGRESS & PROJECT EXECUTION REPORT", logo ? 30 : 11, 9.5);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(8.1);
+  doc.text(report.report.scope_name, logo ? 30 : 11, 15.6);
+  doc.text(`Reporting date: ${fmtDate(report.report.reporting_date)}`, W - 11, 15.6, { align: "right" });
+  doc.setDrawColor(...BORDER); doc.line(10, H - 9.5, W - 10, H - 9.5);
+  doc.setTextColor(...MUTED); doc.setFontSize(6.8);
+  doc.text("SafeCity backend analytics — physical progress only", 10, H - 5);
+  doc.text(`Page ${pageNo} of 2`, W - 10, H - 5, { align: "right" });
 }
 
-function getScopeRows(pageData: DashboardPageData, view: DashboardView, selection?: Selection): ReportRow[] {
-  if (selection?.type === "project") {
-    const p = pageData.projects.find((row) => Number(row.id) === selection.id);
-    return p
-      ? [{ id: p.id, name: projectName(p), physical: pct(p.physical_progress), financial: pct(p.financial_progress), projectCount: 1 }]
-      : [];
-  }
-
-  if (selection?.type === "tehsil") {
-    return filterProjects(pageData, selection).map((p) => ({
-      id: p.id,
-      name: projectName(p),
-      physical: pct(p.physical_progress),
-      financial: pct(p.financial_progress),
-      projectCount: 1,
-    }));
-  }
-
-  if (selection?.type === "district") {
-    return pageData.tehsils
-      .filter((row) => Number(row.district) === selection.id)
-      .map((row) => ({ id: row.id, name: row.name, physical: pct(row.physical_progress), financial: pct(row.financial_progress), projectCount: n(row.project_count) }));
-  }
-
-  if (selection?.type === "division") {
-    return pageData.districts
-      .filter((row) => Number(row.division) === selection.id)
-      .map((row) => ({ id: row.id, name: row.name, physical: pct(row.physical_progress), financial: pct(row.financial_progress), projectCount: n(row.project_count) }));
-  }
-
-  if (view === "projects") {
-    return pageData.projects.map((p) => ({ id: p.id, name: projectName(p), physical: pct(p.physical_progress), financial: pct(p.financial_progress), projectCount: 1 }));
-  }
-
-  const source = view === "divisions" ? pageData.divisions : view === "districts" ? pageData.districts : pageData.tehsils;
-  return source.map((row) => ({ id: row.id, name: row.name, physical: pct(row.physical_progress), financial: pct(row.financial_progress), projectCount: n(row.project_count) }));
+function title(doc: jsPDF, text: string, x: number, y: number) {
+  doc.setTextColor(...NAVY); doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+  doc.text(text, x, y); doc.setDrawColor(...RED); doc.setLineWidth(0.6); doc.line(x, y + 1.8, x + 17, y + 1.8);
 }
 
-function selectedMetric(pageData: DashboardPageData, selection: Selection | undefined, key: "physical_progress" | "financial_progress") {
-  if (!selection) return n(pageData.summary[key]);
-  if (selection.type === "project") return n(pageData.projects.find((r) => Number(r.id) === selection.id)?.[key]);
-  if (selection.type === "tehsil") return n(pageData.tehsils.find((r) => Number(r.id) === selection.id)?.[key]);
-  if (selection.type === "district") return n(pageData.districts.find((r) => Number(r.id) === selection.id)?.[key]);
-  return n(pageData.divisions.find((r) => Number(r.id) === selection.id)?.[key]);
+function card(doc: jsPDF, x: number, y: number, w: number, h: number, label: string, value: string, sub: string, accent: Color = BLUE) {
+  doc.setFillColor(255, 255, 255); doc.setDrawColor(...BORDER); doc.roundedRect(x, y, w, h, 2.2, 2.2, "FD");
+  doc.setFillColor(...accent); doc.roundedRect(x, y, 2.3, h, 1.1, 1.1, "F");
+  doc.setTextColor(...MUTED); doc.setFont("helvetica", "bold"); doc.setFontSize(6.6); doc.text(label.toUpperCase(), x + 5.5, y + 5.8);
+  doc.setTextColor(...TEXT); doc.setFontSize(13.5); doc.text(value, x + 5.5, y + 13.7);
+  doc.setTextColor(...MUTED); doc.setFont("helvetica", "normal"); doc.setFontSize(6.3); doc.text(sub, x + 5.5, y + h - 4.2, { maxWidth: w - 9 });
 }
 
-function scopeTitle(view: DashboardView, selection?: Selection) {
-  if (selection) {
-    const suffix = selection.type === "project" ? "Project" : `${selection.type[0].toUpperCase()}${selection.type.slice(1)}`;
-    return `${selection.name} — ${suffix}`;
+function horizontalBars(
+  doc: jsPDF,
+  rows: Array<{ name: string; value: number; meta?: string }>,
+  x: number, y: number, w: number, maxRows = 7, accent: Color = BLUE, maxValue = 100,
+) {
+  const data = rows.slice(0, maxRows);
+  if (!data.length) {
+    doc.setTextColor(...MUTED); doc.setFont("helvetica", "normal"); doc.setFontSize(7.2);
+    doc.text("No valid backend rows for this comparison.", x, y + 5);
+    return;
   }
-  if (view === "projects") return "All Projects";
-  if (view === "districts") return "All Punjab Districts";
-  if (view === "tehsils") return "All Punjab Tehsils";
-  return "All Punjab Divisions";
-}
-
-function reportRowLabel(view: DashboardView, selection?: Selection) {
-  if (selection?.type === "division") return "District";
-  if (selection?.type === "district") return "Tehsil";
-  if (selection?.type === "tehsil") return "Project";
-  if (selection?.type === "project") return "Project";
-  if (view === "projects") return "Project";
-  if (view === "districts") return "District";
-  if (view === "tehsils") return "Tehsil";
-  return "Division";
-}
-
-function setFill(doc: jsPDF, color: readonly [number, number, number]) {
-  doc.setFillColor(color[0], color[1], color[2]);
-}
-
-function drawPageChrome(doc: jsPDF, pageNo: number, title: string, logo: string | null) {
-  const width = doc.internal.pageSize.getWidth();
-  const height = doc.internal.pageSize.getHeight();
-
-  doc.setFillColor(...LIGHT);
-  doc.rect(0, 0, width, height, "F");
-  doc.setFillColor(...NAVY);
-  doc.rect(0, 0, width, 22, "F");
-  doc.setFillColor(...RED);
-  doc.rect(0, 22, width, 1.4, "F");
-
-  if (logo) {
-    try { doc.addImage(logo, "PNG", 10, 3.5, 15, 15); } catch { /* ignore logo errors */ }
-  }
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.text("PSCA PROJECT PROGRESS & PERFORMANCE REPORT", logo ? 30 : 11, 10.2);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.text(title, logo ? 30 : 11, 16.2);
-
-  doc.setDrawColor(...BORDER);
-  doc.line(10, height - 10, width - 10, height - 10);
-  doc.setTextColor(...MUTED);
-  doc.setFontSize(7.5);
-  doc.text(`Generated ${new Date().toLocaleString()}`, 10, height - 5.5);
-  doc.text(`Page ${pageNo} of 2`, width - 10, height - 5.5, { align: "right" });
-}
-
-function card(doc: jsPDF, x: number, y: number, w: number, h: number, label: string, value: string, sub?: string, accent: readonly [number, number, number] = BLUE) {
-  doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(...BORDER);
-  doc.roundedRect(x, y, w, h, 2.3, 2.3, "FD");
-  doc.setFillColor(...accent);
-  doc.roundedRect(x, y, 2.4, h, 1.2, 1.2, "F");
-  doc.setTextColor(...MUTED);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
-  doc.text(label.toUpperCase(), x + 6, y + 6.5);
-  doc.setTextColor(...TEXT);
-  doc.setFontSize(16);
-  doc.text(value, x + 6, y + 15.5);
-  if (sub) {
-    doc.setTextColor(...MUTED);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.3);
-    doc.text(sub, x + 6, y + h - 4.5, { maxWidth: w - 10 });
-  }
-}
-
-function sectionTitle(doc: jsPDF, text: string, x: number, y: number) {
-  doc.setTextColor(...NAVY);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10.2);
-  doc.text(text, x, y);
-  doc.setDrawColor(...RED);
-  doc.setLineWidth(0.65);
-  doc.line(x, y + 2, x + 18, y + 2);
-}
-
-function horizontalBars(doc: jsPDF, rows: ReportRow[], metric: "physical" | "financial", x: number, y: number, w: number, maxRows = 7) {
-  const ordered = [...rows].sort((a, b) => b[metric] - a[metric]).slice(0, maxRows);
-  const labelW = Math.min(54, w * 0.42);
-  const barW = w - labelW - 19;
-  const rowH = 8.3;
-  ordered.forEach((row, index) => {
-    const yy = y + index * rowH;
-    doc.setTextColor(...TEXT);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.2);
-    const label = row.name.length > 30 ? `${row.name.slice(0, 28)}…` : row.name;
-    doc.text(label, x, yy + 4.8, { maxWidth: labelW - 2 });
-    doc.setFillColor(229, 234, 242);
-    doc.roundedRect(x + labelW, yy + 1.4, barW, 4.2, 1.2, 1.2, "F");
-    setFill(doc, metric === "physical" ? BLUE : RED);
-    doc.roundedRect(x + labelW, yy + 1.4, barW * (pct(row[metric]) / 100), 4.2, 1.2, 1.2, "F");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.3);
-    doc.text(`${pct(row[metric]).toFixed(1)}%`, x + labelW + barW + 3, yy + 4.8);
+  const labelW = Math.min(48, w * 0.38); const barW = w - labelW - 20; const rowH = 8;
+  data.forEach((row, i) => {
+    const yy = y + i * rowH;
+    doc.setTextColor(...TEXT); doc.setFont("helvetica", "normal"); doc.setFontSize(6.8);
+    const name = row.name.length > 27 ? `${row.name.slice(0, 25)}…` : row.name;
+    doc.text(name, x, yy + 4.5, { maxWidth: labelW - 2 });
+    doc.setFillColor(229, 234, 242); doc.roundedRect(x + labelW, yy + 1.2, barW, 4, 1, 1, "F");
+    doc.setFillColor(...accent); doc.roundedRect(x + labelW, yy + 1.2, barW * Math.min(1, Math.max(0, row.value / Math.max(maxValue, 1))), 4, 1, 1, "F");
+    doc.setTextColor(...TEXT); doc.setFont("helvetica", "bold"); doc.setFontSize(6.8);
+    doc.text(`${row.value.toFixed(maxValue === 100 ? 1 : 0)}${maxValue === 100 ? "%" : ""}`, x + labelW + barW + 2, yy + 4.5);
+    if (row.meta) { doc.setTextColor(...MUTED); doc.setFont("helvetica", "normal"); doc.setFontSize(5.7); doc.text(row.meta, x + labelW, yy + 7.2); }
   });
-  if (ordered.length === 0) {
-    doc.setTextColor(...MUTED);
-    doc.setFontSize(8);
-    doc.text("No records available for this scope.", x, y + 8);
-  }
 }
 
-function statusStrip(doc: jsPDF, projects: DashboardProject[], x: number, y: number, w: number) {
-  const counts = {
-    completed: projects.filter((p) => p.status === "completed").length,
-    inProgress: projects.filter((p) => p.status === "in_progress").length,
-    delayed: projects.filter((p) => p.status === "in_delay" || p.has_delay).length,
-    pending: projects.filter((p) => p.status === "pending").length,
-  };
-  const total = Math.max(1, projects.length);
-  const segments = [
-    { label: "Completed", value: counts.completed, color: GREEN },
-    { label: "In Progress", value: counts.inProgress, color: BLUE },
-    { label: "Delayed", value: counts.delayed, color: RED },
-    { label: "Pending", value: counts.pending, color: AMBER },
-  ] as const;
+function distributionBars(doc: jsPDF, report: PhysicalReportData, x: number, y: number, w: number) {
+  const rows = report.progress_distribution;
+  const max = Math.max(...rows.map((r) => r.count), 1);
+  horizontalBars(doc, rows.map((r) => ({ name: r.bucket, value: r.count })), x, y, w, 6, BLUE, max);
+}
 
-  let cursor = x;
-  for (const s of segments) {
-    const sw = w * (s.value / total);
-    if (sw > 0) {
-      setFill(doc, s.color);
-      doc.rect(cursor, y, sw, 6, "F");
-      cursor += sw;
-    }
-  }
-  doc.setDrawColor(...BORDER);
-  doc.rect(x, y, w, 6);
-
-  let lx = x;
-  segments.forEach((s) => {
-    setFill(doc, s.color);
-    doc.circle(lx + 1.5, y + 12, 1.5, "F");
-    doc.setTextColor(...TEXT);
-    doc.setFontSize(7.2);
-    doc.text(`${s.label}: ${s.value}`, lx + 4.5, y + 13.3);
-    lx += w / 4;
+function rankingList(doc: jsPDF, rows: PhysicalReportData["top_projects"], x: number, y: number, w: number, accent: Color = BLUE) {
+  rows.slice(0, 5).forEach((row, i) => {
+    const yy = y + i * 9;
+    doc.setFillColor(255,255,255); doc.setDrawColor(...BORDER); doc.roundedRect(x, yy, w, 7.2, 1.4, 1.4, "FD");
+    doc.setFillColor(...accent); doc.circle(x + 3.8, yy + 3.6, 1.1, "F");
+    doc.setTextColor(...TEXT); doc.setFont("helvetica", "normal"); doc.setFontSize(6.8);
+    const name = row.project_name.length > 28 ? `${row.project_name.slice(0, 26)}…` : row.project_name;
+    doc.text(name, x + 7, yy + 4.5);
+    doc.setFont("helvetica", "bold"); doc.text(`${row.physical_progress.toFixed(2)}%`, x + w - 4, yy + 4.5, { align: "right" });
   });
-  return counts;
 }
 
-function deterministicInsights(scope: string, physical: number, financial: number, projects: DashboardProject[], rows: ReportRow[]) {
-  const delayed = projects.filter((p) => p.status === "in_delay" || p.has_delay).length;
-  const completed = projects.filter((p) => p.status === "completed").length;
-  const best = [...rows].sort((a, b) => b.physical - a.physical)[0];
-  const lowest = [...rows].sort((a, b) => a.physical - b.physical)[0];
-  const gap = physical - financial;
-  const insights = [
-    `${scope} reports ${physical.toFixed(2)}% physical progress across ${projects.length} project${projects.length === 1 ? "" : "s"}.`,
-    `${completed} project${completed === 1 ? " is" : "s are"} completed and ${delayed} project${delayed === 1 ? " has" : "s have"} a recorded delay flag in the current dashboard data.`,
+function scatterMatrix(doc: jsPDF, rows: PhysicalReportData["execution_matrix"], x: number, y: number, w: number, h: number) {
+  doc.setDrawColor(...BORDER); doc.setFillColor(255,255,255); doc.roundedRect(x, y, w, h, 2, 2, "FD");
+  const px = x + 13, py = y + 6, pw = w - 20, ph = h - 15;
+  doc.setDrawColor(190,199,214); doc.line(px, py + ph, px + pw, py + ph); doc.line(px, py, px, py + ph);
+  doc.setDrawColor(220,225,234); doc.line(px, py + ph, px + pw, py); // 1:1 reference
+  doc.setTextColor(...MUTED); doc.setFontSize(5.8); doc.text("Planned time elapsed %", px + pw / 2, y + h - 2, { align: "center" });
+  doc.text("100", px - 2, py + 2, { align: "right" }); doc.text("0", px - 2, py + ph, { align: "right" });
+  doc.text("0", px, py + ph + 4); doc.text("100", px + pw, py + ph + 4, { align: "right" });
+  rows.slice(0, 30).forEach((row, i) => {
+    const sx = px + (clampPct(row.planned_time_elapsed_pct) / 100) * pw;
+    const sy = py + ph - (clampPct(row.physical_progress) / 100) * ph;
+    const pointColor: Color = row.variance_points < -10 ? RED : row.variance_points > 10 ? GREEN : BLUE;
+    doc.setFillColor(pointColor[0], pointColor[1], pointColor[2]);
+    doc.circle(sx, sy, 1.3, "F");
+    if (i < 6) { doc.setTextColor(...MUTED); doc.setFontSize(5.2); const label = row.project_name.slice(0, 14); doc.text(label, sx + 1.7, sy - 1); }
+  });
+}
+
+function exceptionBars(doc: jsPDF, report: PhysicalReportData, x: number, y: number, w: number) {
+  const rows = [
+    { name: "Past finish, incomplete", value: report.schedule.past_finish_incomplete },
+    { name: "Not started after planned start", value: report.schedule.not_started_after_planned_start },
+    { name: "Missing progress date", value: report.data_currency.activities_without_progress_date },
   ];
-  if (best) insights.push(`Highest physical progress in the current comparison is ${best.name} at ${best.physical.toFixed(2)}%.`);
-  if (lowest && lowest.id !== best?.id) insights.push(`Lowest physical progress in the current comparison is ${lowest.name} at ${lowest.physical.toFixed(2)}%.`);
-  insights.push(`Physical progress is ${Math.abs(gap).toFixed(2)} percentage points ${gap >= 0 ? "above" : "below"} the current dashboard financial progress indicator.`);
-  return insights;
+  const max = Math.max(...rows.map((r) => r.value), 1);
+  horizontalBars(doc, rows, x, y, w, 3, AMBER, max);
 }
 
-export async function exportProgressReport({ pageData, view, selection = null }: ExportProgressReportOptions) {
-  const title = scopeTitle(view, selection);
-  const projects = filterProjects(pageData, selection);
-  const rows = getScopeRows(pageData, view, selection);
-  const physical = pct(selectedMetric(pageData, selection, "physical_progress"));
-  const financial = pct(selectedMetric(pageData, selection, "financial_progress"));
-  const delayed = projects.filter((p) => p.status === "in_delay" || p.has_delay).length;
-  const completed = projects.filter((p) => p.status === "completed").length;
-  const inProgress = projects.filter((p) => p.status === "in_progress").length;
-  const pending = projects.filter((p) => p.status === "pending").length;
+function observations(doc: jsPDF, insights: string[], x: number, y: number, w: number, h: number) {
+  doc.setFillColor(255,255,255); doc.setDrawColor(...BORDER); doc.roundedRect(x, y, w, h, 2, 2, "FD");
+  let yy = y + 6;
+  insights.slice(0, 4).forEach((text) => {
+    doc.setFillColor(...BLUE); doc.circle(x + 4, yy - 1, 1, "F");
+    doc.setTextColor(...TEXT); doc.setFont("helvetica", "normal"); doc.setFontSize(6.6);
+    const lines = doc.splitTextToSize(text, w - 12).slice(0, 2); doc.text(lines, x + 8, yy);
+    yy += Math.max(8, lines.length * 4 + 2);
+  });
+}
 
-  const useBackendRootSummary = !selection;
-  const allocated = useBackendRootSummary
-    ? n(pageData.summary.total_budget)
-    : projects.reduce((sum, p) => sum + n(p.total_budget_allocated), 0);
-  const consumed = useBackendRootSummary
-    ? n(pageData.summary.total_consume)
-    : projects.reduce((sum, p) => sum + n(p.budget_utilized), 0);
-  const remaining = useBackendRootSummary
-    ? n(pageData.summary.remaining_budget)
-    : projects.reduce((sum, p) => sum + n(p.budget_remaining), 0);
-
+export async function exportProgressReport({ view, selection }: ExportProgressReportOptions) {
+  const report = await getPhysicalProgressReport(view, selection ?? null);
   const logo = await imageUrlToDataUrl("/Assets/psca logo.png");
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const W = doc.internal.pageSize.getWidth();
+  const gap = 3.5;
 
-  // PAGE 1 — Executive physical performance
-  drawPageChrome(doc, 1, title, logo);
-  doc.setTextColor(...TEXT);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.text(title, 11, 34);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(...MUTED);
-  doc.text(`Executive progress analysis · Current dashboard scope: ${reportRowLabel(view, selection)}`, 11, 40);
+  // PAGE 1 — Portfolio Physical Performance
+  drawChrome(doc, 1, report, logo);
+  title(doc, "Portfolio physical performance", 11, 32);
+  const cw = (W - 22 - gap * 5) / 6;
+  const cards = [
+    ["Physical Progress", `${report.physical.progress.toFixed(2)}%`, "Authoritative scope progress", BLUE],
+    ["Valid Projects", `${report.physical.valid_projects} / ${report.physical.total_projects}`, "Projects with Primavera physical data", NAVY],
+    ["Active Units", String(report.child_progress.length), "Valid child-scope units", SLATE],
+    ["Completed", String(report.project_status.completed), "Projects at 100%", GREEN],
+    ["In Progress", String(report.project_status.in_progress), "Projects between 0% and 100%", BLUE],
+    ["Delay Flagged", String(report.project_status.with_delay_logs), "Projects with recorded delay logs", report.project_status.with_delay_logs ? RED : GREEN],
+  ] as const;
+  cards.forEach((c, i) => card(doc, 11 + i * (cw + gap), 38, cw, 24, c[0], c[1], c[2], c[3]));
 
-  const gap = 4;
-  const cardW = (W - 22 - gap * 3) / 4;
-  card(doc, 11, 46, cardW, 27, "Physical Progress", `${physical.toFixed(2)}%`, `${(100 - physical).toFixed(2)}% remaining`, BLUE);
-  card(doc, 11 + cardW + gap, 46, cardW, 27, "Financial Progress", `${financial.toFixed(2)}%`, "Current dashboard financial indicator", RED);
-  card(doc, 11 + (cardW + gap) * 2, 46, cardW, 27, "Projects", String(projects.length || pageData.summary.total_projects), `${completed} completed · ${inProgress} in progress`, NAVY);
-  card(doc, 11 + (cardW + gap) * 3, 46, cardW, 27, "Delayed Projects", String(delayed), `${pending} pending`, delayed > 0 ? RED : GREEN);
+  const singleProject = report.report.scope_type === "project";
+  title(doc, singleProject ? "Major WBS physical progress" : "Physical progress by current child scope", 11, 73);
+  const primaryRows = singleProject
+    ? report.wbs_progress.map((r) => ({ name: r.name, value: r.physical_progress, meta: `${r.activity_count} activities` }))
+    : report.child_progress.map((r) => ({ name: r.name, value: r.physical_progress, meta: `${r.valid_projects} valid / ${r.total_projects} total projects` }));
+  horizontalBars(doc, primaryRows, 11, 79, 126, 7, BLUE, 100);
 
-  sectionTitle(doc, "Project status composition", 11, 83);
-  statusStrip(doc, projects, 11, 89, W - 22);
+  title(doc, "Project physical progress distribution", 150, 73);
+  distributionBars(doc, report, 150, 79, W - 161);
 
-  sectionTitle(doc, `Physical progress by ${reportRowLabel(view, selection)}`, 11, 113);
-  horizontalBars(doc, rows, "physical", 11, 119, 132, 7);
+  title(doc, "Top performing projects", 11, 139);
+  rankingList(doc, report.top_projects, 11, 145, 126, BLUE);
+  title(doc, "Projects requiring attention", 150, 139);
+  rankingList(doc, report.bottom_projects, 150, 145, W - 161, AMBER);
 
-  sectionTitle(doc, "Executive analysis", 154, 113);
-  const insights = deterministicInsights(title, physical, financial, projects, rows);
-  let iy = 121;
-  insights.slice(0, 5).forEach((text, idx) => {
-    setFill(doc, idx === 4 ? [254, 242, 242] as const : [255, 255, 255] as const);
-    doc.setDrawColor(...BORDER);
-    doc.roundedRect(154, iy - 5, W - 165, 12.5, 2, 2, "FD");
-    setFill(doc, idx === 4 ? RED : BLUE);
-    doc.circle(158.2, iy + 0.7, 1.35, "F");
-    doc.setTextColor(...TEXT);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    const lines = doc.splitTextToSize(text, W - 177);
-    doc.text(lines.slice(0, 2), 162, iy);
-    iy += 15;
-  });
+  title(doc, "Portfolio observations", 11, 191);
+  observations(doc, report.insights, 11, 196, W - 22, 32);
 
-  // PAGE 2 — Financial / management analysis
+  // PAGE 2 — Execution Performance & Management Exceptions
   doc.addPage("a4", "landscape");
-  drawPageChrome(doc, 2, title, logo);
-  sectionTitle(doc, "Financial position", 11, 34);
-  const financeCardW = (W - 22 - gap * 2) / 3;
-  card(doc, 11, 40, financeCardW, 27, "Allocated Budget", money(allocated), "Current dashboard budget source", NAVY);
-  card(doc, 11 + financeCardW + gap, 40, financeCardW, 27, "Budget Utilized", money(consumed), allocated > 0 ? `${((consumed / allocated) * 100).toFixed(2)}% of allocation` : "No allocation denominator", RED);
-  card(doc, 11 + (financeCardW + gap) * 2, 40, financeCardW, 27, "Remaining Budget", money(remaining), "Reported remaining budget", BLUE);
+  drawChrome(doc, 2, report, logo);
+  title(doc, "Execution performance & management exceptions", 11, 32);
 
-  sectionTitle(doc, `Financial progress by ${reportRowLabel(view, selection)}`, 11, 79);
-  horizontalBars(doc, rows, "financial", 11, 85, 132, 7);
+  const p2w = (W - 22 - gap * 5) / 6;
+  const latest = fmtDate(report.data_currency.latest_progress_date);
+  const p2cards = [
+    ["Schedules", `${report.schedule.projects_with_schedule}/${report.physical.total_projects}`, "Projects with planned activity dates", NAVY],
+    ["Past Finish", String(report.schedule.past_finish_incomplete), "Incomplete activities past planned finish", RED],
+    ["Late Start", String(report.schedule.not_started_after_planned_start), "Not started after planned start", AMBER],
+    ["Completed Activities", String(report.activity_status.completed), `${report.activity_status.total} non-WBS activities`, GREEN],
+    ["In Progress Activities", String(report.activity_status.in_progress), "Backend activity progress", BLUE],
+    ["Latest Update", latest, `${report.data_currency.activities_with_progress_date} activities dated`, SLATE],
+  ] as const;
+  p2cards.forEach((c, i) => card(doc, 11 + i * (p2w + gap), 38, p2w, 24, c[0], c[1], c[2], c[3]));
 
-  sectionTitle(doc, "Physical vs financial alignment", 154, 79);
-  const alignRows: ReportRow[] = [
-    { id: 1, name: "Physical Progress", physical, financial: physical, projectCount: projects.length },
-    { id: 2, name: "Financial Progress", physical: financial, financial, projectCount: projects.length },
-  ];
-  horizontalBars(doc, alignRows, "physical", 154, 87, W - 165, 2);
+  title(doc, "Physical progress vs planned schedule position", 11, 74);
+  scatterMatrix(doc, report.execution_matrix, 11, 80, 132, 58);
+  title(doc, "Schedule exception summary", 154, 74);
+  exceptionBars(doc, report, 154, 82, W - 165);
 
-  const physicalFinancialGap = physical - financial;
-  card(
-    doc,
-    154,
-    111,
-    W - 165,
-    25,
-    "Execution Gap",
-    `${Math.abs(physicalFinancialGap).toFixed(2)} pp`,
-    physicalFinancialGap >= 0 ? "Physical progress is above financial progress" : "Financial progress is above physical progress",
-    Math.abs(physicalFinancialGap) >= 20 ? RED : AMBER,
-  );
+  if (report.delay_analysis.has_data) {
+    title(doc, "Top recorded delay activities", 11, 150);
+    const maxDelay = Math.max(...report.delay_analysis.top_delayed_activities.map((r) => r.delay_days), 1);
+    horizontalBars(doc, report.delay_analysis.top_delayed_activities.map((r) => ({ name: r.activity_name, value: r.delay_days, meta: r.project_name })), 11, 156, 132, 5, RED, maxDelay);
+    title(doc, "Delay days by category", 154, 150);
+    const maxCat = Math.max(...report.delay_analysis.by_category.map((r) => r.delay_days), 1);
+    horizontalBars(doc, report.delay_analysis.by_category.map((r) => ({ name: r.category, value: r.delay_days })), 154, 156, W - 165, 5, AMBER, maxCat);
+  } else if (singleProject && report.wbs_remaining.length) {
+    title(doc, "Largest remaining WBS work", 11, 150);
+    horizontalBars(doc, report.wbs_remaining.map((r) => ({ name: r.name, value: r.remaining_progress, meta: `${r.activity_count} activities` })), 11, 156, 132, 5, AMBER, 100);
+    title(doc, "Top incomplete activities", 154, 150);
+    horizontalBars(doc, report.top_incomplete_activities.map((r) => ({ name: r.activity_name, value: r.remaining_progress })), 154, 156, W - 165, 5, AMBER, 100);
+  } else {
+    title(doc, "Project schedule coverage", 11, 150);
+    const coverageRows = [
+      { name: "Projects with schedule", value: report.schedule.projects_with_schedule },
+      { name: "Projects without schedule", value: report.schedule.projects_without_schedule },
+      { name: "Activities completed", value: report.activity_status.completed },
+      { name: "Activities in progress", value: report.activity_status.in_progress },
+      { name: "Activities not started", value: report.activity_status.not_started },
+    ];
+    horizontalBars(doc, coverageRows, 11, 156, 132, 5, BLUE, Math.max(...coverageRows.map((r) => r.value), 1));
+    title(doc, "Data currency", 154, 150);
+    doc.setFillColor(255,255,255); doc.setDrawColor(...BORDER); doc.roundedRect(154, 156, W - 165, 40, 2, 2, "FD");
+    const currency = [
+      ["Latest recorded update", latest],
+      ["Activities with progress date", String(report.data_currency.activities_with_progress_date)],
+      ["Activities without progress date", String(report.data_currency.activities_without_progress_date)],
+    ];
+    currency.forEach((r, i) => { doc.setTextColor(...MUTED); doc.setFontSize(6.8); doc.text(r[0], 160, 164 + i * 9); doc.setTextColor(...TEXT); doc.setFont("helvetica", "bold"); doc.text(r[1], W - 17, 164 + i * 9, { align: "right" }); doc.setFont("helvetica", "normal"); });
+    if (report.data_currency.activities_without_progress_date > report.data_currency.activities_with_progress_date) {
+      doc.setTextColor(...MUTED); doc.setFontSize(6.4); doc.text("Progress-date coverage is limited in the current dataset.", 160, 191);
+    }
+  }
 
-  sectionTitle(doc, "Management attention", 154, 148);
-  const attention = [
-    delayed > 0 ? `${delayed} project${delayed === 1 ? " has" : "s have"} a recorded delay flag.` : "No projects in the current scope carry a recorded delay flag.",
-    rows.length > 0 ? `${rows.filter((r) => r.physical < 25).length} ${reportRowLabel(view, selection).toLowerCase()} record${rows.filter((r) => r.physical < 25).length === 1 ? "s" : ""} are below 25% physical progress.` : "No comparison rows are available.",
-    allocated > 0 ? `${((remaining / allocated) * 100).toFixed(2)}% of the reported allocated budget remains.` : "No allocated budget is available for ratio analysis.",
-  ];
-  let ay = 155;
-  attention.forEach((text) => {
-    doc.setFillColor(255, 255, 255);
-    doc.setDrawColor(...BORDER);
-    doc.roundedRect(154, ay - 5, W - 165, 11.5, 2, 2, "FD");
-    doc.setFillColor(...RED);
-    doc.circle(158.2, ay + 0.4, 1.25, "F");
-    doc.setTextColor(...TEXT);
-    doc.setFontSize(7.4);
-    doc.text(doc.splitTextToSize(text, W - 177).slice(0, 2), 162, ay);
-    ay += 13.5;
-  });
+  title(doc, "Management attention", 11, 207);
+  const facts: string[] = [];
+  if (report.schedule.past_finish_incomplete) facts.push(`${report.schedule.past_finish_incomplete} activities are past planned finish and remain incomplete.`);
+  if (report.schedule.not_started_after_planned_start) facts.push(`${report.schedule.not_started_after_planned_start} activities have not started after their planned start date.`);
+  if (report.delay_analysis.has_data) facts.push(`${report.delay_analysis.affected_projects} projects have recorded delay logs totalling ${report.delay_analysis.total_delay_days} delay days.`);
+  if (!facts.length) facts.push("No schedule or recorded-delay exception was returned for the selected scope.");
+  observations(doc, facts, 11, 212, W - 22, 17);
 
-  doc.setTextColor(...MUTED);
-  doc.setFontSize(7.2);
-  doc.text(
-    "Data note: this report visualizes the current dashboard API values for the selected scope. It does not independently recalculate the authoritative physical hierarchy.",
-    11,
-    190,
-    { maxWidth: 132 },
-  );
-
-  const safeTitle = title.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
-  doc.save(`PSCA-Progress-Report-${safeTitle || view}-${new Date().toISOString().slice(0, 10)}.pdf`);
+  const safe = report.report.scope_name.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
+  doc.save(`PSCA-Physical-Progress-Report-${safe || view}-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
