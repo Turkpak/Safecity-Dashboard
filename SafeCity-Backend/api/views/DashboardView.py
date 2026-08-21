@@ -494,6 +494,33 @@ def _project_scope_summary(project_rows):
 # Hierarchy
 # ============================================================
 
+def _average_metric_rows(rows):
+    """Average progress equally across the supplied child rows."""
+    if not rows:
+        return {
+            "project_count": 0,
+            "physical_progress": 0.0,
+            "financial_progress": 0.0,
+            "overall_progress": 0.0,
+        }
+
+    return {
+        "project_count": sum(row.get("project_count", 1) for row in rows),
+        "physical_progress": round(
+            sum(row.get("physical_progress", 0.0) for row in rows) / len(rows),
+            2,
+        ),
+        "financial_progress": round(
+            sum(row.get("financial_progress", 0.0) for row in rows) / len(rows),
+            2,
+        ),
+        "overall_progress": round(
+            sum(row.get("overall_progress", 0.0) for row in rows) / len(rows),
+            2,
+        ),
+    }
+
+
 def _all_hierarchy_rows(
     page,
     project_rows
@@ -570,32 +597,81 @@ def _all_hierarchy_rows(
             for row in project_rows
         ]
 
-    grouped = defaultdict(list)
-
+    # Build bottom-up metrics so each level is calculated from its immediate
+    # children instead of being weighted by the number of projects.
+    projects_by_tehsil = defaultdict(list)
     for row in project_rows:
+        if row.get("tehsil") is not None:
+            projects_by_tehsil[row["tehsil"]].append(row)
 
+    tehsil_metrics = {
+        tehsil_id: _average_metric_rows(
+            projects_by_tehsil.get(tehsil_id, [])
+        )
+        for tehsil_id in Tehsil.objects.values_list("id", flat=True)
+    }
+
+    district_children = defaultdict(list)
+    for tehsil_id, district_id in Tehsil.objects.values_list(
+        "id", "district_id"
+    ):
+        district_children[district_id].append(tehsil_metrics[tehsil_id])
+
+    district_metrics = {
+        district_id: _average_metric_rows(rows)
+        for district_id, rows in district_children.items()
+    }
+
+    division_children = defaultdict(list)
+    for district_id, division_id in District.objects.values_list(
+        "id", "division_id"
+    ):
+        division_children[division_id].append(district_metrics[district_id])
+
+    division_metrics = {
+        division_id: _average_metric_rows(rows)
+        for division_id, rows in division_children.items()
+    }
+
+    province_children = defaultdict(list)
+    for division_id, province_id in Division.objects.values_list(
+        "id", "province_id"
+    ):
+        province_children[province_id].append(division_metrics[division_id])
+
+    province_metrics = {
+        province_id: _average_metric_rows(rows)
+        for province_id, rows in province_children.items()
+    }
+
+    metric_maps = {
+        "provinces": province_metrics,
+        "divisions": division_metrics,
+        "districts": district_metrics,
+        "tehsils": tehsil_metrics,
+    }
+
+    project_groups = defaultdict(list)
+    for row in project_rows:
         value = row.get(key)
-
         if value is not None:
-            grouped[value].append(row)
+            project_groups[value].append(row)
+
+    grouped = metric_maps[page]
 
     rows = []
 
     for obj in objects:
 
-        scoped = grouped.get(
-            obj.id,
-            []
-        )
-
-        summary = _project_scope_summary(
-            scoped
-        )
+        summary = grouped.get(obj.id)
+        if summary is None:
+            summary = _project_scope_summary(project_groups.get(obj.id, []))
+            summary["project_count"] = summary["total_projects"]
 
         row = {
             "id": obj.id,
             "name": getattr(obj, name_attr),
-            "project_count": summary["total_projects"],
+            "project_count": summary["project_count"],
             "physical_progress": summary["physical_progress"],
             "financial_progress": summary["financial_progress"],
             "overall_progress": summary["overall_progress"],
@@ -881,7 +957,8 @@ class DashboardPageDataView(APIView):
 
         best_projects = _top_projects(
             project_rows,
-            6
+            limit=6,
+            minimum_overall=0.0,
         )
 
         # ----------------------------------------------------

@@ -820,13 +820,13 @@ const ganttProgressByProjectId = useMemo(() => {
   const map = new Map<number, number>();
   for (const row of pageData?.projects ?? []) {
     const id = Number((row as any).id);
-    const v = Number((row as any).physical_progress ?? 0);
+    const v = Number((row as any).overall_progress ?? 0);
     map.set(id, Number.isFinite(v) ? v : 0);
   }
   return map;
 }, [pageData]);
 
-  // All Projects overall % (average of root task `_id:"1"` progress across projects)
+  // All Projects overall % (average of backend-calculated project values)
   const allProjectsOverallFromGantt = useMemo(() => {
     if (apiProjects.length === 0) return 0;
     let sum = 0;
@@ -1209,22 +1209,6 @@ const ganttProgressByProjectId = useMemo(() => {
     }
   };
 
-  // Helper: calculate overall financial progress from a set of projects
-  const calcProjectsOverall = (projects: Project[]): number => {
-    const clampPct = (n: number) => Math.max(0, Math.min(100, n));
-
-    // Required source of truth: nested gantt root task `_id:"1"` progress per project.
-    let sum = 0;
-    let count = 0;
-    for (const p of projects) {
-      const v = ganttProgressByProjectId.get(p.id);
-      if (v === undefined) continue;
-      sum += v;
-      count++;
-    }
-    return count > 0 ? clampPct(sum / count) : 0;
-  };
-
   const distributionChart = useMemo(() => {
     if (!selectedItemType || !selectedItemId) return null;
 
@@ -1237,16 +1221,11 @@ const ganttProgressByProjectId = useMemo(() => {
     const roundPct = (n: number) => Math.max(0, Math.min(100, Number(n.toFixed(2))));
 
     const tehsilOverall = (tehsilId: number): number => {
-      const tehsilProjects = apiProjects.filter((p) => p.tehsil === tehsilId);
-      if (tehsilProjects.length === 0) return 0;
-      return calcProjectsOverall(tehsilProjects);
+      return apiTehsils.find((tehsil) => tehsil.id === tehsilId)?.overall_progress ?? 0;
     };
 
     const districtOverallFromTehsils = (districtId: number): number => {
-      const distTehsils = apiTehsils.filter((t) => t.district === districtId);
-      if (distTehsils.length === 0) return 0;
-      const tehsilOveralls = distTehsils.map((t) => tehsilOverall(t.id));
-      return avg(tehsilOveralls);
+      return apiDistricts.find((district) => district.id === districtId)?.overall_progress ?? 0;
     };
 
     if (selectedItemType === "division") {
@@ -1338,12 +1317,7 @@ const ganttProgressByProjectId = useMemo(() => {
         Number((b as any).overall_progress ?? 0) - Number((a as any).overall_progress ?? 0),
     );
 
-    const qaFallbackProjects = sortedProjects.slice(0, 6);
-    const qualifiedProjects = sortedProjects.filter(
-      (project) => Number((project as any).overall_progress ?? 0) >= 80,
-    );
-
-    return qualifiedProjects.length > 0 ? qualifiedProjects.slice(0, 6) : qaFallbackProjects;
+    return sortedProjects.slice(0, 6);
   }, [apiProjects, projectsInSelectedGeography, selectedItemId, selectedItemType]);
 
   const visibleTopProjects =
@@ -1351,25 +1325,10 @@ const ganttProgressByProjectId = useMemo(() => {
 
   // Get aggregated data based on view type (all projects)
   const aggregatedData = useMemo(() => {
-    // Use the backend's pre-calculated progress for all items in the current view
-    if (viewType === "divisions" && apiDivisions.length > 0) {
-      const allProgress = apiDivisions.map((d) => d.overall_progress ?? 0);
-      const avg = allProgress.length > 0 ? allProgress.reduce((a, b) => a + b) / allProgress.length : 0;
-      return generateCityDataFromOverall(avg);
-    }
-    if (viewType === "districts" && apiDistricts.length > 0) {
-      const allProgress = apiDistricts.map((d) => d.overall_progress ?? 0);
-      const avg = allProgress.length > 0 ? allProgress.reduce((a, b) => a + b) / allProgress.length : 0;
-      return generateCityDataFromOverall(avg);
-    }
-    if (viewType === "tehsils" && apiTehsils.length > 0) {
-      const allProgress = apiTehsils.map((t) => t.overall_progress ?? 0);
-      const avg = allProgress.length > 0 ? allProgress.reduce((a, b) => a + b) / allProgress.length : 0;
-      return generateCityDataFromOverall(avg);
-    }
-    // Default: all projects
-    return generateCityDataFromOverall(allProjectsOverallFromGantt);
-  }, [viewType, apiDivisions, apiDistricts, apiTehsils, allProjectsOverallFromGantt]);
+    return generateCityDataFromOverall(
+      Number(pageData?.summary?.overall_progress ?? allProjectsOverallFromGantt),
+    );
+  }, [pageData, allProjectsOverallFromGantt]);
 
   /** Top projects by budget utilization for root "All Punjab *" views (real API data, not duplicate phase placeholders). */
   const topProjectsForAggregateViews = useMemo((): Project[] => {
@@ -1388,21 +1347,13 @@ const ganttProgressByProjectId = useMemo(() => {
 
   // Overall for All Punjab Divisions (average of division overalls)
   const allDivisionsOverall = useMemo(() => {
-    if (apiDivisions.length === 0) return 0;
-    const activeWithProgress = apiDivisions.filter((d) => (d.overall_progress ?? 0) > 0 || d.project_count > 0);
-    if (activeWithProgress.length === 0) return 0;
-    const sum = activeWithProgress.reduce((acc, d) => acc + (d.overall_progress ?? 0), 0);
-    return sum / activeWithProgress.length;
-  }, [apiDivisions]);
+    return Number(pageData?.summary?.overall_progress ?? 0);
+  }, [pageData]);
 
   // Overall for All Punjab Districts (average of district overalls)
   const allDistrictsOverall = useMemo(() => {
-    if (apiDistricts.length === 0) return 0;
-    const activeWithProgress = apiDistricts.filter((d) => (d.overall_progress ?? 0) > 0 || d.project_count > 0);
-    if (activeWithProgress.length === 0) return 0;
-    const sum = activeWithProgress.reduce((acc, d) => acc + (d.overall_progress ?? 0), 0);
-    return sum / activeWithProgress.length;
-  }, [apiDistricts]);
+    return Number(pageData?.summary?.overall_progress ?? 0);
+  }, [pageData]);
 
   // Context theme: follow the currently visible/selected area overall %
   const contextOverall = useMemo(() => {
@@ -1679,9 +1630,6 @@ const ganttProgressByProjectId = useMemo(() => {
       const n = Number(v);
       return Number.isFinite(n) ? n : 0;
     };
-    const getActivityProgress = (a: any): number =>
-      clamp01(num(a?.progress ?? a?.percent_complete ?? 0));
-
     // Financial utilization % (All divisions / scoped)
     const sumBudgetAllocated = scopeProjects.reduce(
       (acc, p) => acc + num((p as any)?.total_budget_allocated),
@@ -1694,21 +1642,14 @@ const ganttProgressByProjectId = useMemo(() => {
     const utilizationPct =
       sumBudgetAllocated > 0 ? clamp01((sumBudgetUtilized / sumBudgetAllocated) * 100) : 0;
 
-    // Physical progress %: average of activity progresses (project-level avg, then avg across projects)
+    // Physical progress % from the backend project metrics.
     const physicalPct = (() => {
       if (!scopeProjects.length) return 0;
-      let sum = 0;
-      for (const p of scopeProjects) {
-        const acts: any[] = Array.isArray((p as any)?.activities) ? (p as any).activities : [];
-        if (acts.length === 0) {
-          sum += 0;
-          continue;
-        }
-        const projAvg =
-          acts.reduce((acc, a) => acc + getActivityProgress(a), 0) / Math.max(1, acts.length);
-        sum += projAvg;
-      }
-      return clamp01(sum / Math.max(1, scopeProjects.length));
+      const total = scopeProjects.reduce(
+        (sum, project) => sum + num((project as any)?.physical_progress),
+        0,
+      );
+      return clamp01(total / scopeProjects.length);
     })();
 
     // Calculate overall planned and actual from all phases
@@ -1743,7 +1684,7 @@ const ganttProgressByProjectId = useMemo(() => {
 
     // Overall progress donut (physical, percent-based)
     const overallPlannedPct = 100;
-    const overallActualPct = physicalPct;
+    const overallActualPct = clamp01(num(data.overall));
     const overallVariancePct = Math.max(0, 100 - overallActualPct);
     const overallMax = Math.max(overallPlannedPct, overallActualPct);
     const overallTotalForPie = overallMax + overallVariancePct;
@@ -1898,7 +1839,7 @@ const ganttProgressByProjectId = useMemo(() => {
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
-              No project is currently above the 80% best-performing threshold for this dashboard view.
+              No projects are available for this dashboard view.
             </div>
           )}
 
@@ -3091,10 +3032,7 @@ const ganttProgressByProjectId = useMemo(() => {
               const districtTehsilsData = apiTehsils
                 .filter((t) => t.district === selectedItemId)
                 .map((teh, index) => {
-                  const projects = apiProjects.filter(
-                    (p) => p.tehsil === teh.id,
-                  );
-                  const overall = calcProjectsOverall(projects);
+                  const overall = teh.overall_progress ?? 0;
                   return {
                     id: teh.id,
                     name: teh.tehsil_name,
