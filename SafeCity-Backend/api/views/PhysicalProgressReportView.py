@@ -245,12 +245,17 @@ def _activity_analytics(projects, physical_map, reporting_date):
         by_project[activity.project_id].append(activity)
 
     execution_matrix = []
+    execution_watchlist = []
     projects_with_schedule = 0
+    projects_behind_elapsed_position = 0
+    projects_at_or_ahead_elapsed_position = 0
+
     for project in projects:
         rows = by_project.get(project.id, [])
         dated = [a for a in rows if a.start_date and a.end_date]
         if not dated or project.id not in physical_map:
             continue
+
         start = min(a.start_date for a in dated)
         finish = max(a.end_date for a in dated)
         planned_days = max((finish - start).days + 1, 1)
@@ -258,13 +263,57 @@ def _activity_analytics(projects, physical_map, reporting_date):
         elapsed_pct = _clamp((elapsed_days / planned_days) * 100)
         projects_with_schedule += 1
         physical = physical_map[project.id]
-        execution_matrix.append({
+        variance = round(physical - elapsed_pct, 2)
+
+        project_past_finish = 0
+        project_late_start = 0
+        project_completed = 0
+        project_in_progress = 0
+        project_not_started = 0
+        project_dated_updates = 0
+        for activity in rows:
+            progress = normalize_progress_to_percent(activity.progress)
+            if progress >= 100:
+                project_completed += 1
+            elif progress > 0:
+                project_in_progress += 1
+            else:
+                project_not_started += 1
+            if activity.end_date and activity.end_date < reporting_date and progress < 100:
+                project_past_finish += 1
+            if activity.start_date and activity.start_date < reporting_date and progress <= 0:
+                project_late_start += 1
+            if activity.progress_date:
+                project_dated_updates += 1
+
+        if variance < 0:
+            projects_behind_elapsed_position += 1
+        else:
+            projects_at_or_ahead_elapsed_position += 1
+
+        matrix_row = {
             "project_id": project.id,
             "project_name": _project_name(project),
             "physical_progress": physical,
             "planned_time_elapsed_pct": round(elapsed_pct, 2),
-            "variance_points": round(physical - elapsed_pct, 2),
-        })
+            "variance_points": variance,
+            "planned_start": start.isoformat(),
+            "planned_finish": finish.isoformat(),
+            "activity_count": len(rows),
+            "completed_activities": project_completed,
+            "in_progress_activities": project_in_progress,
+            "not_started_activities": project_not_started,
+            "past_finish_incomplete": project_past_finish,
+            "not_started_after_planned_start": project_late_start,
+            "activities_with_progress_date": project_dated_updates,
+        }
+        execution_matrix.append(matrix_row)
+        execution_watchlist.append(matrix_row)
+
+    execution_watchlist = sorted(
+        execution_watchlist,
+        key=lambda x: (x["variance_points"], -x["past_finish_incomplete"], -x["not_started_after_planned_start"], x["project_name"]),
+    )[:6]
 
     delays = list(
         ActivityDelayLog.objects.filter(project_id__in=project_ids)
@@ -311,12 +360,16 @@ def _activity_analytics(projects, physical_map, reporting_date):
             "projects_without_schedule": max(len(projects) - projects_with_schedule, 0),
             "past_finish_incomplete": past_finish_incomplete,
             "not_started_after_planned_start": not_started_after_planned_start,
+            "projects_behind_elapsed_position": projects_behind_elapsed_position,
+            "projects_at_or_ahead_elapsed_position": projects_at_or_ahead_elapsed_position,
         },
         "execution_matrix": sorted(execution_matrix, key=lambda x: x["variance_points"]),
+        "execution_watchlist": execution_watchlist,
         "data_currency": {
             "latest_progress_date": latest_progress_date.isoformat() if latest_progress_date else None,
             "activities_with_progress_date": activities_with_progress_date,
             "activities_without_progress_date": max(len(activities) - activities_with_progress_date, 0),
+            "coverage_pct": round((activities_with_progress_date / len(activities)) * 100, 2) if activities else 0.0,
         },
         "delay_analysis": {
             "has_data": bool(delays),
@@ -329,14 +382,13 @@ def _activity_analytics(projects, physical_map, reporting_date):
         },
     }
 
-
 def _project_wbs(project_id):
     activities = list(
         ProjectActivity.objects.filter(project_id=project_id)
-        .only("id", "parent_id", "activity_name", "activity_id", "task_type", "progress", "duration")
+        .only("id", "parent_id", "activity_name", "activity_id", "task_type", "progress", "duration", "start_date", "end_date", "actual_start", "actual_end")
     )
     if not activities:
-        return [], [], []
+        return [], [], [], []
 
     by_parent = defaultdict(list)
     by_id = {a.id: a for a in activities}
@@ -371,17 +423,19 @@ def _project_wbs(project_id):
         weight = sum(max(float(a.duration or 1), 1.0) for a in leaves)
         weighted = sum(normalize_progress_to_percent(a.progress) * max(float(a.duration or 1), 1.0) for a in leaves)
         progress = round(weighted / weight, 2) if weight else 0.0
+        name = wbs.activity_name or wbs.activity_id or f"WBS {wbs.id}"
         progress_rows.append({
             "id": wbs.id,
-            "name": wbs.activity_name or wbs.activity_id or f"WBS {wbs.id}",
+            "name": name,
             "physical_progress": progress,
             "remaining_progress": round(max(0.0, 100.0 - progress), 2),
             "activity_count": len(leaves),
         })
         contribution_rows.append({
             "id": wbs.id,
-            "name": wbs.activity_name or wbs.activity_id or f"WBS {wbs.id}",
+            "name": name,
             "contribution_points": round(weighted / project_weight, 2),
+            "duration_share_pct": round((weight / project_weight) * 100, 2),
         })
 
     for activity in project_leaf:
@@ -392,12 +446,15 @@ def _project_wbs(project_id):
                 "activity_name": activity.activity_name or activity.activity_id or f"Activity {activity.id}",
                 "physical_progress": round(progress, 2),
                 "remaining_progress": round(100.0 - progress, 2),
+                "planned_start": activity.start_date.isoformat() if activity.start_date else None,
+                "planned_finish": activity.end_date.isoformat() if activity.end_date else None,
             })
 
     return (
         sorted(progress_rows, key=lambda x: (-x["physical_progress"], x["name"])),
         sorted(progress_rows, key=lambda x: (-x["remaining_progress"], x["name"])),
-        sorted(incomplete, key=lambda x: (-x["remaining_progress"], x["activity_name"]))[:5],
+        sorted(contribution_rows, key=lambda x: (-x["contribution_points"], x["name"])),
+        sorted(incomplete, key=lambda x: (-x["remaining_progress"], x["activity_name"]))[:6],
     )
 
 
@@ -455,9 +512,10 @@ class PhysicalProgressReportView(APIView):
 
         wbs_progress = []
         wbs_remaining = []
+        wbs_contribution = []
         top_incomplete_activities = []
         if scope_type == "project" and scope_id:
-            wbs_progress, wbs_remaining, top_incomplete_activities = _project_wbs(scope_id)
+            wbs_progress, wbs_remaining, wbs_contribution, top_incomplete_activities = _project_wbs(scope_id)
 
         low_count = sum(item["count"] for item in distribution if item["bucket"] in {"0%", ">0–25%"})
         high_count = sum(item["count"] for item in distribution if item["bucket"] in {">75–<100%", "100%"})
@@ -471,6 +529,9 @@ class PhysicalProgressReportView(APIView):
             insights.append(f"{low_count} valid projects are at or below 25% physical progress; {high_count} are above 75% or complete.")
         if activity["schedule"]["past_finish_incomplete"]:
             insights.append(f"{activity['schedule']['past_finish_incomplete']} activities are past planned finish and remain incomplete as of the reporting date.")
+        if activity["execution_matrix"]:
+            behind = activity["schedule"]["projects_behind_elapsed_position"]
+            insights.append(f"{behind} of {len(activity['execution_matrix'])} scheduled projects currently have physical progress below their elapsed planned-time position.")
 
         payload = {
             "report": {
@@ -499,10 +560,12 @@ class PhysicalProgressReportView(APIView):
             "activity_status": activity["activity_status"],
             "schedule": activity["schedule"],
             "execution_matrix": activity["execution_matrix"],
+            "execution_watchlist": activity["execution_watchlist"],
             "data_currency": activity["data_currency"],
             "delay_analysis": activity["delay_analysis"],
             "wbs_progress": wbs_progress,
             "wbs_remaining": wbs_remaining,
+            "wbs_contribution": wbs_contribution,
             "top_incomplete_activities": top_incomplete_activities,
             "insights": insights[:5],
         }
