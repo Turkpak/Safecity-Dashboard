@@ -848,175 +848,393 @@ const ganttProgressByProjectId = useMemo(() => {
       .replace(/[^a-z0-9-]/g, "");
 
   // Hydrate dashboard hierarchy state from clean URL query params (slug-based, no IDs).
-  useEffect(() => {
-    if (apiDivisions.length === 0 || apiDistricts.length === 0 || apiTehsils.length === 0) return;
+// ============================================================
+// HYDRATE STATE FROM URL
+// URL -> React state
+// ============================================================
+useEffect(() => {
+  if (
+    apiDivisions.length === 0 &&
+    apiDistricts.length === 0 &&
+    apiTehsils.length === 0
+  ) {
+    return;
+  }
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const level = urlParams.get("level");
-    const viewParam = urlParams.get("view");
-    if (viewParam === "divisions" || viewParam === "districts" || viewParam === "tehsils" || viewParam === "projects") {
-      setViewType((prev) => (prev === viewParam ? prev : viewParam));
+  const urlParams = new URLSearchParams(window.location.search);
+
+  const level = urlParams.get("level");
+  const viewParam = urlParams.get("view");
+
+  const divisionSlug = urlParams.get("division");
+  const districtSlug = urlParams.get("district");
+  const tehsilSlug = urlParams.get("tehsil");
+
+  // ----------------------------------------------------------
+  // VIEW
+  // ----------------------------------------------------------
+  if (
+    viewParam === "divisions" ||
+    viewParam === "districts" ||
+    viewParam === "tehsils" ||
+    viewParam === "projects"
+  ) {
+    if (viewType !== viewParam) {
+      skipNextUrlSyncRef.current = true;
+      setViewType(viewParam);
     }
+  }
 
-    const divisionSlug = urlParams.get("division");
-    const districtSlug = urlParams.get("district");
-    const tehsilSlug = urlParams.get("tehsil");
-    const nextSelectionKey = `${level ?? "root"}|${viewParam ?? "view"}|${divisionSlug ?? ""}|${districtSlug ?? ""}|${tehsilSlug ?? ""}`;
+  // ----------------------------------------------------------
+  // Create a stable key so we hydrate only once per URL
+  // ----------------------------------------------------------
+  const hydrationKey = [
+    level ?? "",
+    viewParam ?? "",
+    divisionSlug ?? "",
+    districtSlug ?? "",
+    tehsilSlug ?? "",
+  ].join("|");
 
-    if (lastHydratedSelectionRef.current === nextSelectionKey) {
-      return;
-    }
+  if (lastHydratedSelectionRef.current === hydrationKey) {
+    return;
+  }
 
-    if (level === "tehsil" && tehsilSlug) {
-      const foundTehsil = apiTehsils.find((t) => {
-        const tehsilName = t.tehsil_name ?? "";
-        const districtName = t.district_name ?? "";
-        const divisionName = t.division_name ?? "";
-        if (toSlug(tehsilName) !== tehsilSlug) return false;
-        if (districtSlug && toSlug(districtName) !== districtSlug) return false;
-        if (divisionSlug && toSlug(divisionName) !== divisionSlug) return false;
-        return true;
-      });
-      if (foundTehsil) {
-        const tehsilName = foundTehsil.tehsil_name ?? null;
-        const districtName = foundTehsil.district_name ?? null;
-        const divisionName = foundTehsil.division_name ?? null;
-        if (!tehsilName) return;
-        skipNextUrlSyncRef.current = true;
-        setSelectedItemType((prev) => (prev === "tehsil" && selectedItemId === foundTehsil.id && selectedItemName === tehsilName ? prev : "tehsil"));
-        setSelectedItemId((prev) => (prev === foundTehsil.id ? prev : foundTehsil.id));
-        setSelectedItemName((prev) => (prev === tehsilName ? prev : tehsilName));
-        setParentDistrictId((prev) => (prev === (foundTehsil.district ?? null) ? prev : (foundTehsil.district ?? null)));
-        setParentDistrictName((prev) => (prev === districtName ? prev : districtName));
-        setParentDivisionId((prev) => (prev === (foundTehsil.division ?? null) ? prev : (foundTehsil.division ?? null)));
-        setParentDivisionName((prev) => (prev === divisionName ? prev : divisionName));
-        lastHydratedSelectionRef.current = nextSelectionKey;
-      }
-      return;
-    }
+  // ==========================================================
+  // TEHSIL
+  // ==========================================================
+  if (level === "tehsil" && tehsilSlug) {
+    const foundTehsil = apiTehsils.find((t) => {
+      const tehsilName = t.tehsil_name ?? "";
+      const districtName = t.district_name ?? "";
+      const divisionName = t.division_name ?? "";
 
-    if (level === "district" && districtSlug) {
-      const foundDistrict = apiDistricts.find((d) => {
-        const districtName = d.district_name ?? "";
-        const divisionName = d.division_name ?? "";
-        if (toSlug(districtName) !== districtSlug) return false;
-        if (divisionSlug && toSlug(divisionName) !== divisionSlug) return false;
-        return true;
-      });
-      if (foundDistrict) {
-        const districtName = foundDistrict.district_name ?? null;
-        const divisionName = foundDistrict.division_name ?? null;
-        if (!districtName) return;
-        skipNextUrlSyncRef.current = true;
-        setSelectedItemType((prev) => (prev === "district" && selectedItemId === foundDistrict.id && selectedItemName === districtName ? prev : "district"));
-        setSelectedItemId((prev) => (prev === foundDistrict.id ? prev : foundDistrict.id));
-        setSelectedItemName((prev) => (prev === districtName ? prev : districtName));
-        setParentDivisionId((prev) => (prev === (foundDistrict.division ?? null) ? prev : (foundDistrict.division ?? null)));
-        setParentDivisionName((prev) => (prev === divisionName ? prev : divisionName));
-        setParentDistrictId(null);
-        setParentDistrictName(null);
-        lastHydratedSelectionRef.current = nextSelectionKey;
-      }
-      return;
-    }
+      return (
+        toSlug(tehsilName) === tehsilSlug &&
+        (!districtSlug || toSlug(districtName) === districtSlug) &&
+        (!divisionSlug || toSlug(divisionName) === divisionSlug)
+      );
+    });
 
-    if (level === "division" && divisionSlug) {
-      const foundDivision = apiDivisions.find((d) => toSlug(d.division_name ?? "") === divisionSlug);
-      if (foundDivision) {
-        const divisionName = foundDivision.division_name ?? null;
-        if (!divisionName) return;
-        skipNextUrlSyncRef.current = true;
-        setSelectedItemType((prev) => (prev === "division" && selectedItemId === foundDivision.id && selectedItemName === divisionName ? prev : "division"));
-        setSelectedItemId((prev) => (prev === foundDivision.id ? prev : foundDivision.id));
-        setSelectedItemName((prev) => (prev === divisionName ? prev : divisionName));
-        setParentDivisionId(null);
-        setParentDivisionName(null);
-        setParentDistrictId(null);
-        setParentDistrictName(null);
-        lastHydratedSelectionRef.current = nextSelectionKey;
-      }
-      return;
-    }
+    if (!foundTehsil) return;
 
-    // Backward compatibility with old ?tehsil=<name> link format.
-    const tehsilParam = urlParams.get("tehsil");
-    if (tehsilParam) {
-      const found = apiTehsils.find((t) => {
-        const name = t.tehsil_name ?? "";
-        return name.toLowerCase() === decodeURIComponent(tehsilParam).toLowerCase();
-      });
-      if (found) {
-        const tehsilName = found.tehsil_name ?? null;
-        if (!tehsilName) return;
-        skipNextUrlSyncRef.current = true;
-        setSelectedItemName((prev) => (prev === tehsilName ? prev : tehsilName));
-        setSelectedItemType((prev) => (prev === "tehsil" && selectedItemId === found.id && selectedItemName === tehsilName ? prev : "tehsil"));
-        setSelectedItemId((prev) => (prev === found.id ? prev : found.id));
-        setParentDistrictId((prev) => (prev === (found.district ?? null) ? prev : (found.district ?? null)));
-        setParentDistrictName((prev) => (prev === (found.district_name ?? null) ? prev : (found.district_name ?? null)));
-        setParentDivisionId((prev) => (prev === (found.division ?? null) ? prev : (found.division ?? null)));
-        setParentDivisionName((prev) => (prev === (found.division_name ?? null) ? prev : (found.division_name ?? null)));
-        lastHydratedSelectionRef.current = nextSelectionKey;
-      }
-    }
-  }, [location, apiDivisions, apiDistricts, apiTehsils, selectedItemId, selectedItemName]);
+    const tehsilName = foundTehsil.tehsil_name ?? null;
+    const districtName = foundTehsil.district_name ?? null;
+    const divisionName = foundTehsil.division_name ?? null;
+
+    if (!tehsilName) return;
+
+    skipNextUrlSyncRef.current = true;
+
+    setSelectedItemType((prev) =>
+      prev === "tehsil" ? prev : "tehsil"
+    );
+
+    setSelectedItemId((prev) =>
+      prev === foundTehsil.id ? prev : foundTehsil.id
+    );
+
+    setSelectedItemName((prev) =>
+      prev === tehsilName ? prev : tehsilName
+    );
+
+    setParentDistrictId((prev) =>
+      prev === (foundTehsil.district ?? null)
+        ? prev
+        : (foundTehsil.district ?? null)
+    );
+
+    setParentDistrictName((prev) =>
+      prev === districtName ? prev : districtName
+    );
+
+    setParentDivisionId((prev) =>
+      prev === (foundTehsil.division ?? null)
+        ? prev
+        : (foundTehsil.division ?? null)
+    );
+
+    setParentDivisionName((prev) =>
+      prev === divisionName ? prev : divisionName
+    );
+
+    lastHydratedSelectionRef.current = hydrationKey;
+
+    return;
+  }
+
+  // ==========================================================
+  // DISTRICT
+  // ==========================================================
+  if (level === "district" && districtSlug) {
+    const foundDistrict = apiDistricts.find((d) => {
+      const districtName = d.district_name ?? "";
+      const divisionName = d.division_name ?? "";
+
+      return (
+        toSlug(districtName) === districtSlug &&
+        (!divisionSlug || toSlug(divisionName) === divisionSlug)
+      );
+    });
+
+    if (!foundDistrict) return;
+
+    const districtName = foundDistrict.district_name ?? null;
+    const divisionName = foundDistrict.division_name ?? null;
+
+    if (!districtName) return;
+
+    skipNextUrlSyncRef.current = true;
+
+    setSelectedItemType((prev) =>
+      prev === "district" ? prev : "district"
+    );
+
+    setSelectedItemId((prev) =>
+      prev === foundDistrict.id
+        ? prev
+        : foundDistrict.id
+    );
+
+    setSelectedItemName((prev) =>
+      prev === districtName
+        ? prev
+        : districtName
+    );
+
+    setParentDivisionId((prev) =>
+      prev === (foundDistrict.division ?? null)
+        ? prev
+        : (foundDistrict.division ?? null)
+    );
+
+    setParentDivisionName((prev) =>
+      prev === divisionName
+        ? prev
+        : divisionName
+    );
+
+    setParentDistrictId(null);
+    setParentDistrictName(null);
+
+    lastHydratedSelectionRef.current = hydrationKey;
+
+    return;
+  }
+
+  // ==========================================================
+  // DIVISION
+  // ==========================================================
+  if (level === "division" && divisionSlug) {
+    const foundDivision = apiDivisions.find(
+      (d) =>
+        toSlug(d.division_name ?? "") === divisionSlug
+    );
+
+    if (!foundDivision) return;
+
+    const divisionName = foundDivision.division_name ?? null;
+
+    if (!divisionName) return;
+
+    skipNextUrlSyncRef.current = true;
+
+    setSelectedItemType((prev) =>
+      prev === "division" ? prev : "division"
+    );
+
+    setSelectedItemId((prev) =>
+      prev === foundDivision.id
+        ? prev
+        : foundDivision.id
+    );
+
+    setSelectedItemName((prev) =>
+      prev === divisionName
+        ? prev
+        : divisionName
+    );
+
+    setParentDivisionId(null);
+    setParentDivisionName(null);
+    setParentDistrictId(null);
+    setParentDistrictName(null);
+
+    lastHydratedSelectionRef.current = hydrationKey;
+
+    return;
+  }
+
+  // ==========================================================
+  // OLD ?tehsil=name SUPPORT
+  // ==========================================================
+  const tehsilParam = urlParams.get("tehsil");
+
+  if (tehsilParam && !level) {
+    const decodedTehsil = decodeURIComponent(tehsilParam);
+
+    const found = apiTehsils.find(
+      (t) =>
+        (t.tehsil_name ?? "").toLowerCase() ===
+        decodedTehsil.toLowerCase()
+    );
+
+    if (!found) return;
+
+    const tehsilName = found.tehsil_name ?? null;
+
+    if (!tehsilName) return;
+
+    skipNextUrlSyncRef.current = true;
+
+    setSelectedItemType("tehsil");
+    setSelectedItemId(found.id);
+    setSelectedItemName(tehsilName);
+
+    setParentDistrictId(found.district ?? null);
+    setParentDistrictName(found.district_name ?? null);
+
+    setParentDivisionId(found.division ?? null);
+    setParentDivisionName(found.division_name ?? null);
+
+    lastHydratedSelectionRef.current = hydrationKey;
+  }
+}, [
+  location,
+  apiDivisions,
+  apiDistricts,
+  apiTehsils,
+]);
 
   // Keep URL in sync with drilldown selection.
-  useEffect(() => {
-    if (skipNextUrlSyncRef.current) {
-      skipNextUrlSyncRef.current = false;
-      return;
+  // ============================================================
+// SYNC REACT STATE -> URL
+// ============================================================
+useEffect(() => {
+  // URL hydration caused this state update.
+  // Do NOT immediately write it back to the URL.
+  if (skipNextUrlSyncRef.current) {
+    skipNextUrlSyncRef.current = false;
+    return;
+  }
+
+  const params = new URLSearchParams();
+
+  // ----------------------------------------------------------
+  // View
+  // ----------------------------------------------------------
+  if (viewType) {
+    params.set("view", viewType);
+  }
+
+  // ----------------------------------------------------------
+  // Division
+  // ----------------------------------------------------------
+  if (
+    selectedItemType === "division" &&
+    selectedItemId != null &&
+    selectedItemName
+  ) {
+    params.set("level", "division");
+    params.set("division", toSlug(selectedItemName));
+  }
+
+  // ----------------------------------------------------------
+  // District
+  // ----------------------------------------------------------
+  else if (
+    selectedItemType === "district" &&
+    selectedItemId != null &&
+    selectedItemName
+  ) {
+    params.set("level", "district");
+    params.set("district", toSlug(selectedItemName));
+
+    if (
+      parentDivisionId != null &&
+      parentDivisionName
+    ) {
+      params.set(
+        "division",
+        toSlug(parentDivisionName)
+      );
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Tehsil
+  // ----------------------------------------------------------
+  else if (
+    selectedItemType === "tehsil" &&
+    selectedItemId != null &&
+    selectedItemName
+  ) {
+    params.set("level", "tehsil");
+    params.set("tehsil", toSlug(selectedItemName));
+
+    if (
+      parentDistrictId != null &&
+      parentDistrictName
+    ) {
+      params.set(
+        "district",
+        toSlug(parentDistrictName)
+      );
     }
 
-    const params = new URLSearchParams();
-    if (viewType) params.set("view", viewType);
-
-    if (selectedItemType === "division" && selectedItemId && selectedItemName) {
-      params.set("level", "division");
-      params.set("division", toSlug(selectedItemName));
-    } else if (selectedItemType === "district" && selectedItemId && selectedItemName) {
-      params.set("level", "district");
-      params.set("district", toSlug(selectedItemName));
-      if (parentDivisionId && parentDivisionName) {
-        params.set("division", toSlug(parentDivisionName));
-      }
-    } else if (selectedItemType === "tehsil" && selectedItemId && selectedItemName) {
-      params.set("level", "tehsil");
-      params.set("tehsil", toSlug(selectedItemName));
-      if (parentDistrictId && parentDistrictName) {
-        params.set("district", toSlug(parentDistrictName));
-      }
-      if (parentDivisionId && parentDivisionName) {
-        params.set("division", toSlug(parentDivisionName));
-      }
+    if (
+      parentDivisionId != null &&
+      parentDivisionName
+    ) {
+      params.set(
+        "division",
+        toSlug(parentDivisionName)
+      );
     }
+  }
 
-    const nextUrl = params.toString() ? `/?${params.toString()}` : "/";
-    const currentUrl = `${window.location.pathname}${window.location.search}`;
-    if (currentUrl !== nextUrl && lastSyncedUrlRef.current !== nextUrl) {
-      lastSyncedUrlRef.current = nextUrl;
-      setLocation(nextUrl);
-    }
-  }, [
-    viewType,
-    selectedItemType,
-    selectedItemId,
-    selectedItemName,
-    parentDivisionId,
-    parentDivisionName,
-    parentDistrictId,
-    parentDistrictName,
-    setLocation,
-  ]);
+  const nextUrl = params.toString()
+    ? `/?${params.toString()}`
+    : "/";
+
+  const currentUrl =
+    `${window.location.pathname}${window.location.search}`;
+
+  // Nothing changed -> DO NOTHING
+  if (currentUrl === nextUrl) {
+    return;
+  }
+
+  // Already attempted this URL -> DO NOTHING
+  if (lastSyncedUrlRef.current === nextUrl) {
+    return;
+  }
+
+  lastSyncedUrlRef.current = nextUrl;
+
+  setLocation(nextUrl);
+}, [
+  viewType,
+  selectedItemType,
+  selectedItemId,
+  selectedItemName,
+  parentDivisionId,
+  parentDivisionName,
+  parentDistrictId,
+  parentDistrictName,
+  setLocation,
+]);
 
   // Simulate loading on initial mount and when view type changes
   useEffect(() => {
     setIsLoading(true);
+
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, 800); // 800ms loading simulation
+    }, 800);
+
     return () => clearTimeout(timer);
-  }, [viewType, selectedItemName, selectedItemType]);
+  }, [viewType]);
 
   // Reset pagination when switching to projects view or when the list changes.
   useEffect(() => {
@@ -2352,6 +2570,50 @@ const ganttProgressByProjectId = useMemo(() => {
     },
   ];
 
+                      const handleViewTypeChange = useCallback((value: string) => {
+  const nextView = value as
+    | "divisions"
+    | "districts"
+    | "tehsils"
+    | "projects";
+
+  if (nextView === viewType) {
+    return;
+  }
+
+  // (deleted: skipNextUrlSyncRef.current = true;)
+
+  setSelectedItemName(null);
+  setSelectedItemType(null);
+  setSelectedItemId(null);
+
+  setParentDivisionId(null);
+  setParentDivisionName(null);
+  setParentDistrictId(null);
+  setParentDistrictName(null);
+
+  setExpandedDivisions(false);
+  setExpandedDistricts(false);
+
+  if (nextView === "tehsils") {
+    setExpandedTehsilGroups({
+      Lahore: true,
+      Sheikhupura: true,
+    });
+  } else {
+    setExpandedTehsilGroups({});
+  }
+
+  setAllTehsilGroupsExpanded(false);
+
+  setTehsilSearchQuery("");
+  setDistrictSearchQuery("");
+  setDivisionSearchQuery("");
+  setProjectsSearch("");
+
+  setViewType(nextView);
+}, [viewType]);
+
   return (
     <Layout title="PSCA Progress Dashboard">
       <div
@@ -2394,8 +2656,8 @@ const ganttProgressByProjectId = useMemo(() => {
                 : "pb-2 px-3 sm:px-4 pt-2 sm:pt-3"
             }`}
           >
-            <div className="flex items-start justify-between gap-2 sm:gap-4">
-              <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0 overflow-hidden">
+                        <div className="flex items-start justify-between gap-2 sm:gap-4">
+              <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
                 {/* Filters Label / Toggle */}
                 <div
                   className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
@@ -2413,100 +2675,77 @@ const ganttProgressByProjectId = useMemo(() => {
                 <AnimatePresence>
                   {showFilters && (
                     <motion.div
-                      initial={{ width: 0, opacity: 0, x: -20 }}
-                      animate={{ width: "auto", opacity: 1, x: 0 }}
-                      exit={{ width: 0, opacity: 0, x: -20 }}
-                      transition={{ duration: 0.4, ease: "circOut" }}
-                      className="overflow-hidden flex items-center min-w-0 w-full pb-1"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -10 }}
+                      transition={{ duration: 0.25, ease: "easeOut" }}
+                      className="flex items-center"
                     >
                       <RadioGroup
                         value={viewType}
-                        onValueChange={(value) => {
-                          setViewType(
-                            value as "divisions" | "districts" | "tehsils" | "projects" | "",
-                          );
-                          setSelectedItemName(null);
-                          setSelectedItemType(null);
-                          setExpandedDivisions(false);
-                          setExpandedDistricts(false);
-                          // Initialize default districts (Lahore and Sheikhupura) when switching to tehsils view
-                          if (value === "tehsils") {
-                            const DEFAULT_DISTRICTS = ["Lahore", "Sheikhupura"];
-                            const defaultState: Record<string, boolean> = {};
-                            DEFAULT_DISTRICTS.forEach((districtName) => {
-                              defaultState[districtName] = true;
-                            });
-                            setExpandedTehsilGroups(defaultState);
-                            setAllTehsilGroupsExpanded(false);
-                          } else {
-                            setExpandedTehsilGroups({});
-                            setAllTehsilGroupsExpanded(false);
-                          }
-                          setTehsilSearchQuery("");
-                        }}
-                        className="grid grid-cols-2 gap-2 pl-1 sm:pl-2 sm:flex sm:items-center sm:gap-4 md:gap-6 sm:whitespace-nowrap"
+                        onValueChange={handleViewTypeChange}
+                        className="flex flex-wrap items-center gap-2 sm:gap-4 md:gap-6"
                       >
-                        <div className="flex items-center space-x-1.5 sm:space-x-2 rounded-md bg-background/40 px-2 py-1">
+                        {/* ALL DIVISIONS */}
+                        <div className="flex items-center gap-1.5 sm:gap-2 rounded-md bg-background/40 px-2 py-1 shrink-0">
                           <RadioGroupItem
                             value="divisions"
                             id="divisions"
-                            className="h-4 w-4 sm:h-5 sm:w-5"
+                            className="h-4 w-4 cursor-pointer"
                           />
                           <Label
                             htmlFor="divisions"
-                            className="text-xs sm:text-sm font-medium text-foreground cursor-pointer"
+                            className="text-xs sm:text-sm font-medium text-foreground cursor-pointer select-none whitespace-nowrap"
                           >
-                            <span className="hidden sm:inline">
-                              All Divisions
-                            </span>
+                            <span className="hidden sm:inline">All Divisions</span>
                             <span className="sm:hidden">Divisions</span>
                           </Label>
                         </div>
-                        <div className="flex items-center space-x-1.5 sm:space-x-2 rounded-md bg-background/40 px-2 py-1">
+
+                        {/* ALL DISTRICTS */}
+                        <div className="flex items-center gap-1.5 sm:gap-2 rounded-md bg-background/40 px-2 py-1 shrink-0">
                           <RadioGroupItem
                             value="districts"
                             id="districts"
-                            className="h-4 w-4 sm:h-5 sm:w-5"
+                            className="h-4 w-4 cursor-pointer"
                           />
                           <Label
                             htmlFor="districts"
-                            className="text-xs sm:text-sm font-medium text-foreground cursor-pointer"
+                            className="text-xs sm:text-sm font-medium text-foreground cursor-pointer select-none whitespace-nowrap"
                           >
-                            <span className="hidden sm:inline">
-                              All Districts
-                            </span>
+                            <span className="hidden sm:inline">All Districts</span>
                             <span className="sm:hidden">Districts</span>
                           </Label>
                         </div>
-                        <div className="flex items-center space-x-1.5 sm:space-x-2 rounded-md bg-background/40 px-2 py-1">
+
+                        {/* ALL TEHSILS */}
+                        <div className="flex items-center gap-1.5 sm:gap-2 rounded-md bg-background/40 px-2 py-1 shrink-0">
                           <RadioGroupItem
                             value="tehsils"
                             id="tehsils"
-                            className="h-4 w-4 sm:h-5 sm:w-5"
+                            className="h-4 w-4 cursor-pointer"
                           />
                           <Label
                             htmlFor="tehsils"
-                            className="text-xs sm:text-sm font-medium text-foreground cursor-pointer"
+                            className="text-xs sm:text-sm font-medium text-foreground cursor-pointer select-none whitespace-nowrap"
                           >
-                            <span className="hidden sm:inline">
-                              All Tehsils
-                            </span>
+                            <span className="hidden sm:inline">All Tehsils</span>
                             <span className="sm:hidden">Tehsils</span>
                           </Label>
                         </div>
-                        <div className="flex items-center space-x-1.5 sm:space-x-2 rounded-md bg-background/40 px-2 py-1">
+
+                        {/* ALL PROJECTS */}
+                        <div className="flex items-center gap-1.5 sm:gap-2 rounded-md bg-background/40 px-2 py-1 shrink-0">
                           <RadioGroupItem
                             value="projects"
                             id="projects"
-                            className="h-4 w-4 sm:h-5 sm:w-5"
+                            className="h-4 w-4 cursor-pointer"
                           />
                           <Label
                             htmlFor="projects"
-                            className="text-xs sm:text-sm font-medium text-foreground cursor-pointer"
+                            className="text-xs sm:text-sm font-medium text-foreground cursor-pointer select-none whitespace-nowrap"
                           >
-                            <span className="hidden sm:inline">
-                              All Projects
-                            </span>
+                            <span className="hidden sm:inline">All Projects</span>
                             <span className="sm:hidden">Projects</span>
                           </Label>
                         </div>
@@ -2517,7 +2756,7 @@ const ganttProgressByProjectId = useMemo(() => {
 
                 {/* Compact breadcrumb on same row when filters are collapsed */}
                 {!showFilters && navigationFlow.length > 1 && (
-                  <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm min-w-0 sm:flex sm:flex-wrap sm:items-center">
+                  <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
                     {navigationFlow.map((step, idx) => (
                       <button
                         key={`${step.key}-compact-${idx}`}
@@ -2526,7 +2765,7 @@ const ganttProgressByProjectId = useMemo(() => {
                           step.clickable && handleNavigateToLevel(step.key)
                         }
                         disabled={!step.clickable}
-                        className={`flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors min-w-0 justify-center sm:justify-start ${
+                        className={`flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors shrink-0 ${
                           step.clickable
                             ? "border-[#1e3a8a] bg-[#1e3a8a] text-white hover:bg-[#1d4ed8] cursor-pointer"
                             : "border-[#b91c1c] bg-[#b91c1c] text-white cursor-default"
@@ -2549,14 +2788,14 @@ const ganttProgressByProjectId = useMemo(() => {
                 variant="outline"
                 size="icon"
                 onClick={() => setIsFilterBarExpanded(!isFilterBarExpanded)}
-                className="rounded-xl w-9 h-9 border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all shadow-sm flex-shrink-0"
+                className="rounded-xl w-9 h-9 border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all shadow-sm shrink-0"
                 title={isFilterBarExpanded ? "Collapse" : "Expand"}
               >
                 {isFilterBarExpanded ? (
                   <ChevronUp className="h-4 w-4" />
-                ) : (
+                ) : 
                   <ChevronDown className="h-4 w-4" />
-                )}
+                }
               </Button>
             </div>
 
@@ -3400,24 +3639,30 @@ const ganttProgressByProjectId = useMemo(() => {
                   (expandedDistricts
                     ? filteredDistrictsData
                     : filteredDistrictsData.slice(0, 4)
-                  ).map((dist) => (
-                    <HierarchyCard
-                      key={dist.id}
-                      title={dist.name}
-                      overallProgress={dist.overall}
-                      color={dist.color}
-                      onClick={() => {
-                        const parentDiv = divisionsData.find(
-                          (d) => d.id === dist.divisionId,
-                        );
-                        setParentDivisionId(dist.divisionId);
-                        setParentDivisionName(parentDiv?.name ?? null);
-                        setSelectedItemId(dist.id);
-                        setSelectedItemName(dist.name);
-                        setSelectedItemType("district");
-                      }}
-                    />
-                  ))
+                  ).map((dist) => {
+                    const parentDiv = divisionsData.find(
+                      (d) => d.id === dist.divisionId
+                    );
+
+                    return (
+                      <HierarchyCard
+                        key={dist.id}
+                        title={dist.name ?? "Unknown District"}
+                        overallProgress={dist.overall ?? 0}
+                        color={dist.color}
+                        onClick={() => {
+                          if (dist.id == null) return;
+
+                          setParentDivisionId(dist.divisionId ?? null);
+                          setParentDivisionName(parentDiv?.name ?? null);
+
+                          setSelectedItemId(dist.id);
+                          setSelectedItemName(dist.name ?? "Unknown District");
+                          setSelectedItemType("district");
+                        }}
+                      />
+                    );
+                  })
                 )}
               </div>
 
@@ -3564,15 +3809,16 @@ const ganttProgressByProjectId = useMemo(() => {
 
                   {/* Tehsil Cards Grouped by District */}
                   {filteredDistricts.length === 0 ? (
-                    <Card className="border-border/50">
-                      <CardContent className="p-8 text-center">
-                        <p className="text-muted-foreground">
-                          No districts found matching "{tehsilSearchQuery}".
-                          Please try a different search term.
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ) : (
+                      <Card className="border-border/50">
+                        <CardContent className="p-8 text-center">
+                          <p className="text-muted-foreground">
+                            {tehsilSearchQuery
+                              ? `No tehsils found matching "${tehsilSearchQuery}". Please try a different search term.`
+                              : "No tehsils found."}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ) : (
                     <div className="space-y-6">
                       {filteredDistricts.map(
                         ([districtName, tehsils]: [
