@@ -8,6 +8,7 @@ import { HierarchyCard } from "@/components/dashboard/HierarchyCard";
 import { SubProject } from "@/components/dashboard/SubProjectCard";
 import { MilestoneDetailsPanel } from "@/components/dashboard/MilestoneDetailsPanel";
 import { exportDashboardToPPTX } from "@/utils/exportToPPTX";
+import { exportProgressReport } from "@/utils/exportProgressReport";
 import {
   PieChart,
   Pie,
@@ -680,6 +681,7 @@ const { data: pageData, isLoading: isPageLoading } = useQuery({
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [isExportingReport, setIsExportingReport] = useState(false);
   const [expandedDivisions, setExpandedDivisions] = useState(false);
   const [expandedDistricts, setExpandedDistricts] = useState(false);
   const [expandedTehsilGroups, setExpandedTehsilGroups] = useState<
@@ -2352,8 +2354,60 @@ const ganttProgressByProjectId = useMemo(() => {
     },
   ];
 
+  const handleExportProgressReport = useCallback(async () => {
+    if (!pageData || !viewType || isExportingReport) return;
+    setIsExportingReport(true);
+    try {
+      const selection = selectedProjectForDetails?.id
+        ? {
+            type: "project" as const,
+            id: Number(selectedProjectForDetails.id),
+            name: selectedProjectForDetails.project_name || `Project ${selectedProjectForDetails.id}`,
+          }
+        : selectedItemType && selectedItemId && selectedItemName
+          ? { type: selectedItemType, id: Number(selectedItemId), name: selectedItemName }
+          : null;
+
+      await exportProgressReport({
+        pageData,
+        view: DASHBOARD_VIEW_TO_API_PAGE[dashboardPage],
+        selection,
+      });
+    } catch (error) {
+      console.error("Failed to export PSCA progress report", error);
+      setShowErrorDialog(true);
+    } finally {
+      setIsExportingReport(false);
+    }
+  }, [
+    pageData,
+    viewType,
+    dashboardPage,
+    selectedProjectForDetails,
+    selectedItemType,
+    selectedItemId,
+    selectedItemName,
+    isExportingReport,
+  ]);
+
   return (
-    <Layout title="PSCA Progress Dashboard">
+    <Layout
+      title="PSCA Progress Dashboard"
+      headerActions={
+        <Button
+          type="button"
+          onClick={handleExportProgressReport}
+          disabled={!pageData || isPageLoading || isExportingReport}
+          className="h-9 gap-2 rounded-lg bg-[#1e3a8a] px-3 text-white shadow-sm hover:bg-[#1d4ed8] disabled:opacity-50"
+          title={`Export 2-page PDF report for ${selectedItemName || (viewType === "projects" ? "All Projects" : viewType === "districts" ? "All Districts" : viewType === "tehsils" ? "All Tehsils" : "All Divisions")}`}
+        >
+          <FileDown className="h-4 w-4" />
+          <span className="hidden sm:inline">
+            {isExportingReport ? "Preparing…" : "Export Report"}
+          </span>
+        </Button>
+      }
+    >
       <div
         className="flex flex-col gap-4"
         style={{
