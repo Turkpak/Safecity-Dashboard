@@ -390,7 +390,7 @@ function buildPhaseFromProjectGantt(
 
   const overallActual = clamp01(
     subProjects.reduce((sum, sp) => sum + sp.actualProgress * sp.weight, 0) /
-      Math.max(1e-9, subProjects.reduce((sum, sp) => sum + sp.weight, 0)),
+    Math.max(1e-9, subProjects.reduce((sum, sp) => sum + sp.weight, 0)),
   );
 
   const dates: Date[] = [];
@@ -534,7 +534,7 @@ const generateSubProjects = (
 const convertToPhaseProgress = (
   currentValue: number,
   phaseKey: string,
-  timelineData?: { month: string; [key: string]: number | string }[],
+  timelineData?: { month: string;[key: string]: number | string }[],
   division?: string,
   district?: string,
   tehsil?: string,
@@ -627,11 +627,11 @@ const CARD_COLORS = [
 
 type ProgressRangeMeta = {
   label:
-    | "Low Progress"
-    | "Moderate Progress"
-    | "Good Progress"
-    | "High Progress"
-    | "Fully Completed";
+  | "Low Progress"
+  | "Moderate Progress"
+  | "Good Progress"
+  | "High Progress"
+  | "Fully Completed";
   color: string; // hex
   min: number;
   max: number;
@@ -660,23 +660,23 @@ export default function Dashboard() {
   const [selectedItemType, setSelectedItemType] = useState<
     "division" | "district" | "tehsil" | null
   >(null);
-const dashboardPage = (viewType || "divisions") as "divisions" | "districts" | "tehsils" | "projects";
+  const dashboardPage = (viewType || "divisions") as "divisions" | "districts" | "tehsils" | "projects";
 
-// Keep the dashboard page names aligned to the canonical backend pages.
-// Legacy aliases remain supported on the backend for compatibility.
-const DASHBOARD_VIEW_TO_API_PAGE: Record< "divisions" | "districts" | "tehsils" | "projects",
-  DashboardView
-> = {
-  divisions: "divisions",
-  districts: "districts",
-  tehsils: "tehsils",
-  projects: "projects",
-};
+  // Keep the dashboard page names aligned to the canonical backend pages.
+  // Legacy aliases remain supported on the backend for compatibility.
+  const DASHBOARD_VIEW_TO_API_PAGE: Record<"divisions" | "districts" | "tehsils" | "projects",
+    DashboardView
+  > = {
+    divisions: "divisions",
+    districts: "districts",
+    tehsils: "tehsils",
+    projects: "projects",
+  };
 
-const { data: pageData, isLoading: isPageLoading } = useQuery({
-  queryKey: ["dashboard-page", dashboardPage],
-  queryFn: () => getDashboardPageData(DASHBOARD_VIEW_TO_API_PAGE[dashboardPage]),
-});
+  const { data: pageData, isLoading: isPageLoading } = useQuery({
+    queryKey: ["dashboard-page", dashboardPage],
+    queryFn: () => getDashboardPageData(DASHBOARD_VIEW_TO_API_PAGE[dashboardPage]),
+  });
 
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
@@ -803,30 +803,30 @@ const { data: pageData, isLoading: isPageLoading } = useQuery({
   const apiTopProjects = pageData?.bestPerformingProjects ?? [];
 
   // Fetch all gantt schedules once and use root task progress for each project card.
-//   const { data: progressSummary = {} } = useQuery({
-//   queryKey: ["project-progress-summary"],
-//   queryFn: () => getProjectProgressSummary(),
-// });
+  //   const { data: progressSummary = {} } = useQuery({
+  //   queryKey: ["project-progress-summary"],
+  //   queryFn: () => getProjectProgressSummary(),
+  // });
 
-// const ganttProgressByProjectId = useMemo(() => {
-//   const clampPct = (n: number) => Math.max(0, Math.min(100, n));
-//   const map = new Map<number, number>();
-//   for (const [pid, progress] of Object.entries(progressSummary)) {
-//     const n = Number(progress);
-//     map.set(Number(pid), Number.isFinite(n) ? clampPct(n) : 0);
-//   }
-//   return map;
-// }, [progressSummary]);
+  // const ganttProgressByProjectId = useMemo(() => {
+  //   const clampPct = (n: number) => Math.max(0, Math.min(100, n));
+  //   const map = new Map<number, number>();
+  //   for (const [pid, progress] of Object.entries(progressSummary)) {
+  //     const n = Number(progress);
+  //     map.set(Number(pid), Number.isFinite(n) ? clampPct(n) : 0);
+  //   }
+  //   return map;
+  // }, [progressSummary]);
 
-const ganttProgressByProjectId = useMemo(() => {
-  const map = new Map<number, number>();
-  for (const row of pageData?.projects ?? []) {
-    const id = Number((row as any).id);
-    const v = Number((row as any).overall_progress ?? 0);
-    map.set(id, Number.isFinite(v) ? v : 0);
-  }
-  return map;
-}, [pageData]);
+  const ganttProgressByProjectId = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const row of pageData?.projects ?? []) {
+      const id = Number((row as any).id);
+      const v = Number((row as any).overall_progress ?? 0);
+      map.set(id, Number.isFinite(v) ? v : 0);
+    }
+    return map;
+  }, [pageData]);
 
   // All Projects overall % (average of backend-calculated project values)
   const allProjectsOverallFromGantt = useMemo(() => {
@@ -1121,10 +1121,10 @@ const ganttProgressByProjectId = useMemo(() => {
       viewType === "districts"
         ? "All Districts"
         : viewType === "tehsils"
-        ? "All Tehsils"
-        : viewType === "projects"
-        ? "All Projects"
-        : "All Divisions";
+          ? "All Tehsils"
+          : viewType === "projects"
+            ? "All Projects"
+            : "All Divisions";
 
     const flow: NavigationStep[] = [
       {
@@ -1272,7 +1272,7 @@ const ganttProgressByProjectId = useMemo(() => {
     itemType: "division" | "district" | "tehsil",
   ): CityInstallationData | null => {
     if (!itemId) return null;
-    
+
     if (itemType === "division") {
       const found = apiDivisions.find((d) => d.id === itemId);
       if (found) return generateCityDataFromOverall(found.overall_progress ?? 0);
@@ -1755,32 +1755,32 @@ const ganttProgressByProjectId = useMemo(() => {
         {/* Best Performing Projects (hide inside selected division/district/tehsil views) */}
         {showBestPerformingSection && (
           <div className="w-full">
-          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 min-w-0">
-            <div className="min-w-0">
-              <h2 className="text-xl font-bold font-heading mb-1">
-                Best Performing Projects
-              </h2>
-              
+            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 min-w-0">
+              <div className="min-w-0">
+                <h2 className="text-xl font-bold font-heading mb-1">
+                  Best Performing Projects
+                </h2>
+
+              </div>
+              {(selectedMilestoneKey || isSelectedProjectInThisScope) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedMilestoneKey(null);
+                    if (useProjectCards && projectCardsInteractive) {
+                      setSelectedProjectForDetails(null);
+                    }
+                  }}
+                  className="h-8 px-3 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700 border-0 transition-colors whitespace-nowrap flex-shrink-0"
+                >
+                  Clear
+                </button>
+              )}
             </div>
-            {(selectedMilestoneKey || isSelectedProjectInThisScope) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedMilestoneKey(null);
-                  if (useProjectCards && projectCardsInteractive) {
-                    setSelectedProjectForDetails(null);
-                  }
-                }}
-                className="h-8 px-3 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700 border-0 transition-colors whitespace-nowrap flex-shrink-0"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-          {visibleTopProjects.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-              {useProjectCards
-                ? visibleTopProjects.map((project, index) => {
+            {visibleTopProjects.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+                {useProjectCards
+                  ? visibleTopProjects.map((project, index) => {
                     const percentage = Math.round((project as any).overall_progress ?? 0);
                     const displayName =
                       project.project_name || `Project ${project.id}`;
@@ -1803,62 +1803,62 @@ const ganttProgressByProjectId = useMemo(() => {
                         onClick={
                           projectCardsInteractive
                             ? () => {
-                                setSelectedMilestoneKey(null);
-                                setSelectedProjectForDetails((prev) =>
-                                  prev?.id === fullProject.id ? null : fullProject,
-                                );
-                              }
+                              setSelectedMilestoneKey(null);
+                              setSelectedProjectForDetails((prev) =>
+                                prev?.id === fullProject.id ? null : fullProject,
+                              );
+                            }
                             : undefined
                         }
                       />
                     );
                   })
-                : installationPhases.map((phase) => {
-                  const progress = data[phase.key];
-                  const hasDetails = hasDetailedProgress(progress);
-                  const progressValue = hasDetails
-                    ? Math.round(progress.actual)
-                    : Math.round(getProgressValue(progress));
+                  : installationPhases.map((phase) => {
+                    const progress = data[phase.key];
+                    const hasDetails = hasDetailedProgress(progress);
+                    const progressValue = hasDetails
+                      ? Math.round(progress.actual)
+                      : Math.round(getProgressValue(progress));
 
-                  return (
-                    <InstallationCard
-                      key={`${title}-${phase.key}`}
-                      title={phase.title}
-                      percentage={progressValue}
-                      icon={phase.icon}
-                      color={phase.color as unknown as "green"}
-                      actualProgress={hasDetails ? progress.actual : undefined}
-                      plannedProgress={hasDetails ? progress.planned : undefined}
-                      selected={selectedMilestoneKey === phase.key}
-                      onClick={() => {
-                        setSelectedMilestoneKey((prev) =>
-                          prev === phase.key ? null : phase.key,
-                        );
-                      }}
-                    />
-                  );
-                })}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
-              No projects are available for this dashboard view.
-            </div>
-          )}
+                    return (
+                      <InstallationCard
+                        key={`${title}-${phase.key}`}
+                        title={phase.title}
+                        percentage={progressValue}
+                        icon={phase.icon}
+                        color={phase.color as unknown as "green"}
+                        actualProgress={hasDetails ? progress.actual : undefined}
+                        plannedProgress={hasDetails ? progress.planned : undefined}
+                        selected={selectedMilestoneKey === phase.key}
+                        onClick={() => {
+                          setSelectedMilestoneKey((prev) =>
+                            prev === phase.key ? null : phase.key,
+                          );
+                        }}
+                      />
+                    );
+                  })}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+                No projects are available for this dashboard view.
+              </div>
+            )}
 
-          {/* Selected project details (Gantt / WBS) for Division/District views */}
-          {isSelectedProjectInThisScope && (
-            <div className="mt-6">
-              <MilestoneDetailsPanel
-                milestoneTitle={`${selectedProjectForDetails!.project_name || `Project ${selectedProjectForDetails!.id}`} - Project Gantt`}
-                phase={selectedProjectPhase}
-                phaseColor="#3b82f6"
-                flatGanttTasks={selectedProjectGanttTasks as any}
-                ganttProjectId={selectedProjectForDetails!.id}
-                onProjectGanttRefresh={refetchSelectedProjectGantt}
-                onClear={() => setSelectedProjectForDetails(null)}
-              />
-            </div>
-          )}
+            {/* Selected project details (Gantt / WBS) for Division/District views */}
+            {isSelectedProjectInThisScope && (
+              <div className="mt-6">
+                <MilestoneDetailsPanel
+                  milestoneTitle={`${selectedProjectForDetails!.project_name || `Project ${selectedProjectForDetails!.id}`} - Project Gantt`}
+                  phase={selectedProjectPhase}
+                  phaseColor="#3b82f6"
+                  flatGanttTasks={selectedProjectGanttTasks as any}
+                  ganttProjectId={selectedProjectForDetails!.id}
+                  onProjectGanttRefresh={refetchSelectedProjectGantt}
+                  onClear={() => setSelectedProjectForDetails(null)}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -2186,17 +2186,15 @@ const ganttProgressByProjectId = useMemo(() => {
                         prev === "physical" ? "financial" : "physical",
                       )
                     }
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                      progressType === "financial" ? "bg-primary" : "bg-muted"
-                    }`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${progressType === "financial" ? "bg-primary" : "bg-muted"
+                      }`}
                     aria-label="Toggle between Physical and Financial Progress"
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
-                        progressType === "financial"
-                          ? "translate-x-6"
-                          : "translate-x-1"
-                      }`}
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${progressType === "financial"
+                        ? "translate-x-6"
+                        : "translate-x-1"
+                        }`}
                     />
                   </button>
                   <DollarSign
@@ -2218,17 +2216,17 @@ const ganttProgressByProjectId = useMemo(() => {
                 phase={
                   progressType === "financial"
                     ? convertToFinancialProgress({
-                        actual: selectedProgress.actual,
-                        planned: selectedProgress.planned,
-                        subProjects: selectedProgress.subProjects,
-                        timeline: selectedProgress.timeline,
-                      })
+                      actual: selectedProgress.actual,
+                      planned: selectedProgress.planned,
+                      subProjects: selectedProgress.subProjects,
+                      timeline: selectedProgress.timeline,
+                    })
                     : {
-                        actual: selectedProgress.actual,
-                        planned: selectedProgress.planned,
-                        subProjects: selectedProgress.subProjects,
-                        timeline: selectedProgress.timeline,
-                      }
+                      actual: selectedProgress.actual,
+                      planned: selectedProgress.planned,
+                      subProjects: selectedProgress.subProjects,
+                      timeline: selectedProgress.timeline,
+                    }
                 }
                 phaseColor={colorMap[selectedPhaseMeta.color] || "#6b7280"}
                 onClear={() => setSelectedMilestoneKey(null)}
@@ -2360,10 +2358,10 @@ const ganttProgressByProjectId = useMemo(() => {
     try {
       const selection = selectedProjectForDetails?.id
         ? {
-            type: "project" as const,
-            id: Number(selectedProjectForDetails.id),
-            name: selectedProjectForDetails.project_name || `Project ${selectedProjectForDetails.id}`,
-          }
+          type: "project" as const,
+          id: Number(selectedProjectForDetails.id),
+          name: selectedProjectForDetails.project_name || `Project ${selectedProjectForDetails.id}`,
+        }
         : selectedItemType && selectedItemId && selectedItemName
           ? { type: selectedItemType, id: Number(selectedItemId), name: selectedItemName }
           : null;
@@ -2397,10 +2395,10 @@ const ganttProgressByProjectId = useMemo(() => {
           type="button"
           onClick={handleExportProgressReport}
           disabled={!pageData || isPageLoading || isExportingReport}
-          className="h-9 gap-2 rounded-lg bg-[#1e3a8a] px-3 text-white shadow-sm hover:bg-[#1d4ed8] disabled:opacity-50"
+          className="h-6 gap-2 rounded-lg bg-[#1e3a8a] px-3 text-white shadow-sm hover:bg-[#1d4ed8] disabled:opacity-50"
           title={`Export 2-page PDF report for ${selectedItemName || (viewType === "projects" ? "All Projects" : viewType === "districts" ? "All Districts" : viewType === "tehsils" ? "All Tehsils" : "All Divisions")}`}
         >
-          <FileDown className="h-4 w-4" />
+          <FileDown className="h-2 w-2" />
           <span className="hidden sm:inline">
             {isExportingReport ? "Preparing…" : "Export Report"}
           </span>
@@ -2441,11 +2439,10 @@ const ganttProgressByProjectId = useMemo(() => {
 
           {/* Filter Bar Section - Radio Buttons */}
           <div
-            className={`relative transition-all duration-300 order-2 md:order-1 ${
-              isFilterBarExpanded
-                ? "border-b border-border/30 pb-3 px-3 sm:px-6 pt-3 sm:pt-4"
-                : "pb-2 px-3 sm:px-4 pt-2 sm:pt-3"
-            }`}
+            className={`relative transition-all duration-300 order-2 md:order-1 ${isFilterBarExpanded
+              ? "border-b border-border/30 pb-3 px-3 sm:px-6 pt-3 sm:pt-4"
+              : "pb-2 px-3 sm:px-4 pt-2 sm:pt-3"
+              }`}
           >
             <div className="flex items-start justify-between gap-2 sm:gap-4">
               <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0 overflow-hidden">
@@ -2579,11 +2576,10 @@ const ganttProgressByProjectId = useMemo(() => {
                           step.clickable && handleNavigateToLevel(step.key)
                         }
                         disabled={!step.clickable}
-                        className={`flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors min-w-0 justify-center sm:justify-start ${
-                          step.clickable
-                            ? "border-[#1e3a8a] bg-[#1e3a8a] text-white hover:bg-[#1d4ed8] cursor-pointer"
-                            : "border-[#b91c1c] bg-[#b91c1c] text-white cursor-default"
-                        }`}
+                        className={`flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors min-w-0 justify-center sm:justify-start ${step.clickable
+                          ? "border-[#1e3a8a] bg-[#1e3a8a] text-white hover:bg-[#1d4ed8] cursor-pointer"
+                          : "border-[#b91c1c] bg-[#b91c1c] text-white cursor-default"
+                          }`}
                       >
                         {idx > 0 && (
                           <span className="text-white/80" aria-hidden>
@@ -2628,11 +2624,10 @@ const ganttProgressByProjectId = useMemo(() => {
                         step.clickable && handleNavigateToLevel(step.key)
                       }
                       disabled={!step.clickable}
-                      className={`flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors min-w-0 justify-center sm:justify-start ${
-                        step.clickable
-                          ? "border-[#1e3a8a] bg-[#1e3a8a] text-white hover:bg-[#1d4ed8] cursor-pointer"
-                          : "border-[#b91c1c] bg-[#b91c1c] text-white cursor-default"
-                      }`}
+                      className={`flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors min-w-0 justify-center sm:justify-start ${step.clickable
+                        ? "border-[#1e3a8a] bg-[#1e3a8a] text-white hover:bg-[#1d4ed8] cursor-pointer"
+                        : "border-[#b91c1c] bg-[#b91c1c] text-white cursor-default"
+                        }`}
                     >
                       {idx > 0 && (
                         <span className="text-white/80" aria-hidden>
@@ -2649,11 +2644,10 @@ const ganttProgressByProjectId = useMemo(() => {
 
           {/* Header Content Section - Collapsible */}
           <div
-            className={`relative flex flex-col md:flex-row md:items-start justify-between gap-4 transition-all duration-300 ease-in-out overflow-hidden order-1 md:order-2 ${
-              isFilterBarExpanded
-                ? "max-h-[500px] opacity-100 px-4 md:px-6 pt-2 pb-4 md:pb-5"
-                : "max-h-0 opacity-0 p-0"
-            }`}
+            className={`relative flex flex-col md:flex-row md:items-start justify-between gap-4 transition-all duration-300 ease-in-out overflow-hidden order-1 md:order-2 ${isFilterBarExpanded
+              ? "max-h-[500px] opacity-100 px-4 md:px-6 pt-2 pb-4 md:pb-5"
+              : "max-h-0 opacity-0 p-0"
+              }`}
           >
             <div className="flex-1 min-w-0">
               {(() => {
@@ -2704,22 +2698,22 @@ const ganttProgressByProjectId = useMemo(() => {
                     selectedItemName && singleItemData
                       ? singleItemData.overall
                       : viewType === "projects" &&
-                          !selectedItemName &&
-                          !selectedItemType
+                        !selectedItemName &&
+                        !selectedItemType
                         ? allProjectsOverallFromGantt
                         : viewType === "tehsils" &&
-                            !selectedItemName &&
-                            !selectedItemType
+                          !selectedItemName &&
+                          !selectedItemType
                           ? allProjectsOverallFromGantt
                           : viewType === "divisions" &&
-                              !selectedItemName &&
-                              !selectedItemType
+                            !selectedItemName &&
+                            !selectedItemType
                             ? allDivisionsOverall
-                          : viewType === "districts" &&
+                            : viewType === "districts" &&
                               !selectedItemName &&
                               !selectedItemType
-                            ? allDistrictsOverall
-                        : aggregatedData?.overall || 0;
+                              ? allDistrictsOverall
+                              : aggregatedData?.overall || 0;
                   const meta = getProgressRangeMeta(overall);
                   const overallLabel =
                     viewType === "projects" && !selectedItemName && !selectedItemType
@@ -2728,9 +2722,9 @@ const ganttProgressByProjectId = useMemo(() => {
                         ? `${overall.toFixed(2)}`
                         : viewType === "divisions" && !selectedItemName && !selectedItemType
                           ? `${overall.toFixed(2)}`
-                        : viewType === "districts" && !selectedItemName && !selectedItemType
-                          ? `${overall.toFixed(2)}`
-                      : `${Math.round(overall)}`;
+                          : viewType === "districts" && !selectedItemName && !selectedItemType
+                            ? `${overall.toFixed(2)}`
+                            : `${Math.round(overall)}`;
 
                   // Map color to Tailwind classes
                   const getBadgeClasses = (color: string) => {
@@ -2823,13 +2817,13 @@ const ganttProgressByProjectId = useMemo(() => {
                                         : aggregatedData;
                                     const exportName =
                                       selectedItemName &&
-                                      selectedItemType === "division"
+                                        selectedItemType === "division"
                                         ? `${selectedItemName} Division`
                                         : selectedItemName &&
-                                            selectedItemType === "district"
+                                          selectedItemType === "district"
                                           ? `${selectedItemName} District`
                                           : selectedItemName &&
-                                              selectedItemType === "tehsil"
+                                            selectedItemType === "tehsil"
                                             ? `${selectedItemName} Tehsil`
                                             : viewType === "divisions"
                                               ? "All Punjab Divisions"
@@ -2923,10 +2917,10 @@ const ganttProgressByProjectId = useMemo(() => {
                           selectedItemName && selectedItemType === "division"
                             ? `${selectedItemName} Division`
                             : selectedItemName &&
-                                selectedItemType === "district"
+                              selectedItemType === "district"
                               ? `${selectedItemName} District`
                               : selectedItemName &&
-                                  selectedItemType === "tehsil"
+                                selectedItemType === "tehsil"
                                 ? `${selectedItemName} Tehsil`
                                 : viewType === "divisions"
                                   ? "All Punjab Divisions"
@@ -3190,7 +3184,7 @@ const ganttProgressByProjectId = useMemo(() => {
                   {/* Project Cards from API */}
                   <div className="w-full">
                     <div className="mb-4">
-                      
+
                     </div>
 
                     {/* dropdown to pick project for KPI/Gantt */}
@@ -3881,23 +3875,23 @@ const ganttProgressByProjectId = useMemo(() => {
                   }
 
                   return pageProjects.map((project, index) => {
-                  const progress = Math.round(
-                    ganttProgressByProjectId.get(project.id) ?? 0,
-                  );
-                  return (
-                    <HierarchyCard
-                      key={project.id}
-                      title={project.project_name || `Project ${project.id}`}
-                      overallProgress={progress}
-                      onClick={() =>
-                        setSelectedProjectForDetails((prev) =>
-                          prev?.id === project.id ? null : project,
-                        )
-                      }
-                      color={CARD_COLORS[(start + index) % CARD_COLORS.length]}
-                      selected={selectedProjectForDetails?.id === project.id}
-                    />
-                  );
+                    const progress = Math.round(
+                      ganttProgressByProjectId.get(project.id) ?? 0,
+                    );
+                    return (
+                      <HierarchyCard
+                        key={project.id}
+                        title={project.project_name || `Project ${project.id}`}
+                        overallProgress={progress}
+                        onClick={() =>
+                          setSelectedProjectForDetails((prev) =>
+                            prev?.id === project.id ? null : project,
+                          )
+                        }
+                        color={CARD_COLORS[(start + index) % CARD_COLORS.length]}
+                        selected={selectedProjectForDetails?.id === project.id}
+                      />
+                    );
                   });
                 })()}
               </div>
