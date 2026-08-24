@@ -15,6 +15,7 @@ export type DashboardView =
 export interface DashboardSummary {
   total_projects: number;
   physical_progress: number;
+  has_physical_data?: boolean;
   financial_progress: number;
   overall_progress: number;
 
@@ -39,6 +40,7 @@ export interface HierarchyRow {
   name: string;
   project_count: number;
   physical_progress: number;
+  has_physical_data?: boolean;
   financial_progress: number;
   overall_progress: number;
 }
@@ -48,6 +50,7 @@ export interface DivisionRow {
   name: string;
   project_count: number;
   physical_progress: number;
+  has_physical_data?: boolean;
   financial_progress: number;
   overall_progress: number;
 
@@ -63,6 +66,7 @@ export interface DistrictRow {
   name: string;
   project_count: number;
   physical_progress: number;
+  has_physical_data?: boolean;
   financial_progress: number;
   overall_progress: number;
 
@@ -82,6 +86,7 @@ export interface TehsilRow {
   name: string;
   project_count: number;
   physical_progress: number;
+  has_physical_data?: boolean;
   financial_progress: number;
   overall_progress: number;
 
@@ -127,6 +132,7 @@ export interface DashboardProject {
   budget_remaining?: number | string | null;
 
   physical_progress: number;
+  has_physical_data?: boolean;
   financial_progress: number;
   overall_progress: number;
 
@@ -276,6 +282,11 @@ const normalizeProject = (
       row.physical_progress ?? 0
     ),
 
+  has_physical_data:
+    Boolean(
+      row.has_physical_data ?? true
+    ),
+
   financial_progress:
     Number(
       row.financial_progress ?? 0
@@ -301,14 +312,14 @@ const normalizeProject = (
 // ============================================================
 
 export async function getDashboardPageData(
-  viewType: DashboardView = "zones"
+  viewType: DashboardView = "divisions"
 ): Promise<DashboardPageData> {
 
   const page =
     PAGE_BY_VIEW[viewType] ??
-    "zones";
+    "divisions";
 
-  const response = await get(
+  const response: any = await get(
     `dashboard/${page}/`
   );
 

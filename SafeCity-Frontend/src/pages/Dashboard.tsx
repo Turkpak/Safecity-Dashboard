@@ -822,7 +822,7 @@ export default function Dashboard() {
     const map = new Map<number, number>();
     for (const row of pageData?.projects ?? []) {
       const id = Number((row as any).id);
-      const v = Number((row as any).overall_progress ?? 0);
+      const v = Number((row as any).physical_progress ?? 0);
       map.set(id, Number.isFinite(v) ? v : 0);
     }
     return map;
@@ -841,6 +841,53 @@ export default function Dashboard() {
     }
     return count > 0 ? sum / count : 0;
   }, [apiProjects, ganttProgressByProjectId]);
+
+  const averagePhysicalRows = useCallback((rows: any[]): number => {
+    const validRows = rows.filter((row) => {
+      if (!row) return false;
+      if (row.has_physical_data === false) return false;
+      const value = Number(row.physical_progress ?? 0);
+      return Number.isFinite(value);
+    });
+
+    if (validRows.length === 0) return 0;
+
+    const total = validRows.reduce(
+      (sum, row) => sum + clamp01(Number(row.physical_progress ?? 0)),
+      0,
+    );
+
+    return total / validRows.length;
+  }, []);
+
+  const selectedScopePhysical = useMemo(() => {
+    if (!selectedItemId || !selectedItemType) return null;
+
+    if (selectedItemType === "division") {
+      return averagePhysicalRows(
+        apiDistricts.filter((district) => Number(district.division ?? 0) === Number(selectedItemId)),
+      );
+    }
+
+    if (selectedItemType === "district") {
+      return averagePhysicalRows(
+        apiTehsils.filter((tehsil) => Number(tehsil.district ?? 0) === Number(selectedItemId)),
+      );
+    }
+
+    const tehsilProjects = apiProjects.filter(
+      (project) => Number((project as any).tehsil ?? 0) === Number(selectedItemId),
+    );
+
+    return averagePhysicalRows(tehsilProjects);
+  }, [
+    selectedItemId,
+    selectedItemType,
+    apiDistricts,
+    apiTehsils,
+    apiProjects,
+    averagePhysicalRows,
+  ]);
 
   const toSlug = (value: string) =>
     value
@@ -1469,11 +1516,11 @@ export default function Dashboard() {
     const roundPct = (n: number) => Math.max(0, Math.min(100, Number(n.toFixed(2))));
 
     const tehsilOverall = (tehsilId: number): number => {
-      return apiTehsils.find((tehsil) => tehsil.id === tehsilId)?.overall_progress ?? 0;
+      return apiTehsils.find((tehsil) => tehsil.id === tehsilId)?.physical_progress ?? 0;
     };
 
     const districtOverallFromTehsils = (districtId: number): number => {
-      return apiDistricts.find((district) => district.id === districtId)?.overall_progress ?? 0;
+      return apiDistricts.find((district) => district.id === districtId)?.physical_progress ?? 0;
     };
 
     if (selectedItemType === "division") {
@@ -1519,17 +1566,16 @@ export default function Dashboard() {
   ): CityInstallationData | null => {
     if (!itemId) return null;
 
-    if (itemType === "division") {
-      const found = apiDivisions.find((d) => d.id === itemId);
-      if (found) return generateCityDataFromOverall(found.overall_progress ?? 0);
-    } else if (itemType === "district") {
-      const found = apiDistricts.find((d) => d.id === itemId);
-      if (found) return generateCityDataFromOverall(found.overall_progress ?? 0);
-    } else {
-      const found = apiTehsils.find((t) => t.id === itemId);
-      if (found) return generateCityDataFromOverall(found.overall_progress ?? 0);
-    }
-    return null;
+    const exists =
+      itemType === "division"
+        ? apiDivisions.some((d) => Number(d.id) === Number(itemId))
+        : itemType === "district"
+          ? apiDistricts.some((d) => Number(d.id) === Number(itemId))
+          : apiTehsils.some((t) => Number(t.id) === Number(itemId));
+
+    if (!exists) return null;
+
+    return generateCityDataFromOverall(Number(selectedScopePhysical ?? 0));
   };
 
   // Get single item data
@@ -1538,7 +1584,14 @@ export default function Dashboard() {
       return getSingleItemData(selectedItemId, selectedItemType);
     }
     return null;
-  }, [selectedItemId, selectedItemType, apiDivisions, apiDistricts, apiTehsils]);
+  }, [
+    selectedItemId,
+    selectedItemType,
+    apiDivisions,
+    apiDistricts,
+    apiTehsils,
+    selectedScopePhysical,
+  ]);
 
   // Projects in the currently selected geography (division / district / tehsil) for "Best Performing Projects" cards
   const projectsInSelectedGeography = useMemo((): Project[] => {
@@ -1562,7 +1615,7 @@ export default function Dashboard() {
 
     const sortedProjects = [...baseProjects].sort(
       (a, b) =>
-        Number((b as any).overall_progress ?? 0) - Number((a as any).overall_progress ?? 0),
+        Number((b as any).physical_progress ?? 0) - Number((a as any).physical_progress ?? 0),
     );
 
     return sortedProjects.slice(0, 6);
@@ -1574,7 +1627,7 @@ export default function Dashboard() {
   // Get aggregated data based on view type (all projects)
   const aggregatedData = useMemo(() => {
     return generateCityDataFromOverall(
-      Number(pageData?.summary?.overall_progress ?? allProjectsOverallFromGantt),
+      Number(pageData?.summary?.physical_progress ?? allProjectsOverallFromGantt),
     );
   }, [pageData, allProjectsOverallFromGantt]);
 
@@ -1595,12 +1648,17 @@ export default function Dashboard() {
 
   // Overall for All Punjab Divisions (average of division overalls)
   const allDivisionsOverall = useMemo(() => {
-    return Number(pageData?.summary?.overall_progress ?? 0);
+    return Number(pageData?.summary?.physical_progress ?? 0);
   }, [pageData]);
 
   // Overall for All Punjab Districts (average of district overalls)
   const allDistrictsOverall = useMemo(() => {
-    return Number(pageData?.summary?.overall_progress ?? 0);
+    return Number(pageData?.summary?.physical_progress ?? 0);
+  }, [pageData]);
+
+  // Overall for All Punjab Tehsils (average of active tehsil physical progress rows)
+  const allTehsilsOverall = useMemo(() => {
+    return Number(pageData?.summary?.physical_progress ?? 0);
   }, [pageData]);
 
   // Context theme: follow the currently visible/selected area overall %
@@ -1609,7 +1667,7 @@ export default function Dashboard() {
     if (viewType === "projects" && !selectedItemName && !selectedItemType)
       return allProjectsOverallFromGantt;
     if (viewType === "tehsils" && !selectedItemName && !selectedItemType)
-      return allProjectsOverallFromGantt;
+      return allTehsilsOverall;
     if (viewType === "divisions" && !selectedItemName && !selectedItemType)
       return allDivisionsOverall;
     if (viewType === "districts" && !selectedItemName && !selectedItemType)
@@ -1624,6 +1682,7 @@ export default function Dashboard() {
     allProjectsOverallFromGantt,
     allDivisionsOverall,
     allDistrictsOverall,
+    allTehsilsOverall,
   ]);
 
   const contextTheme = useMemo(() => {
@@ -1643,7 +1702,7 @@ export default function Dashboard() {
   const divisionsData = useMemo(() => {
     return apiDivisions
       .map((div, index) => {
-        const overall = div.overall_progress ?? 0;
+        const overall = div.physical_progress ?? 0;
         return {
           id: div.id,
           name: div.division_name,
@@ -1659,7 +1718,7 @@ export default function Dashboard() {
   const districtsData = useMemo(() => {
     return apiDistricts
       .map((dist, index) => {
-        const overall = dist.overall_progress ?? 0;
+        const overall = dist.physical_progress ?? 0;
         return {
           id: dist.id,
           name: dist.district_name,
@@ -1705,7 +1764,7 @@ export default function Dashboard() {
     apiTehsils.forEach((teh, index) => {
       const districtName = teh.district_name ?? "Unknown District";
       if (!result[districtName]) result[districtName] = [];
-      const overall = teh.overall_progress ?? 0;
+      const overall = teh.physical_progress ?? 0;
       result[districtName].push({
         id: teh.id,
         name: teh.tehsil_name ?? "Unnamed Tehsil",
@@ -2027,7 +2086,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
                 {useProjectCards
                   ? visibleTopProjects.map((project, index) => {
-                    const percentage = Math.round((project as any).overall_progress ?? 0);
+                    const percentage = Math.round((project as any).physical_progress ?? 0);
                     const displayName =
                       project.project_name || `Project ${project.id}`;
                     const fullProject = projectLookupById.get(project.id) ?? (project as unknown as Project);
@@ -2686,7 +2745,6 @@ export default function Dashboard() {
 
       await exportProgressReport({
         view: DASHBOARD_VIEW_TO_API_PAGE[dashboardPage],
-        pageData,
         selection,
       });
     } catch (error) {
@@ -3010,7 +3068,7 @@ export default function Dashboard() {
                         : viewType === "tehsils" &&
                           !selectedItemName &&
                           !selectedItemType
-                          ? allProjectsOverallFromGantt
+                          ? allTehsilsOverall
                           : viewType === "divisions" &&
                             !selectedItemName &&
                             !selectedItemType
@@ -3385,7 +3443,7 @@ export default function Dashboard() {
               const districtTehsilsData = apiTehsils
                 .filter((t) => t.district === selectedItemId)
                 .map((teh, index) => {
-                  const overall = teh.overall_progress ?? 0;
+                  const overall = teh.physical_progress ?? 0;
                   return {
                     id: teh.id,
                     name: teh.tehsil_name,
@@ -3651,12 +3709,12 @@ export default function Dashboard() {
                   ).map((div) => (
                     <HierarchyCard
                       key={div.id}
-                      title={div.name}
+                      title={div.name ?? "Unknown Division"}
                       overallProgress={div.overall}
                       color={div.color}
                       onClick={() => {
                         setSelectedItemId(div.id);
-                        setSelectedItemName(div.name);
+                        setSelectedItemName(div.name ?? "Unknown Division");
                         setSelectedItemType("division");
                       }}
                     />
