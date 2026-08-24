@@ -903,6 +903,34 @@ export default function Dashboard() {
     }
 
     // ==========================================================
+    // ROOT VIEW
+    // A root URL such as ?view=districts must clear any stale
+    // Division/District/Tehsil drill-down state from the previous view.
+    // ==========================================================
+    const isRootView =
+      !level &&
+      !divisionSlug &&
+      !districtSlug &&
+      !tehsilSlug &&
+      (viewParam === "divisions" ||
+        viewParam === "districts" ||
+        viewParam === "tehsils" ||
+        viewParam === "projects");
+
+    if (isRootView) {
+      setSelectedItemName(null);
+      setSelectedItemType(null);
+      setSelectedItemId(null);
+      setParentDivisionId(null);
+      setParentDivisionName(null);
+      setParentDistrictId(null);
+      setParentDistrictName(null);
+      setSelectedProjectForDetails(null);
+      lastHydratedSelectionRef.current = hydrationKey;
+      return;
+    }
+
+    // ==========================================================
     // TEHSIL
     // ==========================================================
     if (level === "tehsil" && tehsilSlug) {
@@ -2571,21 +2599,35 @@ export default function Dashboard() {
   ];
 
   const handleViewTypeChange = useCallback((value: string) => {
+    if (
+      value !== "divisions" &&
+      value !== "districts" &&
+      value !== "tehsils" &&
+      value !== "projects"
+    ) {
+      return;
+    }
+
     const nextView = value as
       | "divisions"
       | "districts"
       | "tehsils"
       | "projects";
 
-    if (nextView === viewType) {
-      return;
-    }
+    // A radio-button change always means "go to the root of this view".
+    // Update both React state and the URL immediately so the URL hydration
+    // effect cannot restore the previous ?view= value during the transition.
+    const nextUrl = `/?view=${nextView}`;
+    const rootHydrationKey = ["", nextView, "", "", ""].join("|");
 
-    // (deleted: skipNextUrlSyncRef.current = true;)
+    skipNextUrlSyncRef.current = true;
+    lastSyncedUrlRef.current = nextUrl;
+    lastHydratedSelectionRef.current = rootHydrationKey;
 
     setSelectedItemName(null);
     setSelectedItemType(null);
     setSelectedItemId(null);
+    setSelectedProjectForDetails(null);
 
     setParentDivisionId(null);
     setParentDivisionName(null);
@@ -2605,14 +2647,19 @@ export default function Dashboard() {
     }
 
     setAllTehsilGroupsExpanded(false);
-
     setTehsilSearchQuery("");
     setDistrictSearchQuery("");
     setDivisionSearchQuery("");
     setProjectsSearch("");
+    setProjectsPage(1);
 
     setViewType(nextView);
-  }, [viewType]);
+
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+    if (currentUrl !== nextUrl) {
+      setLocation(nextUrl);
+    }
+  }, [setLocation]);
 
   const handleExportProgressReport = useCallback(async () => {
     if (!pageData || !viewType || isExportingReport) return;
