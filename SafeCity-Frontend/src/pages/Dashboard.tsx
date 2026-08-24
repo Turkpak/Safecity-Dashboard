@@ -390,7 +390,7 @@ function buildPhaseFromProjectGantt(
 
   const overallActual = clamp01(
     subProjects.reduce((sum, sp) => sum + sp.actualProgress * sp.weight, 0) /
-      Math.max(1e-9, subProjects.reduce((sum, sp) => sum + sp.weight, 0)),
+    Math.max(1e-9, subProjects.reduce((sum, sp) => sum + sp.weight, 0)),
   );
 
   const dates: Date[] = [];
@@ -534,7 +534,7 @@ const generateSubProjects = (
 const convertToPhaseProgress = (
   currentValue: number,
   phaseKey: string,
-  timelineData?: { month: string; [key: string]: number | string }[],
+  timelineData?: { month: string;[key: string]: number | string }[],
   division?: string,
   district?: string,
   tehsil?: string,
@@ -627,11 +627,11 @@ const CARD_COLORS = [
 
 type ProgressRangeMeta = {
   label:
-    | "Low Progress"
-    | "Moderate Progress"
-    | "Good Progress"
-    | "High Progress"
-    | "Fully Completed";
+  | "Low Progress"
+  | "Moderate Progress"
+  | "Good Progress"
+  | "High Progress"
+  | "Fully Completed";
   color: string; // hex
   min: number;
   max: number;
@@ -660,23 +660,23 @@ export default function Dashboard() {
   const [selectedItemType, setSelectedItemType] = useState<
     "division" | "district" | "tehsil" | null
   >(null);
-const dashboardPage = (viewType || "divisions") as "divisions" | "districts" | "tehsils" | "projects";
+  const dashboardPage = (viewType || "divisions") as "divisions" | "districts" | "tehsils" | "projects";
 
-// Keep the dashboard page names aligned to the canonical backend pages.
-// Legacy aliases remain supported on the backend for compatibility.
-const DASHBOARD_VIEW_TO_API_PAGE: Record< "divisions" | "districts" | "tehsils" | "projects",
-  DashboardView
-> = {
-  divisions: "divisions",
-  districts: "districts",
-  tehsils: "tehsils",
-  projects: "projects",
-};
+  // Keep the dashboard page names aligned to the canonical backend pages.
+  // Legacy aliases remain supported on the backend for compatibility.
+  const DASHBOARD_VIEW_TO_API_PAGE: Record<"divisions" | "districts" | "tehsils" | "projects",
+    DashboardView
+  > = {
+    divisions: "divisions",
+    districts: "districts",
+    tehsils: "tehsils",
+    projects: "projects",
+  };
 
-const { data: pageData, isLoading: isPageLoading } = useQuery({
-  queryKey: ["dashboard-page", dashboardPage],
-  queryFn: () => getDashboardPageData(DASHBOARD_VIEW_TO_API_PAGE[dashboardPage]),
-});
+  const { data: pageData, isLoading: isPageLoading } = useQuery({
+    queryKey: ["dashboard-page", dashboardPage],
+    queryFn: () => getDashboardPageData(DASHBOARD_VIEW_TO_API_PAGE[dashboardPage]),
+  });
 
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
@@ -803,30 +803,30 @@ const { data: pageData, isLoading: isPageLoading } = useQuery({
   const apiTopProjects = pageData?.bestPerformingProjects ?? [];
 
   // Fetch all gantt schedules once and use root task progress for each project card.
-//   const { data: progressSummary = {} } = useQuery({
-//   queryKey: ["project-progress-summary"],
-//   queryFn: () => getProjectProgressSummary(),
-// });
+  //   const { data: progressSummary = {} } = useQuery({
+  //   queryKey: ["project-progress-summary"],
+  //   queryFn: () => getProjectProgressSummary(),
+  // });
 
-// const ganttProgressByProjectId = useMemo(() => {
-//   const clampPct = (n: number) => Math.max(0, Math.min(100, n));
-//   const map = new Map<number, number>();
-//   for (const [pid, progress] of Object.entries(progressSummary)) {
-//     const n = Number(progress);
-//     map.set(Number(pid), Number.isFinite(n) ? clampPct(n) : 0);
-//   }
-//   return map;
-// }, [progressSummary]);
+  // const ganttProgressByProjectId = useMemo(() => {
+  //   const clampPct = (n: number) => Math.max(0, Math.min(100, n));
+  //   const map = new Map<number, number>();
+  //   for (const [pid, progress] of Object.entries(progressSummary)) {
+  //     const n = Number(progress);
+  //     map.set(Number(pid), Number.isFinite(n) ? clampPct(n) : 0);
+  //   }
+  //   return map;
+  // }, [progressSummary]);
 
-const ganttProgressByProjectId = useMemo(() => {
-  const map = new Map<number, number>();
-  for (const row of pageData?.projects ?? []) {
-    const id = Number((row as any).id);
-    const v = Number((row as any).overall_progress ?? 0);
-    map.set(id, Number.isFinite(v) ? v : 0);
-  }
-  return map;
-}, [pageData]);
+  const ganttProgressByProjectId = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const row of pageData?.projects ?? []) {
+      const id = Number((row as any).id);
+      const v = Number((row as any).overall_progress ?? 0);
+      map.set(id, Number.isFinite(v) ? v : 0);
+    }
+    return map;
+  }, [pageData]);
 
   // All Projects overall % (average of backend-calculated project values)
   const allProjectsOverallFromGantt = useMemo(() => {
@@ -850,382 +850,382 @@ const ganttProgressByProjectId = useMemo(() => {
       .replace(/[^a-z0-9-]/g, "");
 
   // Hydrate dashboard hierarchy state from clean URL query params (slug-based, no IDs).
-// ============================================================
-// HYDRATE STATE FROM URL
-// URL -> React state
-// ============================================================
-useEffect(() => {
-  if (
-    apiDivisions.length === 0 &&
-    apiDistricts.length === 0 &&
-    apiTehsils.length === 0
-  ) {
-    return;
-  }
-
-  const urlParams = new URLSearchParams(window.location.search);
-
-  const level = urlParams.get("level");
-  const viewParam = urlParams.get("view");
-
-  const divisionSlug = urlParams.get("division");
-  const districtSlug = urlParams.get("district");
-  const tehsilSlug = urlParams.get("tehsil");
-
-  // ----------------------------------------------------------
-  // VIEW
-  // ----------------------------------------------------------
-  if (
-    viewParam === "divisions" ||
-    viewParam === "districts" ||
-    viewParam === "tehsils" ||
-    viewParam === "projects"
-  ) {
-    if (viewType !== viewParam) {
-      skipNextUrlSyncRef.current = true;
-      setViewType(viewParam);
+  // ============================================================
+  // HYDRATE STATE FROM URL
+  // URL -> React state
+  // ============================================================
+  useEffect(() => {
+    if (
+      apiDivisions.length === 0 &&
+      apiDistricts.length === 0 &&
+      apiTehsils.length === 0
+    ) {
+      return;
     }
-  }
 
-  // ----------------------------------------------------------
-  // Create a stable key so we hydrate only once per URL
-  // ----------------------------------------------------------
-  const hydrationKey = [
-    level ?? "",
-    viewParam ?? "",
-    divisionSlug ?? "",
-    districtSlug ?? "",
-    tehsilSlug ?? "",
-  ].join("|");
+    const urlParams = new URLSearchParams(window.location.search);
 
-  if (lastHydratedSelectionRef.current === hydrationKey) {
-    return;
-  }
+    const level = urlParams.get("level");
+    const viewParam = urlParams.get("view");
 
-  // ==========================================================
-  // TEHSIL
-  // ==========================================================
-  if (level === "tehsil" && tehsilSlug) {
-    const foundTehsil = apiTehsils.find((t) => {
-      const tehsilName = t.tehsil_name ?? "";
-      const districtName = t.district_name ?? "";
-      const divisionName = t.division_name ?? "";
+    const divisionSlug = urlParams.get("division");
+    const districtSlug = urlParams.get("district");
+    const tehsilSlug = urlParams.get("tehsil");
 
-      return (
-        toSlug(tehsilName) === tehsilSlug &&
-        (!districtSlug || toSlug(districtName) === districtSlug) &&
-        (!divisionSlug || toSlug(divisionName) === divisionSlug)
+    // ----------------------------------------------------------
+    // VIEW
+    // ----------------------------------------------------------
+    if (
+      viewParam === "divisions" ||
+      viewParam === "districts" ||
+      viewParam === "tehsils" ||
+      viewParam === "projects"
+    ) {
+      if (viewType !== viewParam) {
+        skipNextUrlSyncRef.current = true;
+        setViewType(viewParam);
+      }
+    }
+
+    // ----------------------------------------------------------
+    // Create a stable key so we hydrate only once per URL
+    // ----------------------------------------------------------
+    const hydrationKey = [
+      level ?? "",
+      viewParam ?? "",
+      divisionSlug ?? "",
+      districtSlug ?? "",
+      tehsilSlug ?? "",
+    ].join("|");
+
+    if (lastHydratedSelectionRef.current === hydrationKey) {
+      return;
+    }
+
+    // ==========================================================
+    // TEHSIL
+    // ==========================================================
+    if (level === "tehsil" && tehsilSlug) {
+      const foundTehsil = apiTehsils.find((t) => {
+        const tehsilName = t.tehsil_name ?? "";
+        const districtName = t.district_name ?? "";
+        const divisionName = t.division_name ?? "";
+
+        return (
+          toSlug(tehsilName) === tehsilSlug &&
+          (!districtSlug || toSlug(districtName) === districtSlug) &&
+          (!divisionSlug || toSlug(divisionName) === divisionSlug)
+        );
+      });
+
+      if (!foundTehsil) return;
+
+      const tehsilName = foundTehsil.tehsil_name ?? null;
+      const districtName = foundTehsil.district_name ?? null;
+      const divisionName = foundTehsil.division_name ?? null;
+
+      if (!tehsilName) return;
+
+      skipNextUrlSyncRef.current = true;
+
+      setSelectedItemType((prev) =>
+        prev === "tehsil" ? prev : "tehsil"
       );
-    });
 
-    if (!foundTehsil) return;
-
-    const tehsilName = foundTehsil.tehsil_name ?? null;
-    const districtName = foundTehsil.district_name ?? null;
-    const divisionName = foundTehsil.division_name ?? null;
-
-    if (!tehsilName) return;
-
-    skipNextUrlSyncRef.current = true;
-
-    setSelectedItemType((prev) =>
-      prev === "tehsil" ? prev : "tehsil"
-    );
-
-    setSelectedItemId((prev) =>
-      prev === foundTehsil.id ? prev : foundTehsil.id
-    );
-
-    setSelectedItemName((prev) =>
-      prev === tehsilName ? prev : tehsilName
-    );
-
-    setParentDistrictId((prev) =>
-      prev === (foundTehsil.district ?? null)
-        ? prev
-        : (foundTehsil.district ?? null)
-    );
-
-    setParentDistrictName((prev) =>
-      prev === districtName ? prev : districtName
-    );
-
-    setParentDivisionId((prev) =>
-      prev === (foundTehsil.division ?? null)
-        ? prev
-        : (foundTehsil.division ?? null)
-    );
-
-    setParentDivisionName((prev) =>
-      prev === divisionName ? prev : divisionName
-    );
-
-    lastHydratedSelectionRef.current = hydrationKey;
-
-    return;
-  }
-
-  // ==========================================================
-  // DISTRICT
-  // ==========================================================
-  if (level === "district" && districtSlug) {
-    const foundDistrict = apiDistricts.find((d) => {
-      const districtName = d.district_name ?? "";
-      const divisionName = d.division_name ?? "";
-
-      return (
-        toSlug(districtName) === districtSlug &&
-        (!divisionSlug || toSlug(divisionName) === divisionSlug)
+      setSelectedItemId((prev) =>
+        prev === foundTehsil.id ? prev : foundTehsil.id
       );
-    });
 
-    if (!foundDistrict) return;
+      setSelectedItemName((prev) =>
+        prev === tehsilName ? prev : tehsilName
+      );
 
-    const districtName = foundDistrict.district_name ?? null;
-    const divisionName = foundDistrict.division_name ?? null;
+      setParentDistrictId((prev) =>
+        prev === (foundTehsil.district ?? null)
+          ? prev
+          : (foundTehsil.district ?? null)
+      );
 
-    if (!districtName) return;
+      setParentDistrictName((prev) =>
+        prev === districtName ? prev : districtName
+      );
 
-    skipNextUrlSyncRef.current = true;
+      setParentDivisionId((prev) =>
+        prev === (foundTehsil.division ?? null)
+          ? prev
+          : (foundTehsil.division ?? null)
+      );
 
-    setSelectedItemType((prev) =>
-      prev === "district" ? prev : "district"
-    );
+      setParentDivisionName((prev) =>
+        prev === divisionName ? prev : divisionName
+      );
 
-    setSelectedItemId((prev) =>
-      prev === foundDistrict.id
-        ? prev
-        : foundDistrict.id
-    );
+      lastHydratedSelectionRef.current = hydrationKey;
 
-    setSelectedItemName((prev) =>
-      prev === districtName
-        ? prev
-        : districtName
-    );
+      return;
+    }
 
-    setParentDivisionId((prev) =>
-      prev === (foundDistrict.division ?? null)
-        ? prev
-        : (foundDistrict.division ?? null)
-    );
+    // ==========================================================
+    // DISTRICT
+    // ==========================================================
+    if (level === "district" && districtSlug) {
+      const foundDistrict = apiDistricts.find((d) => {
+        const districtName = d.district_name ?? "";
+        const divisionName = d.division_name ?? "";
 
-    setParentDivisionName((prev) =>
-      prev === divisionName
-        ? prev
-        : divisionName
-    );
+        return (
+          toSlug(districtName) === districtSlug &&
+          (!divisionSlug || toSlug(divisionName) === divisionSlug)
+        );
+      });
 
-    setParentDistrictId(null);
-    setParentDistrictName(null);
+      if (!foundDistrict) return;
 
-    lastHydratedSelectionRef.current = hydrationKey;
+      const districtName = foundDistrict.district_name ?? null;
+      const divisionName = foundDistrict.division_name ?? null;
 
-    return;
-  }
+      if (!districtName) return;
 
-  // ==========================================================
-  // DIVISION
-  // ==========================================================
-  if (level === "division" && divisionSlug) {
-    const foundDivision = apiDivisions.find(
-      (d) =>
-        toSlug(d.division_name ?? "") === divisionSlug
-    );
+      skipNextUrlSyncRef.current = true;
 
-    if (!foundDivision) return;
+      setSelectedItemType((prev) =>
+        prev === "district" ? prev : "district"
+      );
 
-    const divisionName = foundDivision.division_name ?? null;
+      setSelectedItemId((prev) =>
+        prev === foundDistrict.id
+          ? prev
+          : foundDistrict.id
+      );
 
-    if (!divisionName) return;
+      setSelectedItemName((prev) =>
+        prev === districtName
+          ? prev
+          : districtName
+      );
 
-    skipNextUrlSyncRef.current = true;
+      setParentDivisionId((prev) =>
+        prev === (foundDistrict.division ?? null)
+          ? prev
+          : (foundDistrict.division ?? null)
+      );
 
-    setSelectedItemType((prev) =>
-      prev === "division" ? prev : "division"
-    );
+      setParentDivisionName((prev) =>
+        prev === divisionName
+          ? prev
+          : divisionName
+      );
 
-    setSelectedItemId((prev) =>
-      prev === foundDivision.id
-        ? prev
-        : foundDivision.id
-    );
+      setParentDistrictId(null);
+      setParentDistrictName(null);
 
-    setSelectedItemName((prev) =>
-      prev === divisionName
-        ? prev
-        : divisionName
-    );
+      lastHydratedSelectionRef.current = hydrationKey;
 
-    setParentDivisionId(null);
-    setParentDivisionName(null);
-    setParentDistrictId(null);
-    setParentDistrictName(null);
+      return;
+    }
 
-    lastHydratedSelectionRef.current = hydrationKey;
+    // ==========================================================
+    // DIVISION
+    // ==========================================================
+    if (level === "division" && divisionSlug) {
+      const foundDivision = apiDivisions.find(
+        (d) =>
+          toSlug(d.division_name ?? "") === divisionSlug
+      );
 
-    return;
-  }
+      if (!foundDivision) return;
 
-  // ==========================================================
-  // OLD ?tehsil=name SUPPORT
-  // ==========================================================
-  const tehsilParam = urlParams.get("tehsil");
+      const divisionName = foundDivision.division_name ?? null;
 
-  if (tehsilParam && !level) {
-    const decodedTehsil = decodeURIComponent(tehsilParam);
+      if (!divisionName) return;
 
-    const found = apiTehsils.find(
-      (t) =>
-        (t.tehsil_name ?? "").toLowerCase() ===
-        decodedTehsil.toLowerCase()
-    );
+      skipNextUrlSyncRef.current = true;
 
-    if (!found) return;
+      setSelectedItemType((prev) =>
+        prev === "division" ? prev : "division"
+      );
 
-    const tehsilName = found.tehsil_name ?? null;
+      setSelectedItemId((prev) =>
+        prev === foundDivision.id
+          ? prev
+          : foundDivision.id
+      );
 
-    if (!tehsilName) return;
+      setSelectedItemName((prev) =>
+        prev === divisionName
+          ? prev
+          : divisionName
+      );
 
-    skipNextUrlSyncRef.current = true;
+      setParentDivisionId(null);
+      setParentDivisionName(null);
+      setParentDistrictId(null);
+      setParentDistrictName(null);
 
-    setSelectedItemType("tehsil");
-    setSelectedItemId(found.id);
-    setSelectedItemName(tehsilName);
+      lastHydratedSelectionRef.current = hydrationKey;
 
-    setParentDistrictId(found.district ?? null);
-    setParentDistrictName(found.district_name ?? null);
+      return;
+    }
 
-    setParentDivisionId(found.division ?? null);
-    setParentDivisionName(found.division_name ?? null);
+    // ==========================================================
+    // OLD ?tehsil=name SUPPORT
+    // ==========================================================
+    const tehsilParam = urlParams.get("tehsil");
 
-    lastHydratedSelectionRef.current = hydrationKey;
-  }
-}, [
-  location,
-  apiDivisions,
-  apiDistricts,
-  apiTehsils,
-]);
+    if (tehsilParam && !level) {
+      const decodedTehsil = decodeURIComponent(tehsilParam);
+
+      const found = apiTehsils.find(
+        (t) =>
+          (t.tehsil_name ?? "").toLowerCase() ===
+          decodedTehsil.toLowerCase()
+      );
+
+      if (!found) return;
+
+      const tehsilName = found.tehsil_name ?? null;
+
+      if (!tehsilName) return;
+
+      skipNextUrlSyncRef.current = true;
+
+      setSelectedItemType("tehsil");
+      setSelectedItemId(found.id);
+      setSelectedItemName(tehsilName);
+
+      setParentDistrictId(found.district ?? null);
+      setParentDistrictName(found.district_name ?? null);
+
+      setParentDivisionId(found.division ?? null);
+      setParentDivisionName(found.division_name ?? null);
+
+      lastHydratedSelectionRef.current = hydrationKey;
+    }
+  }, [
+    location,
+    apiDivisions,
+    apiDistricts,
+    apiTehsils,
+  ]);
 
   // Keep URL in sync with drilldown selection.
   // ============================================================
-// SYNC REACT STATE -> URL
-// ============================================================
-useEffect(() => {
-  // URL hydration caused this state update.
-  // Do NOT immediately write it back to the URL.
-  if (skipNextUrlSyncRef.current) {
-    skipNextUrlSyncRef.current = false;
-    return;
-  }
-
-  const params = new URLSearchParams();
-
-  // ----------------------------------------------------------
-  // View
-  // ----------------------------------------------------------
-  if (viewType) {
-    params.set("view", viewType);
-  }
-
-  // ----------------------------------------------------------
-  // Division
-  // ----------------------------------------------------------
-  if (
-    selectedItemType === "division" &&
-    selectedItemId != null &&
-    selectedItemName
-  ) {
-    params.set("level", "division");
-    params.set("division", toSlug(selectedItemName));
-  }
-
-  // ----------------------------------------------------------
-  // District
-  // ----------------------------------------------------------
-  else if (
-    selectedItemType === "district" &&
-    selectedItemId != null &&
-    selectedItemName
-  ) {
-    params.set("level", "district");
-    params.set("district", toSlug(selectedItemName));
-
-    if (
-      parentDivisionId != null &&
-      parentDivisionName
-    ) {
-      params.set(
-        "division",
-        toSlug(parentDivisionName)
-      );
-    }
-  }
-
-  // ----------------------------------------------------------
-  // Tehsil
-  // ----------------------------------------------------------
-  else if (
-    selectedItemType === "tehsil" &&
-    selectedItemId != null &&
-    selectedItemName
-  ) {
-    params.set("level", "tehsil");
-    params.set("tehsil", toSlug(selectedItemName));
-
-    if (
-      parentDistrictId != null &&
-      parentDistrictName
-    ) {
-      params.set(
-        "district",
-        toSlug(parentDistrictName)
-      );
+  // SYNC REACT STATE -> URL
+  // ============================================================
+  useEffect(() => {
+    // URL hydration caused this state update.
+    // Do NOT immediately write it back to the URL.
+    if (skipNextUrlSyncRef.current) {
+      skipNextUrlSyncRef.current = false;
+      return;
     }
 
-    if (
-      parentDivisionId != null &&
-      parentDivisionName
-    ) {
-      params.set(
-        "division",
-        toSlug(parentDivisionName)
-      );
+    const params = new URLSearchParams();
+
+    // ----------------------------------------------------------
+    // View
+    // ----------------------------------------------------------
+    if (viewType) {
+      params.set("view", viewType);
     }
-  }
 
-  const nextUrl = params.toString()
-    ? `/?${params.toString()}`
-    : "/";
+    // ----------------------------------------------------------
+    // Division
+    // ----------------------------------------------------------
+    if (
+      selectedItemType === "division" &&
+      selectedItemId != null &&
+      selectedItemName
+    ) {
+      params.set("level", "division");
+      params.set("division", toSlug(selectedItemName));
+    }
 
-  const currentUrl =
-    `${window.location.pathname}${window.location.search}`;
+    // ----------------------------------------------------------
+    // District
+    // ----------------------------------------------------------
+    else if (
+      selectedItemType === "district" &&
+      selectedItemId != null &&
+      selectedItemName
+    ) {
+      params.set("level", "district");
+      params.set("district", toSlug(selectedItemName));
 
-  // Nothing changed -> DO NOTHING
-  if (currentUrl === nextUrl) {
-    return;
-  }
+      if (
+        parentDivisionId != null &&
+        parentDivisionName
+      ) {
+        params.set(
+          "division",
+          toSlug(parentDivisionName)
+        );
+      }
+    }
 
-  // Already attempted this URL -> DO NOTHING
-  if (lastSyncedUrlRef.current === nextUrl) {
-    return;
-  }
+    // ----------------------------------------------------------
+    // Tehsil
+    // ----------------------------------------------------------
+    else if (
+      selectedItemType === "tehsil" &&
+      selectedItemId != null &&
+      selectedItemName
+    ) {
+      params.set("level", "tehsil");
+      params.set("tehsil", toSlug(selectedItemName));
 
-  lastSyncedUrlRef.current = nextUrl;
+      if (
+        parentDistrictId != null &&
+        parentDistrictName
+      ) {
+        params.set(
+          "district",
+          toSlug(parentDistrictName)
+        );
+      }
 
-  setLocation(nextUrl);
-}, [
-  viewType,
-  selectedItemType,
-  selectedItemId,
-  selectedItemName,
-  parentDivisionId,
-  parentDivisionName,
-  parentDistrictId,
-  parentDistrictName,
-  setLocation,
-]);
+      if (
+        parentDivisionId != null &&
+        parentDivisionName
+      ) {
+        params.set(
+          "division",
+          toSlug(parentDivisionName)
+        );
+      }
+    }
+
+    const nextUrl = params.toString()
+      ? `/?${params.toString()}`
+      : "/";
+
+    const currentUrl =
+      `${window.location.pathname}${window.location.search}`;
+
+    // Nothing changed -> DO NOTHING
+    if (currentUrl === nextUrl) {
+      return;
+    }
+
+    // Already attempted this URL -> DO NOTHING
+    if (lastSyncedUrlRef.current === nextUrl) {
+      return;
+    }
+
+    lastSyncedUrlRef.current = nextUrl;
+
+    setLocation(nextUrl);
+  }, [
+    viewType,
+    selectedItemType,
+    selectedItemId,
+    selectedItemName,
+    parentDivisionId,
+    parentDivisionName,
+    parentDistrictId,
+    parentDistrictName,
+    setLocation,
+  ]);
 
   // Simulate loading on initial mount and when view type changes
   useEffect(() => {
@@ -1339,10 +1339,10 @@ useEffect(() => {
       viewType === "districts"
         ? "All Districts"
         : viewType === "tehsils"
-        ? "All Tehsils"
-        : viewType === "projects"
-        ? "All Projects"
-        : "All Divisions";
+          ? "All Tehsils"
+          : viewType === "projects"
+            ? "All Projects"
+            : "All Divisions";
 
     const flow: NavigationStep[] = [
       {
@@ -1490,7 +1490,7 @@ useEffect(() => {
     itemType: "division" | "district" | "tehsil",
   ): CityInstallationData | null => {
     if (!itemId) return null;
-    
+
     if (itemType === "division") {
       const found = apiDivisions.find((d) => d.id === itemId);
       if (found) return generateCityDataFromOverall(found.overall_progress ?? 0);
@@ -1973,32 +1973,32 @@ useEffect(() => {
         {/* Best Performing Projects (hide inside selected division/district/tehsil views) */}
         {showBestPerformingSection && (
           <div className="w-full">
-          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 min-w-0">
-            <div className="min-w-0">
-              <h2 className="text-xl font-bold font-heading mb-1">
-                Best Performing Projects
-              </h2>
-              
+            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 min-w-0">
+              <div className="min-w-0">
+                <h2 className="text-xl font-bold font-heading mb-1">
+                  Best Performing Projects
+                </h2>
+
+              </div>
+              {(selectedMilestoneKey || isSelectedProjectInThisScope) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedMilestoneKey(null);
+                    if (useProjectCards && projectCardsInteractive) {
+                      setSelectedProjectForDetails(null);
+                    }
+                  }}
+                  className="h-8 px-3 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700 border-0 transition-colors whitespace-nowrap flex-shrink-0"
+                >
+                  Clear
+                </button>
+              )}
             </div>
-            {(selectedMilestoneKey || isSelectedProjectInThisScope) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedMilestoneKey(null);
-                  if (useProjectCards && projectCardsInteractive) {
-                    setSelectedProjectForDetails(null);
-                  }
-                }}
-                className="h-8 px-3 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700 border-0 transition-colors whitespace-nowrap flex-shrink-0"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-          {visibleTopProjects.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-              {useProjectCards
-                ? visibleTopProjects.map((project, index) => {
+            {visibleTopProjects.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+                {useProjectCards
+                  ? visibleTopProjects.map((project, index) => {
                     const percentage = Math.round((project as any).overall_progress ?? 0);
                     const displayName =
                       project.project_name || `Project ${project.id}`;
@@ -2021,62 +2021,62 @@ useEffect(() => {
                         onClick={
                           projectCardsInteractive
                             ? () => {
-                                setSelectedMilestoneKey(null);
-                                setSelectedProjectForDetails((prev) =>
-                                  prev?.id === fullProject.id ? null : fullProject,
-                                );
-                              }
+                              setSelectedMilestoneKey(null);
+                              setSelectedProjectForDetails((prev) =>
+                                prev?.id === fullProject.id ? null : fullProject,
+                              );
+                            }
                             : undefined
                         }
                       />
                     );
                   })
-                : installationPhases.map((phase) => {
-                  const progress = data[phase.key];
-                  const hasDetails = hasDetailedProgress(progress);
-                  const progressValue = hasDetails
-                    ? Math.round(progress.actual)
-                    : Math.round(getProgressValue(progress));
+                  : installationPhases.map((phase) => {
+                    const progress = data[phase.key];
+                    const hasDetails = hasDetailedProgress(progress);
+                    const progressValue = hasDetails
+                      ? Math.round(progress.actual)
+                      : Math.round(getProgressValue(progress));
 
-                  return (
-                    <InstallationCard
-                      key={`${title}-${phase.key}`}
-                      title={phase.title}
-                      percentage={progressValue}
-                      icon={phase.icon}
-                      color={phase.color as unknown as "green"}
-                      actualProgress={hasDetails ? progress.actual : undefined}
-                      plannedProgress={hasDetails ? progress.planned : undefined}
-                      selected={selectedMilestoneKey === phase.key}
-                      onClick={() => {
-                        setSelectedMilestoneKey((prev) =>
-                          prev === phase.key ? null : phase.key,
-                        );
-                      }}
-                    />
-                  );
-                })}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
-              No projects are available for this dashboard view.
-            </div>
-          )}
+                    return (
+                      <InstallationCard
+                        key={`${title}-${phase.key}`}
+                        title={phase.title}
+                        percentage={progressValue}
+                        icon={phase.icon}
+                        color={phase.color as unknown as "green"}
+                        actualProgress={hasDetails ? progress.actual : undefined}
+                        plannedProgress={hasDetails ? progress.planned : undefined}
+                        selected={selectedMilestoneKey === phase.key}
+                        onClick={() => {
+                          setSelectedMilestoneKey((prev) =>
+                            prev === phase.key ? null : phase.key,
+                          );
+                        }}
+                      />
+                    );
+                  })}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+                No projects are available for this dashboard view.
+              </div>
+            )}
 
-          {/* Selected project details (Gantt / WBS) for Division/District views */}
-          {isSelectedProjectInThisScope && (
-            <div className="mt-6">
-              <MilestoneDetailsPanel
-                milestoneTitle={`${selectedProjectForDetails!.project_name || `Project ${selectedProjectForDetails!.id}`} - Project Gantt`}
-                phase={selectedProjectPhase}
-                phaseColor="#3b82f6"
-                flatGanttTasks={selectedProjectGanttTasks as any}
-                ganttProjectId={selectedProjectForDetails!.id}
-                onProjectGanttRefresh={refetchSelectedProjectGantt}
-                onClear={() => setSelectedProjectForDetails(null)}
-              />
-            </div>
-          )}
+            {/* Selected project details (Gantt / WBS) for Division/District views */}
+            {isSelectedProjectInThisScope && (
+              <div className="mt-6">
+                <MilestoneDetailsPanel
+                  milestoneTitle={`${selectedProjectForDetails!.project_name || `Project ${selectedProjectForDetails!.id}`} - Project Gantt`}
+                  phase={selectedProjectPhase}
+                  phaseColor="#3b82f6"
+                  flatGanttTasks={selectedProjectGanttTasks as any}
+                  ganttProjectId={selectedProjectForDetails!.id}
+                  onProjectGanttRefresh={refetchSelectedProjectGantt}
+                  onClear={() => setSelectedProjectForDetails(null)}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -2404,17 +2404,15 @@ useEffect(() => {
                         prev === "physical" ? "financial" : "physical",
                       )
                     }
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                      progressType === "financial" ? "bg-primary" : "bg-muted"
-                    }`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${progressType === "financial" ? "bg-primary" : "bg-muted"
+                      }`}
                     aria-label="Toggle between Physical and Financial Progress"
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
-                        progressType === "financial"
-                          ? "translate-x-6"
-                          : "translate-x-1"
-                      }`}
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${progressType === "financial"
+                        ? "translate-x-6"
+                        : "translate-x-1"
+                        }`}
                     />
                   </button>
                   <DollarSign
@@ -2436,17 +2434,17 @@ useEffect(() => {
                 phase={
                   progressType === "financial"
                     ? convertToFinancialProgress({
-                        actual: selectedProgress.actual,
-                        planned: selectedProgress.planned,
-                        subProjects: selectedProgress.subProjects,
-                        timeline: selectedProgress.timeline,
-                      })
+                      actual: selectedProgress.actual,
+                      planned: selectedProgress.planned,
+                      subProjects: selectedProgress.subProjects,
+                      timeline: selectedProgress.timeline,
+                    })
                     : {
-                        actual: selectedProgress.actual,
-                        planned: selectedProgress.planned,
-                        subProjects: selectedProgress.subProjects,
-                        timeline: selectedProgress.timeline,
-                      }
+                      actual: selectedProgress.actual,
+                      planned: selectedProgress.planned,
+                      subProjects: selectedProgress.subProjects,
+                      timeline: selectedProgress.timeline,
+                    }
                 }
                 phaseColor={colorMap[selectedPhaseMeta.color] || "#6b7280"}
                 onClear={() => setSelectedMilestoneKey(null)}
@@ -2572,49 +2570,93 @@ useEffect(() => {
     },
   ];
 
-                      const handleViewTypeChange = useCallback((value: string) => {
-  const nextView = value as
-    | "divisions"
-    | "districts"
-    | "tehsils"
-    | "projects";
+  const handleViewTypeChange = useCallback((value: string) => {
+    const nextView = value as
+      | "divisions"
+      | "districts"
+      | "tehsils"
+      | "projects";
 
-  if (nextView === viewType) {
-    return;
-  }
+    if (nextView === viewType) {
+      return;
+    }
 
-  // (deleted: skipNextUrlSyncRef.current = true;)
+    // (deleted: skipNextUrlSyncRef.current = true;)
 
-  setSelectedItemName(null);
-  setSelectedItemType(null);
-  setSelectedItemId(null);
+    setSelectedItemName(null);
+    setSelectedItemType(null);
+    setSelectedItemId(null);
 
-  setParentDivisionId(null);
-  setParentDivisionName(null);
-  setParentDistrictId(null);
-  setParentDistrictName(null);
+    setParentDivisionId(null);
+    setParentDivisionName(null);
+    setParentDistrictId(null);
+    setParentDistrictName(null);
 
-  setExpandedDivisions(false);
-  setExpandedDistricts(false);
+    setExpandedDivisions(false);
+    setExpandedDistricts(false);
 
-  if (nextView === "tehsils") {
-    setExpandedTehsilGroups({
-      Lahore: true,
-      Sheikhupura: true,
-    });
-  } else {
-    setExpandedTehsilGroups({});
-  }
+    if (nextView === "tehsils") {
+      setExpandedTehsilGroups({
+        Lahore: true,
+        Sheikhupura: true,
+      });
+    } else {
+      setExpandedTehsilGroups({});
+    }
 
-  setAllTehsilGroupsExpanded(false);
+    setAllTehsilGroupsExpanded(false);
 
-  setTehsilSearchQuery("");
-  setDistrictSearchQuery("");
-  setDivisionSearchQuery("");
-  setProjectsSearch("");
+    setTehsilSearchQuery("");
+    setDistrictSearchQuery("");
+    setDivisionSearchQuery("");
+    setProjectsSearch("");
 
-  setViewType(nextView);
-}, [viewType]);
+    setViewType(nextView);
+  }, [viewType]);
+
+  const handleExportProgressReport = useCallback(async () => {
+    if (!pageData || !viewType || isExportingReport) return;
+
+    setIsExportingReport(true);
+    try {
+      // Selection priority is intentionally Project -> Geography -> Root scope.
+      // This keeps the exported PDF synchronized with what the user is currently viewing.
+      const selection = selectedProjectForDetails?.id
+        ? {
+            type: "project" as const,
+            id: Number(selectedProjectForDetails.id),
+            name:
+              selectedProjectForDetails.project_name ||
+              `Project ${selectedProjectForDetails.id}`,
+          }
+        : selectedItemType && selectedItemId && selectedItemName
+          ? {
+              type: selectedItemType,
+              id: Number(selectedItemId),
+              name: selectedItemName,
+            }
+          : null;
+
+      await exportProgressReport({
+        view: DASHBOARD_VIEW_TO_API_PAGE[dashboardPage],
+        selection,
+      });
+    } catch (error) {
+      console.error("Failed to export PSCA progress report", error);
+      setShowErrorDialog(true);
+    } finally {
+      setIsExportingReport(false);
+    }
+  }, [
+    pageData,
+    viewType,
+    dashboardPage,
+    selectedProjectForDetails,
+    selectedItemType,
+    selectedItemId,
+    selectedItemName,
+    isExportingReport,
+  ]);
 
   return (
     <Layout
@@ -2625,7 +2667,17 @@ useEffect(() => {
           onClick={handleExportProgressReport}
           disabled={!pageData || isPageLoading || isExportingReport}
           className="h-9 gap-2 rounded-lg bg-[#1e3a8a] px-3 text-white shadow-sm hover:bg-[#1d4ed8] disabled:opacity-50"
-          title={`Export 2-page PDF report for ${selectedItemName || (viewType === "projects" ? "All Projects" : viewType === "districts" ? "All Districts" : viewType === "tehsils" ? "All Tehsils" : "All Divisions")}`}
+          title={`Export 2-page PDF report for ${
+            selectedProjectForDetails?.project_name ||
+            selectedItemName ||
+            (viewType === "projects"
+              ? "All Projects"
+              : viewType === "districts"
+                ? "All Districts"
+                : viewType === "tehsils"
+                  ? "All Tehsils"
+                  : "All Divisions")
+          }`}
         >
           <FileDown className="h-4 w-4" />
           <span className="hidden sm:inline">
@@ -2668,13 +2720,12 @@ useEffect(() => {
 
           {/* Filter Bar Section - Radio Buttons */}
           <div
-            className={`relative transition-all duration-300 order-2 md:order-1 ${
-              isFilterBarExpanded
-                ? "border-b border-border/30 pb-3 px-3 sm:px-6 pt-3 sm:pt-4"
-                : "pb-2 px-3 sm:px-4 pt-2 sm:pt-3"
-            }`}
+            className={`relative transition-all duration-300 order-2 md:order-1 ${isFilterBarExpanded
+              ? "border-b border-border/30 pb-3 px-3 sm:px-6 pt-3 sm:pt-4"
+              : "pb-2 px-3 sm:px-4 pt-2 sm:pt-3"
+              }`}
           >
-                        <div className="flex items-start justify-between gap-2 sm:gap-4">
+            <div className="flex items-start justify-between gap-2 sm:gap-4">
               <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
                 {/* Filters Label / Toggle */}
                 <div
@@ -2783,11 +2834,10 @@ useEffect(() => {
                           step.clickable && handleNavigateToLevel(step.key)
                         }
                         disabled={!step.clickable}
-                        className={`flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors shrink-0 ${
-                          step.clickable
-                            ? "border-[#1e3a8a] bg-[#1e3a8a] text-white hover:bg-[#1d4ed8] cursor-pointer"
-                            : "border-[#b91c1c] bg-[#b91c1c] text-white cursor-default"
-                        }`}
+                        className={`flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors shrink-0 ${step.clickable
+                          ? "border-[#1e3a8a] bg-[#1e3a8a] text-white hover:bg-[#1d4ed8] cursor-pointer"
+                          : "border-[#b91c1c] bg-[#b91c1c] text-white cursor-default"
+                          }`}
                       >
                         {idx > 0 && (
                           <span className="text-white/80" aria-hidden>
@@ -2811,7 +2861,7 @@ useEffect(() => {
               >
                 {isFilterBarExpanded ? (
                   <ChevronUp className="h-4 w-4" />
-                ) : 
+                ) :
                   <ChevronDown className="h-4 w-4" />
                 }
               </Button>
@@ -2832,11 +2882,10 @@ useEffect(() => {
                         step.clickable && handleNavigateToLevel(step.key)
                       }
                       disabled={!step.clickable}
-                      className={`flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors min-w-0 justify-center sm:justify-start ${
-                        step.clickable
-                          ? "border-[#1e3a8a] bg-[#1e3a8a] text-white hover:bg-[#1d4ed8] cursor-pointer"
-                          : "border-[#b91c1c] bg-[#b91c1c] text-white cursor-default"
-                      }`}
+                      className={`flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors min-w-0 justify-center sm:justify-start ${step.clickable
+                        ? "border-[#1e3a8a] bg-[#1e3a8a] text-white hover:bg-[#1d4ed8] cursor-pointer"
+                        : "border-[#b91c1c] bg-[#b91c1c] text-white cursor-default"
+                        }`}
                     >
                       {idx > 0 && (
                         <span className="text-white/80" aria-hidden>
@@ -2853,11 +2902,10 @@ useEffect(() => {
 
           {/* Header Content Section - Collapsible */}
           <div
-            className={`relative flex flex-col md:flex-row md:items-start justify-between gap-4 transition-all duration-300 ease-in-out overflow-hidden order-1 md:order-2 ${
-              isFilterBarExpanded
-                ? "max-h-[500px] opacity-100 px-4 md:px-6 pt-2 pb-4 md:pb-5"
-                : "max-h-0 opacity-0 p-0"
-            }`}
+            className={`relative flex flex-col md:flex-row md:items-start justify-between gap-4 transition-all duration-300 ease-in-out overflow-hidden order-1 md:order-2 ${isFilterBarExpanded
+              ? "max-h-[500px] opacity-100 px-4 md:px-6 pt-2 pb-4 md:pb-5"
+              : "max-h-0 opacity-0 p-0"
+              }`}
           >
             <div className="flex-1 min-w-0">
               {(() => {
@@ -2908,22 +2956,22 @@ useEffect(() => {
                     selectedItemName && singleItemData
                       ? singleItemData.overall
                       : viewType === "projects" &&
-                          !selectedItemName &&
-                          !selectedItemType
+                        !selectedItemName &&
+                        !selectedItemType
                         ? allProjectsOverallFromGantt
                         : viewType === "tehsils" &&
-                            !selectedItemName &&
-                            !selectedItemType
+                          !selectedItemName &&
+                          !selectedItemType
                           ? allProjectsOverallFromGantt
                           : viewType === "divisions" &&
-                              !selectedItemName &&
-                              !selectedItemType
+                            !selectedItemName &&
+                            !selectedItemType
                             ? allDivisionsOverall
-                          : viewType === "districts" &&
+                            : viewType === "districts" &&
                               !selectedItemName &&
                               !selectedItemType
-                            ? allDistrictsOverall
-                        : aggregatedData?.overall || 0;
+                              ? allDistrictsOverall
+                              : aggregatedData?.overall || 0;
                   const meta = getProgressRangeMeta(overall);
                   const overallLabel =
                     viewType === "projects" && !selectedItemName && !selectedItemType
@@ -2932,9 +2980,9 @@ useEffect(() => {
                         ? `${overall.toFixed(2)}`
                         : viewType === "divisions" && !selectedItemName && !selectedItemType
                           ? `${overall.toFixed(2)}`
-                        : viewType === "districts" && !selectedItemName && !selectedItemType
-                          ? `${overall.toFixed(2)}`
-                      : `${Math.round(overall)}`;
+                          : viewType === "districts" && !selectedItemName && !selectedItemType
+                            ? `${overall.toFixed(2)}`
+                            : `${Math.round(overall)}`;
 
                   // Map color to Tailwind classes
                   const getBadgeClasses = (color: string) => {
@@ -3027,13 +3075,13 @@ useEffect(() => {
                                         : aggregatedData;
                                     const exportName =
                                       selectedItemName &&
-                                      selectedItemType === "division"
+                                        selectedItemType === "division"
                                         ? `${selectedItemName} Division`
                                         : selectedItemName &&
-                                            selectedItemType === "district"
+                                          selectedItemType === "district"
                                           ? `${selectedItemName} District`
                                           : selectedItemName &&
-                                              selectedItemType === "tehsil"
+                                            selectedItemType === "tehsil"
                                             ? `${selectedItemName} Tehsil`
                                             : viewType === "divisions"
                                               ? "All Punjab Divisions"
@@ -3127,10 +3175,10 @@ useEffect(() => {
                           selectedItemName && selectedItemType === "division"
                             ? `${selectedItemName} Division`
                             : selectedItemName &&
-                                selectedItemType === "district"
+                              selectedItemType === "district"
                               ? `${selectedItemName} District`
                               : selectedItemName &&
-                                  selectedItemType === "tehsil"
+                                selectedItemType === "tehsil"
                                 ? `${selectedItemName} Tehsil`
                                 : viewType === "divisions"
                                   ? "All Punjab Divisions"
@@ -3394,7 +3442,7 @@ useEffect(() => {
                   {/* Project Cards from API */}
                   <div className="w-full">
                     <div className="mb-4">
-                      
+
                     </div>
 
                     {/* dropdown to pick project for KPI/Gantt */}
@@ -3827,16 +3875,16 @@ useEffect(() => {
 
                   {/* Tehsil Cards Grouped by District */}
                   {filteredDistricts.length === 0 ? (
-                      <Card className="border-border/50">
-                        <CardContent className="p-8 text-center">
-                          <p className="text-muted-foreground">
-                            {tehsilSearchQuery
-                              ? `No tehsils found matching "${tehsilSearchQuery}". Please try a different search term.`
-                              : "No tehsils found."}
-                          </p>
-                        </CardContent>
-                      </Card>
-                    ) : (
+                    <Card className="border-border/50">
+                      <CardContent className="p-8 text-center">
+                        <p className="text-muted-foreground">
+                          {tehsilSearchQuery
+                            ? `No tehsils found matching "${tehsilSearchQuery}". Please try a different search term.`
+                            : "No tehsils found."}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
                     <div className="space-y-6">
                       {filteredDistricts.map(
                         ([districtName, tehsils]: [
@@ -4092,23 +4140,23 @@ useEffect(() => {
                   }
 
                   return pageProjects.map((project, index) => {
-                  const progress = Math.round(
-                    ganttProgressByProjectId.get(project.id) ?? 0,
-                  );
-                  return (
-                    <HierarchyCard
-                      key={project.id}
-                      title={project.project_name || `Project ${project.id}`}
-                      overallProgress={progress}
-                      onClick={() =>
-                        setSelectedProjectForDetails((prev) =>
-                          prev?.id === project.id ? null : project,
-                        )
-                      }
-                      color={CARD_COLORS[(start + index) % CARD_COLORS.length]}
-                      selected={selectedProjectForDetails?.id === project.id}
-                    />
-                  );
+                    const progress = Math.round(
+                      ganttProgressByProjectId.get(project.id) ?? 0,
+                    );
+                    return (
+                      <HierarchyCard
+                        key={project.id}
+                        title={project.project_name || `Project ${project.id}`}
+                        overallProgress={progress}
+                        onClick={() =>
+                          setSelectedProjectForDetails((prev) =>
+                            prev?.id === project.id ? null : project,
+                          )
+                        }
+                        color={CARD_COLORS[(start + index) % CARD_COLORS.length]}
+                        selected={selectedProjectForDetails?.id === project.id}
+                      />
+                    );
                   });
                 })()}
               </div>
