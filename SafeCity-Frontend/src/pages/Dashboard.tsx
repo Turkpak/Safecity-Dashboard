@@ -33,6 +33,12 @@ import {
 
 import type { Division, District, Tehsil, Project, TopProject } from "@/api/types";
 import { getDashboardPageData, type DashboardView } from "@/api/dashboard";
+import {
+  calculateCurrentScopePhysical,
+  formatProgress,
+  buildCurrentPhysicalChartData,
+  getCurrentScopeRows,
+} from "@/utils/dashboardPhysicalProgress";
 
 
 import {
@@ -842,6 +848,51 @@ export default function Dashboard() {
     return count > 0 ? sum / count : 0;
   }, [apiProjects, ganttProgressByProjectId]);
 
+  const currentScopeContext = useMemo(() => {
+    return {
+      viewType: viewType || "",
+      level: selectedItemType,
+      selectedDivisionId: selectedItemType === "division" ? selectedItemId : (selectedItemType === "district" || selectedItemType === "tehsil" ? parentDivisionId : null),
+      selectedDistrictId: selectedItemType === "district" ? selectedItemId : (selectedItemType === "tehsil" ? parentDistrictId : null),
+      selectedTehsilId: selectedItemType === "tehsil" ? selectedItemId : null,
+      selectedProjectForDetails,
+      apiDivisions,
+      apiDistricts,
+      apiTehsils,
+      apiProjects,
+    };
+  }, [
+    viewType,
+    selectedItemType,
+    selectedItemId,
+    parentDivisionId,
+    parentDistrictId,
+    selectedProjectForDetails,
+    apiDivisions,
+    apiDistricts,
+    apiTehsils,
+    apiProjects,
+  ]);
+
+  const currentScopePhysical = useMemo(() => {
+    return calculateCurrentScopePhysical(currentScopeContext);
+  }, [currentScopeContext]);
+
+  const currentScopeRowsForProgress = useMemo(() => {
+    return getCurrentScopeRows(currentScopeContext).rows;
+  }, [currentScopeContext]);
+
+  useEffect(() => {
+    console.log("[Physical Scope]", {
+      viewType,
+      selectedItemType,
+      selectedItemId,
+      selectedProjectForDetails: selectedProjectForDetails?.id,
+      rowCount: currentScopeRowsForProgress.length,
+      currentScopePhysical,
+    });
+  }, [viewType, selectedItemType, selectedItemId, selectedProjectForDetails, currentScopeRowsForProgress, currentScopePhysical]);
+
   const averagePhysicalRows = useCallback((rows: any[]): number => {
     const validRows = rows.filter((row) => {
       if (!row) return false;
@@ -1559,29 +1610,19 @@ export default function Dashboard() {
     ganttProgressByProjectId,
   ]);
 
-  // Get single item data from hierarchy rows (using backend's pre-calculated values)
-  const getSingleItemData = (
-    itemId: number | null,
-    itemType: "division" | "district" | "tehsil",
-  ): CityInstallationData | null => {
-    if (!itemId) return null;
-
-    const exists =
-      itemType === "division"
-        ? apiDivisions.some((d) => Number(d.id) === Number(itemId))
-        : itemType === "district"
-          ? apiDistricts.some((d) => Number(d.id) === Number(itemId))
-          : apiTehsils.some((t) => Number(t.id) === Number(itemId));
-
-    if (!exists) return null;
-
-    return generateCityDataFromOverall(Number(selectedScopePhysical ?? 0));
-  };
-
   // Get single item data
   const singleItemData = useMemo(() => {
     if (selectedItemId && selectedItemType) {
-      return getSingleItemData(selectedItemId, selectedItemType);
+      const exists =
+        selectedItemType === "division"
+          ? apiDivisions.some((d) => Number(d.id) === Number(selectedItemId))
+          : selectedItemType === "district"
+            ? apiDistricts.some((d) => Number(d.id) === Number(selectedItemId))
+            : apiTehsils.some((t) => Number(t.id) === Number(selectedItemId));
+
+      if (exists) {
+        return generateCityDataFromOverall(currentScopePhysical);
+      }
     }
     return null;
   }, [
@@ -1590,7 +1631,7 @@ export default function Dashboard() {
     apiDivisions,
     apiDistricts,
     apiTehsils,
-    selectedScopePhysical,
+    currentScopePhysical,
   ]);
 
   // Projects in the currently selected geography (division / district / tehsil) for "Best Performing Projects" cards
@@ -1626,10 +1667,8 @@ export default function Dashboard() {
 
   // Get aggregated data based on view type (all projects)
   const aggregatedData = useMemo(() => {
-    return generateCityDataFromOverall(
-      Number(pageData?.summary?.physical_progress ?? allProjectsOverallFromGantt),
-    );
-  }, [pageData, allProjectsOverallFromGantt]);
+    return generateCityDataFromOverall(currentScopePhysical);
+  }, [currentScopePhysical]);
 
   /** Top projects by budget utilization for root "All Punjab *" views (real API data, not duplicate phase placeholders). */
   const topProjectsForAggregateViews = useMemo((): Project[] => {
@@ -1662,28 +1701,7 @@ export default function Dashboard() {
   }, [pageData]);
 
   // Context theme: follow the currently visible/selected area overall %
-  const contextOverall = useMemo(() => {
-    if (selectedItemName && singleItemData) return singleItemData.overall ?? 0;
-    if (viewType === "projects" && !selectedItemName && !selectedItemType)
-      return allProjectsOverallFromGantt;
-    if (viewType === "tehsils" && !selectedItemName && !selectedItemType)
-      return allTehsilsOverall;
-    if (viewType === "divisions" && !selectedItemName && !selectedItemType)
-      return allDivisionsOverall;
-    if (viewType === "districts" && !selectedItemName && !selectedItemType)
-      return allDistrictsOverall;
-    return aggregatedData?.overall ?? 0;
-  }, [
-    selectedItemName,
-    singleItemData,
-    aggregatedData,
-    viewType,
-    selectedItemType,
-    allProjectsOverallFromGantt,
-    allDivisionsOverall,
-    allDistrictsOverall,
-    allTehsilsOverall,
-  ]);
+  const contextOverall = currentScopePhysical;
 
   const contextTheme = useMemo(() => {
     const meta = getProgressRangeMeta(contextOverall);
@@ -3058,37 +3076,9 @@ export default function Dashboard() {
                 }
 
                 return (() => {
-                  const overall =
-                    selectedItemName && singleItemData
-                      ? singleItemData.overall
-                      : viewType === "projects" &&
-                        !selectedItemName &&
-                        !selectedItemType
-                        ? allProjectsOverallFromGantt
-                        : viewType === "tehsils" &&
-                          !selectedItemName &&
-                          !selectedItemType
-                          ? allTehsilsOverall
-                          : viewType === "divisions" &&
-                            !selectedItemName &&
-                            !selectedItemType
-                            ? allDivisionsOverall
-                            : viewType === "districts" &&
-                              !selectedItemName &&
-                              !selectedItemType
-                              ? allDistrictsOverall
-                              : aggregatedData?.overall || 0;
+                  const overall = currentScopePhysical;
                   const meta = getProgressRangeMeta(overall);
-                  const overallLabel =
-                    viewType === "projects" && !selectedItemName && !selectedItemType
-                      ? `${overall.toFixed(2)}`
-                      : viewType === "tehsils" && !selectedItemName && !selectedItemType
-                        ? `${overall.toFixed(2)}`
-                        : viewType === "divisions" && !selectedItemName && !selectedItemType
-                          ? `${overall.toFixed(2)}`
-                          : viewType === "districts" && !selectedItemName && !selectedItemType
-                            ? `${overall.toFixed(2)}`
-                            : `${Math.round(overall)}`;
+                  const overallLabel = formatProgress(overall);
 
                   // Map color to Tailwind classes
                   const getBadgeClasses = (color: string) => {
