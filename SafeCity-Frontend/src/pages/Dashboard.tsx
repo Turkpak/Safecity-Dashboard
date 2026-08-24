@@ -2639,6 +2639,7 @@ export default function Dashboard() {
 
       await exportProgressReport({
         view: DASHBOARD_VIEW_TO_API_PAGE[dashboardPage],
+        pageData,
         selection,
       });
     } catch (error) {
