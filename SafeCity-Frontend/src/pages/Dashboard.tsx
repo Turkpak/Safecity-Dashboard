@@ -873,17 +873,16 @@ useEffect(() => {
   // ----------------------------------------------------------
   // VIEW
   // ----------------------------------------------------------
-  if (
-    viewParam === "divisions" ||
-    viewParam === "districts" ||
-    viewParam === "tehsils" ||
-    viewParam === "projects"
-  ) {
-    if (viewType !== viewParam) {
-      skipNextUrlSyncRef.current = true;
-      setViewType(viewParam);
-    }
+if (
+  viewParam === "divisions" ||
+  viewParam === "districts" ||
+  viewParam === "tehsils" ||
+  viewParam === "projects"
+) {
+  if (viewType !== viewParam) {
+    setViewType(viewParam);
   }
+}
 
   // ----------------------------------------------------------
   // Create a stable key so we hydrate only once per URL
@@ -924,7 +923,8 @@ useEffect(() => {
 
     if (!tehsilName) return;
 
-    skipNextUrlSyncRef.current = true;
+    // skipNextUrlSyncRef.current = true;
+    skipNextUrlSyncRef.current = false;
 
     setSelectedItemType((prev) =>
       prev === "tehsil" ? prev : "tehsil"
@@ -984,7 +984,8 @@ useEffect(() => {
 
     if (!districtName) return;
 
-    skipNextUrlSyncRef.current = true;
+    // skipNextUrlSyncRef.current = true;
+    skipNextUrlSyncRef.current = false;
 
     setSelectedItemType((prev) =>
       prev === "district" ? prev : "district"
@@ -1037,7 +1038,8 @@ useEffect(() => {
 
     if (!divisionName) return;
 
-    skipNextUrlSyncRef.current = true;
+    // skipNextUrlSyncRef.current = true;
+    skipNextUrlSyncRef.current = false;
 
     setSelectedItemType((prev) =>
       prev === "division" ? prev : "division"
@@ -1085,7 +1087,8 @@ useEffect(() => {
 
     if (!tehsilName) return;
 
-    skipNextUrlSyncRef.current = true;
+    // skipNextUrlSyncRef.current = true;
+    skipNextUrlSyncRef.current = false;
 
     setSelectedItemType("tehsil");
     setSelectedItemId(found.id);
@@ -1111,8 +1114,8 @@ useEffect(() => {
 // SYNC REACT STATE -> URL
 // ============================================================
 useEffect(() => {
-  // URL hydration caused this state update.
-  // Do NOT immediately write it back to the URL.
+  // If this state change came from URL hydration,
+  // don't immediately write it back to the URL.
   if (skipNextUrlSyncRef.current) {
     skipNextUrlSyncRef.current = false;
     return;
@@ -1200,12 +1203,12 @@ useEffect(() => {
   const currentUrl =
     `${window.location.pathname}${window.location.search}`;
 
-  // Nothing changed -> DO NOTHING
+  // Nothing changed
   if (currentUrl === nextUrl) {
     return;
   }
 
-  // Already attempted this URL -> DO NOTHING
+  // Already attempted this URL
   if (lastSyncedUrlRef.current === nextUrl) {
     return;
   }
@@ -1224,6 +1227,7 @@ useEffect(() => {
   parentDistrictName,
   setLocation,
 ]);
+
 
   // Simulate loading on initial mount and when view type changes
   useEffect(() => {
@@ -1685,12 +1689,35 @@ useEffect(() => {
         color: CARD_COLORS[index % CARD_COLORS.length],
       });
     });
+
+    
     // Sort tehsils within each district
     Object.keys(result).forEach((district) => {
       result[district].sort((a, b) => b.overall - a.overall);
     });
     return result;
   }, [apiTehsils]);
+
+  const filteredDistricts = useMemo(() => {
+  const entries = Object.entries(tehsilsDataByDistrict);
+
+  const query = tehsilSearchQuery.trim().toLowerCase();
+
+  if (!query) {
+    return entries;
+  }
+
+  return entries.filter(([districtName, tehsils]) => {
+    const districtMatches =
+      districtName.toLowerCase().includes(query);
+
+    const tehsilMatches = tehsils.some((tehsil) =>
+      tehsil.name.toLowerCase().includes(query)
+    );
+
+    return districtMatches || tehsilMatches;
+  });
+}, [tehsilsDataByDistrict, tehsilSearchQuery]);
 
   // Skeleton loader component
   const renderSkeletonLoader = () => (
@@ -2581,7 +2608,15 @@ useEffect(() => {
     return;
   }
 
-  // (deleted: skipNextUrlSyncRef.current = true;)
+  // Keep the URL and controlled radio state in sync in the same user action.
+  // This prevents the URL-hydration effect from restoring the previous view
+  // while React is switching to the newly selected radio option.
+  const nextUrl = `/?view=${nextView}`;
+  lastHydratedSelectionRef.current = `|${nextView}|||`;
+  lastSyncedUrlRef.current = null;
+  setLocation(nextUrl);
+
+  skipNextUrlSyncRef.current = false;
 
   setSelectedItemName(null);
   setSelectedItemType(null);
@@ -2591,6 +2626,9 @@ useEffect(() => {
   setParentDivisionName(null);
   setParentDistrictId(null);
   setParentDistrictName(null);
+
+  setSelectedProjectForDetails(null);
+  setSelectedProjectGanttTasks([]);
 
   setExpandedDivisions(false);
   setExpandedDistricts(false);
@@ -2610,9 +2648,10 @@ useEffect(() => {
   setDistrictSearchQuery("");
   setDivisionSearchQuery("");
   setProjectsSearch("");
+  setProjectsPage(1);
 
   setViewType(nextView);
-}, [viewType]);
+}, [viewType, setLocation]);
 
   return (
     <Layout title="PSCA Progress Dashboard">
@@ -2681,11 +2720,11 @@ useEffect(() => {
                       transition={{ duration: 0.25, ease: "easeOut" }}
                       className="flex items-center"
                     >
-                      <RadioGroup
-                        value={viewType}
-                        onValueChange={handleViewTypeChange}
-                        className="flex flex-wrap items-center gap-2 sm:gap-4 md:gap-6"
-                      >
+                    <RadioGroup
+  value={viewType}
+  onValueChange={handleViewTypeChange}
+  className="grid grid-cols-2 gap-2 pl-1 sm:pl-2 sm:flex sm:items-center sm:gap-4 md:gap-6 sm:whitespace-nowrap"
+>
                         {/* ALL DIVISIONS */}
                         <div className="flex items-center gap-1.5 sm:gap-2 rounded-md bg-background/40 px-2 py-1 shrink-0">
                           <RadioGroupItem
@@ -3721,17 +3760,8 @@ useEffect(() => {
                 },
               );
 
-              // Filter districts to show: by default only Lahore and Sheikhupura, unless all are expanded
-              const filteredDistricts = allDistricts.filter(
-                ([districtName]) => {
-                  // If search query exists, show all matching districts
-                  if (tehsilSearchQuery.trim()) return true;
-                  // If all expanded, show all districts
-                  if (allTehsilGroupsExpanded) return true;
-                  // Otherwise, show only default districts
-                  return DEFAULT_DISTRICTS.includes(districtName);
-                },
-              );
+
+             
 
               // Toggle all groups expand/collapse
               const handleToggleAllGroups = () => {
