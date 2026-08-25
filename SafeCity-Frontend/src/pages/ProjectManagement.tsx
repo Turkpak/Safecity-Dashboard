@@ -386,44 +386,52 @@ export default function ProjectManagement() {
     enabled: !!districtIdNum,
   });
 
-  const createProjectMutation = useMutation({
-    mutationFn: createProject,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      toast({ title: "Success", description: "Project created successfully." });
-      resetForm();
-      setEditingProject(null);
-      setShowAddProjectDialog(false);
-    },
-    onError: (e: Error) => {
-      toast({ title: "Error", description: e.message || "Failed to create project", variant: "destructive" });
-    },
-  });
-  const updateProjectMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: number; payload: Parameters<typeof updateProject>[1] }) =>
-      updateProject(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      toast({ title: "Success", description: "Project updated successfully." });
-      resetForm();
-      setEditingProject(null);
-      setShowAddProjectDialog(false);
-    },
-    onError: (e: Error) => {
-      toast({ title: "Error", description: e.message || "Failed to update project", variant: "destructive" });
-    },
-  });
-  const deleteProjectMutation = useMutation({
-    mutationFn: deleteProject,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      toast({ title: "Project Deleted", description: "Project has been deleted successfully." });
-    },
-    onError: (e: Error) => {
-      toast({ title: "Error", description: e.message || "Failed to delete project", variant: "destructive" });
-    },
-  });
-
+const createProjectMutation = useMutation({
+  mutationFn: createProject,
+  onSuccess: () => {
+    // Add this line ↓↓↓
+    queryClient.invalidateQueries({ queryKey: ["dashboard-page"] });
+    
+    queryClient.invalidateQueries({ queryKey: ["projects"] });
+    toast({ title: "Success", description: "Project created successfully." });
+    resetForm();
+    setEditingProject(null);
+    setShowAddProjectDialog(false);
+  },
+  onError: (e: Error) => {
+    toast({ title: "Error", description: e.message || "Failed to create project", variant: "destructive" });
+  },
+});
+const updateProjectMutation = useMutation({
+  mutationFn: ({ id, payload }: { id: number; payload: Parameters<typeof updateProject>[1] }) =>
+    updateProject(id, payload),
+  onSuccess: () => {
+    // Add this line ↓↓↓
+    queryClient.invalidateQueries({ queryKey: ["dashboard-page"] });
+    
+    queryClient.invalidateQueries({ queryKey: ["projects"] });
+    toast({ title: "Success", description: "Project updated successfully." });
+    resetForm();
+    setEditingProject(null);
+    setShowAddProjectDialog(false);
+  },
+  onError: (e: Error) => {
+    toast({ title: "Error", description: e.message || "Failed to update project", variant: "destructive" });
+  },
+});
+const deleteProjectMutation = useMutation({
+  mutationFn: deleteProject,
+  onSuccess: () => {
+    // Add this line ↓↓↓
+    queryClient.invalidateQueries({ queryKey: ["dashboard-page"] });
+    
+    queryClient.invalidateQueries({ queryKey: ["projects"] });
+    toast({ title: "Project Deleted", description: "Project has been deleted successfully." });
+  },
+  onError: (e: Error) => {
+    toast({ title: "Error", description: e.message || "Failed to delete project", variant: "destructive" });
+  },
+});
   // Form state
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
