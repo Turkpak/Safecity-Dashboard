@@ -38,6 +38,7 @@ import {
   formatProgress,
   buildCurrentPhysicalChartData,
   getCurrentScopeRows,
+  type ScopeContext,
 } from "@/utils/dashboardPhysicalProgress";
 
 
@@ -850,7 +851,7 @@ export default function Dashboard() {
 
   const currentScopeContext = useMemo(() => {
     return {
-      viewType: viewType || "",
+      viewType: (viewType || "") as ScopeContext["viewType"],
       level: selectedItemType,
       selectedDivisionId: selectedItemType === "division" ? selectedItemId : (selectedItemType === "district" || selectedItemType === "tehsil" ? parentDivisionId : null),
       selectedDistrictId: selectedItemType === "district" ? selectedItemId : (selectedItemType === "tehsil" ? parentDistrictId : null),
@@ -883,15 +884,31 @@ export default function Dashboard() {
   }, [currentScopeContext]);
 
   useEffect(() => {
-    console.log("[Physical Scope]", {
+    const scopeResult = getCurrentScopeRows(currentScopeContext);
+    console.log("[Physical Scope Debug]", {
       viewType,
-      selectedItemType,
-      selectedItemId,
+      level: currentScopeContext.level,
+      scopeType: scopeResult.scopeType,
+      selectedDivisionId: currentScopeContext.selectedDivisionId,
+      selectedDistrictId: currentScopeContext.selectedDistrictId,
+      selectedTehsilId: currentScopeContext.selectedTehsilId,
       selectedProjectForDetails: selectedProjectForDetails?.id,
       rowCount: currentScopeRowsForProgress.length,
+      rows: currentScopeRowsForProgress.map((r: any) => ({
+        id: r.id,
+        name:
+          r.name ??
+          r.division_name ??
+          r.zone_name ??
+          r.district_name ??
+          r.circle_name ??
+          r.tehsil_name ??
+          r.project_name,
+        physical_progress: r.physical_progress,
+      })),
       currentScopePhysical,
     });
-  }, [viewType, selectedItemType, selectedItemId, selectedProjectForDetails, currentScopeRowsForProgress, currentScopePhysical]);
+  }, [viewType, currentScopeContext, selectedProjectForDetails, currentScopeRowsForProgress, currentScopePhysical]);
 
   const averagePhysicalRows = useCallback((rows: any[]): number => {
     const validRows = rows.filter((row) => {
@@ -2008,17 +2025,17 @@ export default function Dashboard() {
     const absFinancialVariance = Math.max(0, 100 - financialActual);
 
     // Overall progress donut (physical, percent-based)
-    const overallPlannedPct = 100;
-    const overallActualPct = clamp01(num(data.overall));
-    const overallVariancePct = Math.max(0, 100 - overallActualPct);
-    const overallMax = Math.max(overallPlannedPct, overallActualPct);
-    const overallTotalForPie = overallMax + overallVariancePct;
-    const normalizedOverallPlanned =
-      overallTotalForPie > 0 ? (overallPlannedPct / overallTotalForPie) * 100 : 0;
-    const normalizedOverallActual =
-      overallTotalForPie > 0 ? (overallActualPct / overallTotalForPie) * 100 : 0;
-    const normalizedOverallVariance =
-      overallTotalForPie > 0 ? (overallVariancePct / overallTotalForPie) * 100 : 0;
+    // ── CANONICAL SOURCE: currentScopePhysical (closure variable) ──
+    // buildCurrentPhysicalChartData uses the SAME value as the Header Overall badge.
+    // Do NOT use data.overall here — it may lag or be stale when singleItemData
+    // is null. currentScopePhysical is always up-to-date.
+    const _overallChartData = buildCurrentPhysicalChartData(currentScopePhysical);
+    const overallPlannedPct = _overallChartData.planned;
+    const overallActualPct = _overallChartData.actual;
+    const overallVariancePct = _overallChartData.variance;
+    const normalizedOverallPlanned = _overallChartData.normalizedPlanned;
+    const normalizedOverallActual = _overallChartData.normalizedActual;
+    const normalizedOverallVariance = _overallChartData.normalizedVariance;
 
     // Calculate totals for pie chart normalization (installation progress)
     const maxValue = Math.max(avgPlanned, avgActual);
@@ -2385,7 +2402,7 @@ export default function Dashboard() {
                           content={({ viewBox }: any) => {
                             const cx = viewBox?.cx ?? 0;
                             const cy = viewBox?.cy ?? 0;
-                            const valueText = `${overallActualPct.toFixed(1)}%`;
+                            const valueText = `${formatProgress(overallActualPct)}%`;
                             return (
                               <g>
                                 <text
@@ -2436,7 +2453,7 @@ export default function Dashboard() {
                         ) => {
                           const originalValue =
                             props.payload?.originalValue ?? value;
-                          return [`${originalValue.toFixed(1)}%`, name];
+                          return [`${formatProgress(originalValue)}%`, name];
                         }}
                       />
                       <Legend
@@ -2458,7 +2475,7 @@ export default function Dashboard() {
                             <span className="text-muted-foreground font-medium">
                               {value}{" "}
                               <span className="font-semibold text-foreground">
-                                {itemValue.toFixed(1)}%
+                                {formatProgress(itemValue)}%
                               </span>
                             </span>
                           );
