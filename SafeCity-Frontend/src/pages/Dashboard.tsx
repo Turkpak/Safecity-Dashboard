@@ -7,6 +7,7 @@ import { PlannedVsActualChart } from "@/components/dashboard/PlannedVsActualChar
 import { HierarchyCard } from "@/components/dashboard/HierarchyCard";
 import { SubProject } from "@/components/dashboard/SubProjectCard";
 import { MilestoneDetailsPanel } from "@/components/dashboard/MilestoneDetailsPanel";
+import ProgressOverviewChart from "@/components/dashboard/ProgressOverviewChart";
 import { exportDashboardToPPTX } from "@/utils/exportToPPTX";
 import { exportProgressReport } from "@/utils/exportProgressReport";
 import {
@@ -36,7 +37,6 @@ import { getDashboardPageData, type DashboardView } from "@/api/dashboard";
 import {
   calculateCurrentScopePhysical,
   formatProgress,
-  buildCurrentPhysicalChartData,
   getCurrentScopeRows,
   type ScopeContext,
 } from "@/utils/dashboardPhysicalProgress";
@@ -909,53 +909,6 @@ export default function Dashboard() {
       currentScopePhysical,
     });
   }, [viewType, currentScopeContext, selectedProjectForDetails, currentScopeRowsForProgress, currentScopePhysical]);
-
-  const averagePhysicalRows = useCallback((rows: any[]): number => {
-    const validRows = rows.filter((row) => {
-      if (!row) return false;
-      if (row.has_physical_data === false) return false;
-      const value = Number(row.physical_progress ?? 0);
-      return Number.isFinite(value);
-    });
-
-    if (validRows.length === 0) return 0;
-
-    const total = validRows.reduce(
-      (sum, row) => sum + clamp01(Number(row.physical_progress ?? 0)),
-      0,
-    );
-
-    return total / validRows.length;
-  }, []);
-
-  const selectedScopePhysical = useMemo(() => {
-    if (!selectedItemId || !selectedItemType) return null;
-
-    if (selectedItemType === "division") {
-      return averagePhysicalRows(
-        apiDistricts.filter((district) => Number(district.division ?? 0) === Number(selectedItemId)),
-      );
-    }
-
-    if (selectedItemType === "district") {
-      return averagePhysicalRows(
-        apiTehsils.filter((tehsil) => Number(tehsil.district ?? 0) === Number(selectedItemId)),
-      );
-    }
-
-    const tehsilProjects = apiProjects.filter(
-      (project) => Number((project as any).tehsil ?? 0) === Number(selectedItemId),
-    );
-
-    return averagePhysicalRows(tehsilProjects);
-  }, [
-    selectedItemId,
-    selectedItemType,
-    apiDistricts,
-    apiTehsils,
-    apiProjects,
-    averagePhysicalRows,
-  ]);
 
   const toSlug = (value: string) =>
     value
@@ -2026,16 +1979,9 @@ export default function Dashboard() {
 
     // Overall progress donut (physical, percent-based)
     // ── CANONICAL SOURCE: currentScopePhysical (closure variable) ──
-    // buildCurrentPhysicalChartData uses the SAME value as the Header Overall badge.
-    // Do NOT use data.overall here — it may lag or be stale when singleItemData
-    // is null. currentScopePhysical is always up-to-date.
-    const _overallChartData = buildCurrentPhysicalChartData(currentScopePhysical);
-    const overallPlannedPct = _overallChartData.planned;
-    const overallActualPct = _overallChartData.actual;
-    const overallVariancePct = _overallChartData.variance;
-    const normalizedOverallPlanned = _overallChartData.normalizedPlanned;
-    const normalizedOverallActual = _overallChartData.normalizedActual;
-    const normalizedOverallVariance = _overallChartData.normalizedVariance;
+    // The ProgressOverviewChart component handles all rendering using
+    // buildCurrentPhysicalChartData(currentScopePhysical) internally.
+    // Do NOT use data.overall here — it may lag or be stale.
 
     // Calculate totals for pie chart normalization (installation progress)
     const maxValue = Math.max(avgPlanned, avgActual);
@@ -2347,145 +2293,8 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {/* Overall Progress Donut Chart */}
-            <Card className="overflow-hidden border border-border/80 bg-card shadow-lg shadow-primary/5 transition-shadow hover:shadow-xl hover:shadow-primary/10">
-              <CardHeader className="py-3 px-4 pb-1">
-                <CardTitle className="text-base font-heading">
-                  Overall Progress
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 px-4 pb-4">
-                <div
-                  className="relative w-full"
-                  style={{
-                    height: isMobile ? "200px" : isTablet ? "220px" : "260px",
-                  }}
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart
-                      margin={{ top: 2, right: 2, bottom: 32, left: 2 }}
-                    >
-                      <Pie
-                        data={[
-                          {
-                            name: "Planned",
-                            value: normalizedOverallPlanned,
-                            originalValue: overallPlannedPct,
-                            fill: "#60a5fa",
-                          },
-                          {
-                            name: "Actual",
-                            value: normalizedOverallActual,
-                            originalValue: overallActualPct,
-                            fill: "#22c55e",
-                          },
-                          {
-                            name: "Variance",
-                            value: normalizedOverallVariance,
-                            originalValue: overallVariancePct,
-                            fill: "#ef4444",
-                          },
-                        ]}
-                        cx="50%"
-                        cy={isMobile ? "46%" : "50%"}
-                        innerRadius={isMobile ? 42 : isTablet ? 44 : 54}
-                        outerRadius={isMobile ? 60 : isTablet ? 72 : 88}
-                        paddingAngle={2}
-                        dataKey="value"
-                        stroke="rgba(255,255,255,0.9)"
-                        strokeWidth={2}
-                        isAnimationActive
-                        animationDuration={800}
-                        animationBegin={0}
-                      >
-                        <RechartsLabel
-                          content={({ viewBox }: any) => {
-                            const cx = viewBox?.cx ?? 0;
-                            const cy = viewBox?.cy ?? 0;
-                            const valueText = `${formatProgress(overallActualPct)}%`;
-                            return (
-                              <g>
-                                <text
-                                  x={cx}
-                                  y={cy - (isMobile ? 2 : 3)}
-                                  textAnchor="middle"
-                                  dominantBaseline="central"
-                                  className="font-heading font-bold tabular-nums fill-foreground"
-                                  style={{ fontSize: isMobile ? 14 : 18 }}
-                                >
-                                  {valueText}
-                                </text>
-                                <text
-                                  x={cx}
-                                  y={cy + (isMobile ? 12 : 14)}
-                                  textAnchor="middle"
-                                  dominantBaseline="central"
-                                  className="font-medium uppercase tracking-wider fill-muted-foreground"
-                                  style={{ fontSize: isMobile ? 9 : 10 }}
-                                >
-                                  Actual
-                                </text>
-                              </g>
-                            );
-                          }}
-                        />
-                        {["#60a5fa", "#22c55e", "#ef4444"].map((fill, index) => (
-                          <Cell
-                            key={`cell-o-${index}`}
-                            fill={fill}
-                            stroke="rgba(255,255,255,0.9)"
-                            strokeWidth={2}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "12px",
-                          fontSize: isMobile ? "11px" : "13px",
-                          boxShadow: "0 10px 40px -10px rgba(0,0,0,0.15)",
-                        }}
-                        formatter={(
-                          value: number,
-                          name: string,
-                          props: any,
-                        ) => {
-                          const originalValue =
-                            props.payload?.originalValue ?? value;
-                          return [`${formatProgress(originalValue)}%`, name];
-                        }}
-                      />
-                      <Legend
-                        verticalAlign="bottom"
-                        align="center"
-                        layout="horizontal"
-                        wrapperStyle={{
-                          paddingTop: 6,
-                          fontSize: isMobile ? "10px" : "11px",
-                        }}
-                        iconType="circle"
-                        iconSize={8}
-                        formatter={(value) => {
-                          let itemValue = 0;
-                          if (value === "Planned") itemValue = overallPlannedPct;
-                          else if (value === "Actual") itemValue = overallActualPct;
-                          else if (value === "Variance") itemValue = overallVariancePct;
-                          return (
-                            <span className="text-muted-foreground font-medium">
-                              {value}{" "}
-                              <span className="font-semibold text-foreground">
-                                {formatProgress(itemValue)}%
-                              </span>
-                            </span>
-                          );
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Overall Progress Donut Chart — extracted to ProgressOverviewChart */}
+            <ProgressOverviewChart value={currentScopePhysical} />
           </div>
         )}
 
