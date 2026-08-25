@@ -23,7 +23,8 @@ export default function Comparison() {
     return divisions
       .map((div: any) => {
         const divisionName = div.division_name ?? div.name ?? "Division";
-        const completionValue = Number(div.overall_progress ?? div.physical_progress ?? 0);
+        // ✅ FIX: Use physical_progress (matches Dashboard)
+        const completionValue = Number(div.physical_progress ?? 0);
 
         return {
           city: `${divisionName} Division`,
@@ -39,7 +40,8 @@ export default function Comparison() {
     return districts
       .map((dist: any) => {
         const districtName = dist.district_name ?? dist.name ?? "District";
-        const completionValue = Number(dist.overall_progress ?? dist.physical_progress ?? 0);
+        // ✅ FIX: Use physical_progress (same field as divisions)
+        const completionValue = Number(dist.physical_progress ?? 0);
 
         return {
           city: `${districtName} District`,
