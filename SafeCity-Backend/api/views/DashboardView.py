@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .common_imports import *
+from api.progress_calculations import calculate_project_physical_progress_map
 
 CACHE_TIMEOUT_SECONDS = 60
 
@@ -189,17 +190,18 @@ def _calculate_project_physical_progress(activities):
 # Project Metrics
 # ============================================================
 
-def _project_metrics(project):
+def _project_metrics(project, physical_progress=None, has_physical_data=None):
 
     activities = list(
         project.activities.all()
     )
 
-    physical_progress = (
-        _calculate_project_physical_progress(
-            activities
-        )
-    )
+    if physical_progress is None:
+        project_progress_map = calculate_project_physical_progress_map([project.id])
+        has_physical_data = project.id in project_progress_map
+        physical_progress = project_progress_map.get(project.id, 0.0)
+    elif has_physical_data is None:
+        has_physical_data = True
 
     # --------------------------------------------------------
     # Financial
@@ -355,6 +357,9 @@ def _project_metrics(project):
         "overall_progress":
             overall_progress,
 
+        # Physical-data validity (0% can still be valid)
+        "has_physical_data": bool(has_physical_data),
+
         # Status
         "status":
             status,
@@ -383,6 +388,9 @@ def _summary_payload(
 
         "physical_progress":
             round(physical, 2),
+
+        "has_physical_data":
+            any(row.get("has_physical_data") is True for row in project_rows),
 
         "financial_progress":
             round(financial, 2),
@@ -442,13 +450,18 @@ def _project_scope_summary(project_rows):
 
     count = len(project_rows)
 
-    if count:
+    physical_rows = [
+        row for row in project_rows
+        if row.get("has_physical_data") is True
+    ]
+
+    if physical_rows:
 
         physical = round(
             sum(
                 row["physical_progress"]
-                for row in project_rows
-            ) / count,
+                for row in physical_rows
+            ) / len(physical_rows),
             2
         )
 
@@ -495,28 +508,36 @@ def _project_scope_summary(project_rows):
 # ============================================================
 
 def _average_metric_rows(rows):
-    """Average progress equally across the supplied child rows."""
+    """Average immediate children while preserving physical-data validity.
+
+    Physical progress excludes children with no valid Primavera physical data,
+    but includes genuine 0% children. Legacy financial/overall fields retain
+    their previous simple-average behavior.
+    """
     if not rows:
         return {
             "project_count": 0,
             "physical_progress": 0.0,
+            "has_physical_data": False,
             "financial_progress": 0.0,
             "overall_progress": 0.0,
         }
 
+    physical_rows = [row for row in rows if row.get("has_physical_data") is True]
+    physical_progress = (
+        round(sum(row.get("physical_progress", 0.0) for row in physical_rows) / len(physical_rows), 2)
+        if physical_rows else 0.0
+    )
+
     return {
         "project_count": sum(row.get("project_count", 1) for row in rows),
-        "physical_progress": round(
-            sum(row.get("physical_progress", 0.0) for row in rows) / len(rows),
-            2,
-        ),
+        "physical_progress": physical_progress,
+        "has_physical_data": bool(physical_rows),
         "financial_progress": round(
-            sum(row.get("financial_progress", 0.0) for row in rows) / len(rows),
-            2,
+            sum(row.get("financial_progress", 0.0) for row in rows) / len(rows), 2
         ),
         "overall_progress": round(
-            sum(row.get("overall_progress", 0.0) for row in rows) / len(rows),
-            2,
+            sum(row.get("overall_progress", 0.0) for row in rows) / len(rows), 2
         ),
     }
 
@@ -525,173 +546,132 @@ def _all_hierarchy_rows(
     page,
     project_rows
 ):
+    """Return the rows for the requested dashboard page.
+
+    This intentionally follows the dashboard-page logic from the reference
+    DashboardView.py supplied by the client:
+
+    * All Divisions  = each row is one Division, calculated from projects in it.
+    * All Districts  = each row is one District, calculated from projects in it.
+    * All Tehsils    = each row is one Tehsil, calculated from projects in it.
+    * All Projects   = each row is one Project.
+
+    The page summary then averages the active rows currently visible on that
+    page. Drill-down pages in the frontend use the same principle for the
+    current visible child level.
+    """
 
     if page == "provinces":
-
         objects = (
             Province.objects
             .all()
             .order_by("province_name")
         )
-
         key = "province"
         name_attr = "province_name"
 
     elif page == "divisions":
-
         objects = (
             Division.objects
             .select_related("province")
             .all()
             .order_by("division_name")
         )
-
         key = "division"
         name_attr = "division_name"
 
     elif page == "districts":
-
         objects = (
             District.objects
-            .select_related(
-                "province",
-                "division"
-            )
+            .select_related("province", "division")
             .all()
             .order_by("district_name")
         )
-
         key = "district"
         name_attr = "district_name"
 
     elif page == "tehsils":
-
         objects = (
             Tehsil.objects
-            .select_related(
-                "province",
-                "division",
-                "district"
-            )
+            .select_related("province", "division", "district")
             .all()
             .order_by("tehsil_name")
         )
-
         key = "tehsil"
         name_attr = "tehsil_name"
 
     else:
-
         return [
             {
                 "id": row["id"],
                 "name": row["project_name"],
                 "project_count": 1,
-                "physical_progress":
-                    row["physical_progress"],
-                "financial_progress":
-                    row["financial_progress"],
-                "overall_progress":
-                    row["overall_progress"],
+                "physical_progress": row["physical_progress"],
+                "has_physical_data": row.get("has_physical_data", False),
+                "financial_progress": row["financial_progress"],
+                "overall_progress": row["overall_progress"],
             }
             for row in project_rows
         ]
 
-    # Build bottom-up metrics so each level is calculated from its immediate
-    # children instead of being weighted by the number of projects.
-    projects_by_tehsil = defaultdict(list)
-    for row in project_rows:
-        if row.get("tehsil") is not None:
-            projects_by_tehsil[row["tehsil"]].append(row)
-
-    tehsil_metrics = {
-        tehsil_id: _average_metric_rows(
-            projects_by_tehsil.get(tehsil_id, [])
-        )
-        for tehsil_id in Tehsil.objects.values_list("id", flat=True)
-    }
-
-    district_children = defaultdict(list)
-    for tehsil_id, district_id in Tehsil.objects.values_list(
-        "id", "district_id"
-    ):
-        district_children[district_id].append(tehsil_metrics[tehsil_id])
-
-    district_metrics = {
-        district_id: _average_metric_rows(rows)
-        for district_id, rows in district_children.items()
-    }
-
-    division_children = defaultdict(list)
-    for district_id, division_id in District.objects.values_list(
-        "id", "division_id"
-    ):
-        division_children[division_id].append(district_metrics[district_id])
-
-    division_metrics = {
-        division_id: _average_metric_rows(rows)
-        for division_id, rows in division_children.items()
-    }
-
-    province_children = defaultdict(list)
-    for division_id, province_id in Division.objects.values_list(
-        "id", "province_id"
-    ):
-        province_children[province_id].append(division_metrics[division_id])
-
-    province_metrics = {
-        province_id: _average_metric_rows(rows)
-        for province_id, rows in province_children.items()
-    }
-
-    metric_maps = {
-        "provinces": province_metrics,
-        "divisions": division_metrics,
-        "districts": district_metrics,
-        "tehsils": tehsil_metrics,
-    }
-
-    project_groups = defaultdict(list)
+    grouped = defaultdict(list)
     for row in project_rows:
         value = row.get(key)
         if value is not None:
-            project_groups[value].append(row)
-
-    grouped = metric_maps[page]
+            grouped[value].append(row)
 
     rows = []
-
     for obj in objects:
-
-        summary = grouped.get(obj.id)
-        if summary is None:
-            summary = _project_scope_summary(project_groups.get(obj.id, []))
-            summary["project_count"] = summary["total_projects"]
+        scoped_projects = grouped.get(obj.id, [])
+        summary = _project_scope_summary(scoped_projects)
 
         row = {
             "id": obj.id,
             "name": getattr(obj, name_attr),
-            "project_count": summary["project_count"],
+            "project_count": summary["total_projects"],
             "physical_progress": summary["physical_progress"],
+            "has_physical_data": summary.get("has_physical_data", False),
             "financial_progress": summary["financial_progress"],
             "overall_progress": summary["overall_progress"],
         }
 
-        if page == "divisions":
+        if page == "provinces":
+            row["province"] = obj.id
+            row["province_id"] = obj.id
+            row["province_name"] = obj.province_name
+
+        elif page == "divisions":
             row["division"] = obj.id
             row["division_id"] = obj.id
+            row["division_name"] = obj.division_name
+            row["province"] = obj.province_id
+            row["province_id"] = obj.province_id
+            row["province_name"] = obj.province.province_name if obj.province_id else None
+
         elif page == "districts":
             row["district"] = obj.id
             row["district_id"] = obj.id
+            row["district_name"] = obj.district_name
             row["division"] = obj.division_id
             row["division_id"] = obj.division_id
+            row["division_name"] = obj.division.division_name if obj.division_id else None
+            row["province"] = obj.province_id
+            row["province_id"] = obj.province_id
+            row["province_name"] = obj.province.province_name if obj.province_id else None
+
         elif page == "tehsils":
             row["tehsil"] = obj.id
             row["tehsil_id"] = obj.id
+            row["tehsil_name"] = obj.tehsil_name
             row["district"] = obj.district_id
             row["district_id"] = obj.district_id
+            row["district_name"] = obj.district.district_name if obj.district_id else None
             row["division"] = obj.division_id
             row["division_id"] = obj.division_id
+            row["division_name"] = obj.division.division_name if obj.division_id else None
+            row["province"] = obj.province_id
+            row["province_id"] = obj.province_id
+            row["province_name"] = obj.province.province_name if obj.province_id else None
 
         rows.append(row)
 
@@ -709,31 +689,25 @@ def _page_summary(
 ):
 
     active = [
-        row
-        for row in hierarchy_rows
-        if row.get(
-            "project_count",
-            0
-        ) > 0
+        row for row in hierarchy_rows
+        if row.get("project_count", 0) > 0
+    ]
+    physical_active = [
+        row for row in hierarchy_rows
+        if row.get("has_physical_data") is True
     ]
 
-    if not active:
+    if not active and not physical_active:
         return _project_scope_summary([])
 
     physical = (
-        sum(
-            row["physical_progress"]
-            for row in active
-        ) /
-        len(active)
+        sum(row["physical_progress"] for row in physical_active) / len(physical_active)
+        if physical_active else 0.0
     )
 
     financial = (
-        sum(
-            row["financial_progress"]
-            for row in active
-        ) /
-        len(active)
+        sum(row["financial_progress"] for row in active) / len(active)
+        if active else 0.0
     )
 
     total_budget = sum(
@@ -874,7 +848,7 @@ class DashboardPageDataView(APIView):
         # ----------------------------------------------------
 
         cache_key = (
-            f"dashboard_page_data_{canonical_page}"
+            f"dashboard_page_data_contextual_physical_v4_{canonical_page}"
         )
 
         cached_data = cache.get(
@@ -925,8 +899,16 @@ class DashboardPageDataView(APIView):
         # Calculate project metrics
         # ----------------------------------------------------
 
+        physical_progress_map = calculate_project_physical_progress_map(
+            [project.id for project in projects]
+        )
+
         project_rows = [
-            _project_metrics(project)
+            _project_metrics(
+                project,
+                physical_progress_map.get(project.id, 0.0),
+                project.id in physical_progress_map,
+            )
             for project in projects
         ]
 
@@ -1008,6 +990,12 @@ class DashboardPageDataView(APIView):
                     metrics.get(
                         "physical_progress",
                         0
+                    ),
+
+                "has_physical_data":
+                    metrics.get(
+                        "has_physical_data",
+                        False
                     ),
 
                 "financial_progress":

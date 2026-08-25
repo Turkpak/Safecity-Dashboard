@@ -2,7 +2,7 @@ import { Bell, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/contexts/SidebarContext";
 
-export function Header({ title }: { title: string }) {
+export function Header({ title, actions }: { title: string; actions?: React.ReactNode }) {
   const { setMobileSidebarOpen } = useSidebar();
 
   return (
@@ -33,8 +33,9 @@ export function Header({ title }: { title: string }) {
           <span className="hidden sm:inline">{title}</span>
         </h1>
 
-        <div className="col-start-3 justify-self-end hidden md:flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="relative">
+        <div className="col-start-3 justify-self-end flex items-center gap-2 sm:gap-3">
+          {actions}
+          <Button variant="ghost" size="icon" className="relative hidden md:inline-flex">
             <Bell className="h-5 w-5" />
             <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive animate-pulse" />
           </Button>

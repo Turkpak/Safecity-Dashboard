@@ -103,6 +103,8 @@ urlpatterns = [
     path("project-progress-summary/", ProjectProgressSummaryView.as_view()),
     path("project-status-summary/", ProjectStatusSummaryView.as_view()),
 
+    path("physical-progress-report/", PhysicalProgressReportView.as_view(), name="physical-progress-report"),
+
     path(
         "dashboard/<str:page>/", DashboardPageDataView.as_view(), name="dashboard-page-data",
     ),

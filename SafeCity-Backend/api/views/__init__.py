@@ -11,3 +11,4 @@ from .PictorialArchiveView import *
 from .ProgressImageView import *
 from .ActivityDelayLogView import *
 from .ProjectDocumentView import *
+from .PhysicalProgressReportView import *
