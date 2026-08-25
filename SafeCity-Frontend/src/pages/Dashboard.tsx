@@ -8,8 +8,9 @@ import { HierarchyCard } from "@/components/dashboard/HierarchyCard";
 import { SubProject } from "@/components/dashboard/SubProjectCard";
 import { MilestoneDetailsPanel } from "@/components/dashboard/MilestoneDetailsPanel";
 import ProgressOverviewChart from "@/components/dashboard/ProgressOverviewChart";
-import { exportDashboardToPPTX } from "@/utils/exportToPPTX";
-import { exportProgressReport } from "@/utils/exportProgressReport";
+import { exportDashboardToPPTX, type ExportToPPTXOptions } from "@/utils/exportToPPTX";
+import { exportProgressReport, type ExportProgressReportOptions } from "@/utils/exportProgressReport";
+import type { ScopeType } from "@/utils/buildProgressReportData";
 import {
   PieChart,
   Pie,
@@ -882,6 +883,18 @@ export default function Dashboard() {
   const currentScopeRowsForProgress = useMemo(() => {
     return getCurrentScopeRows(currentScopeContext).rows;
   }, [currentScopeContext]);
+
+  /** Derives the ScopeType string consumed by export functions. */
+  const exportScopeType = useMemo((): ScopeType => {
+    if (selectedProjectForDetails) return "selected-project";
+    if (selectedItemType === "tehsil")   return "selected-tehsil";
+    if (selectedItemType === "district") return "selected-district";
+    if (selectedItemType === "division") return "selected-division";
+    if (viewType === "projects")  return "all-projects";
+    if (viewType === "tehsils")   return "all-tehsils";
+    if (viewType === "districts") return "all-districts";
+    return "all-divisions";
+  }, [selectedProjectForDetails, selectedItemType, viewType]);
 
   useEffect(() => {
     const scopeResult = getCurrentScopeRows(currentScopeContext);
@@ -2569,28 +2582,33 @@ export default function Dashboard() {
 
     setIsExportingReport(true);
     try {
-      // Selection priority is intentionally Project -> Geography -> Root scope.
-      // This keeps the exported PDF synchronized with what the user is currently viewing.
-      const selection = selectedProjectForDetails?.id
-        ? {
-            type: "project" as const,
-            id: Number(selectedProjectForDetails.id),
-            name:
-              selectedProjectForDetails.project_name ||
-              `Project ${selectedProjectForDetails.id}`,
-          }
-        : selectedItemType && selectedItemId && selectedItemName
-          ? {
-              type: selectedItemType,
-              id: Number(selectedItemId),
-              name: selectedItemName,
-            }
-          : null;
+      const cityName =
+        selectedProjectForDetails?.project_name
+          ? `Project: ${selectedProjectForDetails.project_name}`
+          : selectedItemName && selectedItemType === "division"
+            ? `${selectedItemName} Division`
+            : selectedItemName && selectedItemType === "district"
+              ? `${selectedItemName} District`
+              : selectedItemName && selectedItemType === "tehsil"
+                ? `${selectedItemName} Tehsil`
+                : viewType === "projects"
+                  ? "All Projects"
+                  : viewType === "districts"
+                    ? "All Punjab Districts"
+                    : viewType === "tehsils"
+                      ? "All Punjab Tehsils"
+                      : "All Punjab Divisions";
 
       await exportProgressReport({
-        view: DASHBOARD_VIEW_TO_API_PAGE[dashboardPage],
-        selection,
-      });
+        cityName,
+        pageData: pageData!,
+        scopeType: exportScopeType,
+        currentScopePhysical,
+        currentScopeRows: currentScopeRowsForProgress,
+        selectedId: selectedProjectForDetails?.id ?? selectedItemId ?? null,
+        selectedName: selectedProjectForDetails?.project_name ?? selectedItemName ?? null,
+        selectedType: selectedProjectForDetails ? "project" : selectedItemType ?? null,
+      } satisfies ExportProgressReportOptions);
     } catch (error) {
       console.error("Failed to export PSCA progress report", error);
       setShowErrorDialog(true);
@@ -2600,7 +2618,9 @@ export default function Dashboard() {
   }, [
     pageData,
     viewType,
-    dashboardPage,
+    exportScopeType,
+    currentScopePhysical,
+    currentScopeRowsForProgress,
     selectedProjectForDetails,
     selectedItemType,
     selectedItemId,
@@ -3018,16 +3038,14 @@ export default function Dashboard() {
 
                                     await exportDashboardToPPTX({
                                       cityName: exportName,
-                                      cityData: dataToExport as any,
-                                      installationPhases:
-                                        installationPhases.map((phase) => ({
-                                          key: phase.key,
-                                          title: phase.title,
-                                          percentage: getProgressValue(
-                                            dataToExport[phase.key],
-                                          ),
-                                        })),
-                                    });
+                                      pageData: pageData!,
+                                      scopeType: exportScopeType,
+                                      currentScopePhysical,
+                                      currentScopeRows: currentScopeRowsForProgress,
+                                      selectedId: selectedProjectForDetails?.id ?? selectedItemId ?? null,
+                                      selectedName: selectedProjectForDetails?.project_name ?? selectedItemName ?? null,
+                                      selectedType: selectedProjectForDetails ? "project" : selectedItemType ?? null,
+                                    } satisfies ExportToPPTXOptions);
                                     setShowSuccessDialog(true);
                                   } catch (error) {
                                     console.error(
@@ -3116,17 +3134,14 @@ export default function Dashboard() {
                         // Pass the full data structure including PhaseProgress objects with timeline
                         await exportDashboardToPPTX({
                           cityName: exportName,
-                          cityData: dataToExport as any, // Type assertion needed due to PhaseProgress union type
-                          installationPhases: installationPhases.map(
-                            (phase) => ({
-                              key: phase.key,
-                              title: phase.title,
-                              percentage: getProgressValue(
-                                dataToExport[phase.key],
-                              ),
-                            }),
-                          ),
-                        });
+                          pageData: pageData!,
+                          scopeType: exportScopeType,
+                          currentScopePhysical,
+                          currentScopeRows: currentScopeRowsForProgress,
+                          selectedId: selectedProjectForDetails?.id ?? selectedItemId ?? null,
+                          selectedName: selectedProjectForDetails?.project_name ?? selectedItemName ?? null,
+                          selectedType: selectedProjectForDetails ? "project" : selectedItemType ?? null,
+                        } satisfies ExportToPPTXOptions);
                         setShowSuccessDialog(true);
                       } catch (error) {
                         console.error("Error exporting to PPTX:", error);
