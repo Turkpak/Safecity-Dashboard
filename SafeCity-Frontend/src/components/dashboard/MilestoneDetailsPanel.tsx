@@ -3027,6 +3027,7 @@ export function MilestoneDetailsPanel({
                 });
                 toast({ title: "Document uploaded", description: "The file was saved for this activity." });
                 await queryClient.invalidateQueries({ queryKey: ["project-documents", ganttProjectId] });
+                await onProjectGanttRefresh?.();
                 closeDocumentDialog();
               } catch (err) {
                 toast({
@@ -3233,6 +3234,7 @@ export function MilestoneDetailsPanel({
                         image: updateImageForm.newImageFile,
                       });
                       await queryClient.invalidateQueries({ queryKey: ["progress-images", ganttProjectId] });
+                      await onProjectGanttRefresh?.(); 
                       closeUpdateImageDialog();
                     } finally {
                       setUpdatingImage(false);
@@ -3496,6 +3498,7 @@ export function MilestoneDetailsPanel({
                         file: updateDocForm.newFile,
                       });
                       await queryClient.invalidateQueries({ queryKey: ["project-documents", ganttProjectId] });
+                      await onProjectGanttRefresh?.(); 
                       closeUpdateDocDialog();
                     } catch (err) {
                       toast({
