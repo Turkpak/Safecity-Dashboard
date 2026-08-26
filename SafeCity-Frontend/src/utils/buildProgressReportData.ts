@@ -19,6 +19,12 @@ import {
   getParentTehsilId,
   formatProgress,
 } from "./dashboardPhysicalProgress";
+import {
+  buildFinancialSummary,
+  buildRiskMatrix,
+  type FinancialSummary,
+  type RiskMatrix,
+} from "./progressReportAnalytics";
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -102,6 +108,10 @@ export interface ReportData {
   distribution: DistributionBucket[];
   /** Insights / observations generated from data. */
   insights: string[];
+  /** Aggregated financial metrics from project rows. */
+  financialSummary: FinancialSummary;
+  /** Risk quadrant categorization of projects. */
+  riskMatrix: RiskMatrix;
 }
 
 // ── Constants ─────────────────────────────────────────────────
@@ -151,7 +161,7 @@ function buildDistribution(projects: ProjectSummaryRow[]): DistributionBucket[] 
 
 function generateInsights(data: Omit<ReportData, "insights">): string[] {
   const ins: string[] = [];
-  const { kpis, hierarchyUnits, attentionProjects, distribution } = data;
+  const { kpis, hierarchyUnits, attentionProjects, distribution, financialSummary, riskMatrix } = data;
 
   ins.push(
     `Overall physical progress: ${formatProgress(kpis.overallPhysical)}% across ${kpis.totalProjects} project(s).`,
@@ -191,7 +201,17 @@ function generateInsights(data: Omit<ReportData, "insights">): string[] {
     ins.push(`${kpis.completedProjects} project(s) completed, ${kpis.inProgressProjects} in progress, ${kpis.pendingProjects} pending.`);
   }
 
-  return ins.slice(0, 6);
+  // Financial insight
+  if (financialSummary && financialSummary.totalBudget > 0) {
+    ins.push(`Financial utilization: ${formatProgress(financialSummary.utilizationPct)}% of allocated budget consumed.`);
+  }
+
+  // Risk insight
+  if (riskMatrix.highRisk > 0) {
+    ins.push(`${riskMatrix.highRisk} project(s) are high-risk (low progress + delay recorded).`);
+  }
+
+  return ins.slice(0, 8);
 }
 
 // ── Main builder ──────────────────────────────────────────────
@@ -355,6 +375,8 @@ export function buildReportData(
   );
 
   const distribution = buildDistribution(projectRows);
+  const financialSummary = buildFinancialSummary(projectRows);
+  const riskMatrix = buildRiskMatrix(projectRows);
 
   const partial: Omit<ReportData, "insights"> = {
     scope: {
@@ -373,6 +395,8 @@ export function buildReportData(
     bottomProjects,
     attentionProjects,
     distribution,
+    financialSummary,
+    riskMatrix,
   };
 
   return { ...partial, insights: generateInsights(partial) };
