@@ -539,28 +539,66 @@ class PictorialArchiveSerializer(serializers.ModelSerializer):
 
     def get_project_name(self, obj):
         return obj.project.project_name
-
-
 class ProjectListSerializer(serializers.ModelSerializer):
     province_name = serializers.SerializerMethodField()
     division_name = serializers.SerializerMethodField()
     district_name = serializers.SerializerMethodField()
     tehsil_name = serializers.SerializerMethodField()
     stakeholder_details = serializers.SerializerMethodField()
-    geom = GeometryField() 
+    geom = GeometryField()
+
     class Meta:
         model = Project
         fields = [
-            'id', 'stakeholder_details',
-            'project_name', 'project_description',
-            'project_starting_date', 'project_reference_no',
-            'province', 'province_name',
-            'division', 'division_name', 'district', 'district_name',
-            'tehsil', 'tehsil_name', 'geom',
-            'total_budget_allocated', 'budget_utilized',
-            'budget_variance', 'budget_remaining',
-            'created_at', 'updated_at', 
-            # deliberately no: activities, geom, xer_file, allocation/pd_release/spending/pifra cost breakdowns
+            'id',
+            'stakeholder_details',
+
+            'project_name',
+            'project_description',
+            'project_starting_date',
+            'project_reference_no',
+
+            'province',
+            'province_name',
+            'division',
+            'division_name',
+            'district',
+            'district_name',
+            'tehsil',
+            'tehsil_name',
+
+            'geom',
+
+            # Budget
+            'total_budget_allocated',
+            'budget_utilized',
+            'budget_variance',
+            'budget_remaining',
+
+            # ✅ Financial data needed by Finance.tsx
+            'allocation_capital_cost',
+            'allocation_revenue_cost',
+            'allocation_total_cost',
+            'pifra_utilization_total_cost',
+            'pd_release_capital_cost',
+            'pd_release_cost',
+            'pd_release_total_cost',
+
+            'spending_release_capital_cost',
+            'spending_release_revenue_cost',
+            'spending_release_total_cost',
+
+            'pifra_utilization_capital_cost',
+            'pifra_utilization_revenue_cost',
+            'pifra_utilization_total_cost',
+            'pifra_utilization_date',
+
+            'percentage_utilization_capital',
+            'percentage_utilization_revenue',
+            'percentage_utilization_total',
+
+            'created_at',
+            'updated_at',
         ]
 
     def get_province_name(self, obj):
@@ -573,13 +611,13 @@ class ProjectListSerializer(serializers.ModelSerializer):
         return obj.district.district_name if obj.district else None
 
     def get_tehsil_name(self, obj):
-        return obj.tehsil.tehsil_name
+        return obj.tehsil.tehsil_name if obj.tehsil else None
 
     def get_stakeholder_details(self, obj):
         return [
             {
                 "stakeholder_type": s.stakeholder_type,
-                "stakeholder_title": s.stakeholder_title
+                "stakeholder_title": s.stakeholder_title,
             }
             for s in obj.stakeholder.all()
         ]

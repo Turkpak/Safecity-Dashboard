@@ -34,7 +34,8 @@ export default function Finance() {
   const [selectedDistrictId, setSelectedDistrictId] = useState<string>("all");
   const [selectedTehsilId, setSelectedTehsilId] = useState<string>("all");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
-
+  const [comparisonPage, setComparisonPage] = useState(1);
+  const COMPARISON_PAGE_SIZE = 10;
   const isMobile = width < 640;
 
   const { data: projects = [] } = useQuery({
@@ -82,7 +83,18 @@ export default function Finance() {
     }
     return map;
   }, [projects]);
-
+useEffect(() => {
+  console.log("PROJECTS:", projects);
+  console.log(
+    "FINANCIAL PROJECT DATA:",
+    projects.map((p) => ({
+      id: p.id,
+      name: p.project_name,
+      allocation: p.allocation_total_cost,
+      pifra: p.pifra_utilization_total_cost,
+    }))
+  );
+}, [projects]);
   const { data: divisions = [], isLoading: divisionsLoading } = useQuery({
     queryKey: ["finance", "list-division"],
     queryFn: () => listDivisions(),
@@ -274,31 +286,68 @@ export default function Finance() {
     return [];
   }, [selectedProject, projectSummary, aggregatedFinancials, isAllFilters, selectedProjectId]);
 
-  const divisionComparisonData = useMemo(() => {
-    const EPS = 1e-6;
-    const rows = filteredProjects.map((p, i) => {
-      const baseName = (p.project_name?.trim() || `#${p.id}`) as string;
-      return {
-        division: baseName,
-        approvedM: Number(p.allocation_total_cost ?? 0),
-        pifraM: Number(p.pifra_utilization_total_cost ?? 0),
-        id: p.id,
-        color: STAGE_COLORS[i % STAGE_COLORS.length],
-      };
-    });
-    const nameCounts = new Map<string, number>();
-    for (const r of rows) nameCounts.set(r.division, (nameCounts.get(r.division) ?? 0) + 1);
-    const seen = new Map<string, number>();
-    const withUniqueLabels = rows.map((r) => {
-      if ((nameCounts.get(r.division) ?? 0) > 1) {
-        const n = (seen.get(r.division) ?? 0) + 1;
-        seen.set(r.division, n);
-        return { ...r, division: `${r.division} (#${r.id})` };
+const divisionComparisonData = useMemo(() => {
+  const EPS = 1e-6;
+
+  return filteredProjects
+    .map((p) => {
+      const allocation = Number(p.allocation_total_cost ?? 0);
+      const pifra = Number(p.pifra_utilization_total_cost ?? 0);
+
+      if (allocation <= EPS && pifra <= EPS) {
+        return null;
       }
-      return r;
-    });
-    return withUniqueLabels.filter((r) => r.approvedM > EPS || r.pifraM > EPS);
-  }, [filteredProjects]);
+
+      const difference = allocation - pifra;
+      const utilization = allocation > 0
+        ? (pifra / allocation) * 100
+        : 0;
+
+      return {
+        id: p.id,
+
+        projectName:
+          p.project_name?.trim() || `Project #${p.id}`,
+
+        divisionName:
+          p.division_name?.trim() || "—",
+
+        districtName:
+          p.district_name?.trim() || "—",
+
+        tehsilName:
+          p.tehsil_name?.trim() || "—",
+
+        allocationM: allocation,
+        pifraM: pifra,
+        differenceM: difference,
+        utilizationPct: utilization,
+      };
+    })
+    .filter(Boolean);
+}, [filteredProjects]);
+
+const comparisonTotalPages = Math.ceil(
+  divisionComparisonData.length / COMPARISON_PAGE_SIZE
+);
+
+const paginatedComparisonData = useMemo(() => {
+  const start = (comparisonPage - 1) * COMPARISON_PAGE_SIZE;
+
+  return divisionComparisonData.slice(
+    start,
+    start + COMPARISON_PAGE_SIZE
+  );
+}, [divisionComparisonData, comparisonPage]);
+useEffect(() => {
+  setComparisonPage(1);
+}, [
+  selectedDivisionId,
+  selectedDistrictId,
+  selectedTehsilId,
+  selectedProjectId,
+]);
+
 
   const kpiDerived = useMemo(() => {
     const allocationM = selectedProject
@@ -892,54 +941,219 @@ export default function Finance() {
               </CardContent>
             </Card>
 
-            {/* Project comparison — only projects with financial data; duplicate names disambiguated */}
-            <Card className="border-2 transition-colors hover:border-[#101a3c]">
-              <CardHeader>
-                <CardTitle>Project comparison</CardTitle>
-                <CardDescription>Allocation vs PIFRA utilization (PKR millions), projects with data only</CardDescription>
-              </CardHeader>
-              <CardContent className="h-[300px] sm:h-[330px] lg:h-[380px]">
-                {divisionComparisonData.length === 0 ? (
-                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                    No projects with allocation or PIFRA totals in the current filter.
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart
-                      data={divisionComparisonData}
-                      margin={{ top: 10, right: 24, left: 8, bottom: divisionComparisonData.length > 6 ? 72 : 56 }}
-                      barGap={4}
+            {/* Project comparison */}
+<Card className="border-2 transition-colors hover:border-[#101a3c] overflow-hidden">
+  <CardHeader className="border-b bg-muted/20">
+    <div className="flex flex-col gap-1">
+      <CardTitle>Project comparison</CardTitle>
+
+      <CardDescription>
+        Allocation vs PIFRA utilization — projects with financial data only
+      </CardDescription>
+    </div>
+  </CardHeader>
+
+  <CardContent className="p-0">
+    {divisionComparisonData.length === 0 ? (
+      <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
+        No projects with allocation or PIFRA totals in the current filter.
+      </div>
+    ) : (
+      <div className="overflow-x-auto">
+        <div className="min-w-[900px]">
+
+          {/* Table header */}
+          <div className="grid grid-cols-[2.2fr_1.5fr_1.5fr_1.5fr_1.3fr] gap-4 border-b bg-muted/40 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <div>Project / Location</div>
+            <div>Allocation</div>
+            <div>PIFRA Utilization</div>
+            <div>Difference</div>
+            <div>Utilization</div>
+          </div>
+
+          {/* Project rows */}
+          <div className="divide-y">
+            {paginatedComparisonData.map((project) => {
+              const utilization = Math.min(
+                100,
+                Math.max(0, project.utilizationPct)
+              );
+
+              const differencePositive = project.differenceM >= 0;
+
+              return (
+                <div
+                  key={project.id}
+                  className="grid grid-cols-[2.2fr_1.5fr_1.5fr_1.5fr_1.3fr] gap-4 px-5 py-4 transition-colors hover:bg-muted/20"
+                >
+
+                  {/* Project + Location */}
+                  <div className="min-w-0">
+                    <div
+                      className="truncate text-sm font-semibold text-foreground"
+                      title={project.projectName}
                     >
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                      <XAxis
-                        dataKey="division"
-                        angle={-35}
-                        textAnchor="end"
-                        height={divisionComparisonData.length > 6 ? 88 : 72}
-                        interval={0}
-                        tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
-                        tickFormatter={(v) => `${v}M`}
-                        width={48}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          borderColor: "hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                        formatter={(value: number, name: string) => [`PKR ${Number(value).toFixed(2)} M`, name]}
-                      />
-                      <Legend wrapperStyle={{ paddingTop: 8 }} />
-                      <Bar dataKey="approvedM" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Approved (M)" maxBarSize={56} />
-                      <Bar dataKey="pifraM" fill="#10b981" radius={[4, 4, 0, 0]} name="PIFRA (M)" maxBarSize={56} />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
+                      {project.projectName}
+                    </div>
+
+                    <div className="mt-1 flex flex-wrap items-center gap-x-1 text-[11px] text-muted-foreground">
+                      <span>{project.divisionName}</span>
+                      <span>›</span>
+                      <span>{project.districtName}</span>
+                      <span>›</span>
+                      <span>{project.tehsilName}</span>
+                    </div>
+                  </div>
+
+                  {/* Allocation */}
+                  <div className="flex items-center">
+                    <div>
+                      <div className="text-sm font-semibold">
+                        PKR {project.allocationM.toFixed(2)} M
+                      </div>
+
+                      <div className="mt-1 h-1.5 w-full min-w-[100px] overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-blue-500"
+                          style={{
+                            width: "100%",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* PIFRA */}
+                  <div className="flex items-center">
+                    <div className="w-full">
+                      <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                        PKR {project.pifraM.toFixed(2)} M
+                      </div>
+
+                      <div className="mt-1 h-1.5 w-full min-w-[100px] overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-emerald-500"
+                          style={{
+                            width: `${utilization}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Difference */}
+                  <div className="flex items-center">
+                    <div
+                      className={cn(
+                        "rounded-lg px-2.5 py-1.5 text-sm font-semibold",
+                        differencePositive
+                          ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                          : "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400"
+                      )}
+                    >
+                      {differencePositive ? "Remaining " : "Over by "}
+                      PKR {Math.abs(project.differenceM).toFixed(2)} M
+                    </div>
+                  </div>
+
+                  {/* Utilization */}
+                  <div className="flex items-center">
+                    <div className="w-full max-w-[140px]">
+                      <div className="mb-1 flex items-center justify-between">
+                        <span
+                          className={cn(
+                            "text-sm font-bold",
+                            utilization >= 80
+                              ? "text-emerald-600"
+                              : utilization >= 50
+                                ? "text-amber-600"
+                                : "text-rose-600"
+                          )}
+                        >
+                          {project.utilizationPct.toFixed(1)}%
+                        </span>
+                      </div>
+
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={cn(
+                            "h-full rounded-full transition-all",
+                            utilization >= 80
+                              ? "bg-emerald-500"
+                              : utilization >= 50
+                                ? "bg-amber-500"
+                                : "bg-rose-500"
+                          )}
+                          style={{
+                            width: `${utilization}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              );
+            })}
+          </div>
+          {comparisonTotalPages > 1 && (
+  <div className="flex flex-col gap-3 border-t bg-muted/20 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+    
+    <div className="text-xs text-muted-foreground">
+      Showing{" "}
+      <span className="font-medium text-foreground">
+        {(comparisonPage - 1) * COMPARISON_PAGE_SIZE + 1}
+      </span>
+      {" – "}
+      <span className="font-medium text-foreground">
+        {Math.min(
+          comparisonPage * COMPARISON_PAGE_SIZE,
+          divisionComparisonData.length
+        )}
+      </span>
+      {" of "}
+      <span className="font-medium text-foreground">
+        {divisionComparisonData.length}
+      </span>
+      {" projects"}
+    </div>
+
+    <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={comparisonPage === 1}
+        onClick={() =>
+          setComparisonPage((page) => Math.max(1, page - 1))
+        }
+      >
+        Previous
+      </Button>
+
+      <div className="px-2 text-xs font-medium">
+        Page {comparisonPage} of {comparisonTotalPages}
+      </div>
+
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={comparisonPage === comparisonTotalPages}
+        onClick={() =>
+          setComparisonPage((page) =>
+            Math.min(comparisonTotalPages, page + 1)
+          )
+        }
+      >
+        Next
+      </Button>
+    </div>
+  </div>
+)}
+        </div>
+      </div>
+    )}
+  </CardContent>
+</Card>
 
             {/* Stage breakdown */}
             <Card>
