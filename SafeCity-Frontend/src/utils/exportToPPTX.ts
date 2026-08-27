@@ -740,7 +740,7 @@ function addCompactTable(
       const lower = raw.toLowerCase();
 
       // Status-aware color
-      let cellColor = T.text;
+      let cellColor: string = T.text;
       if (lower.includes("delay") || lower === "yes") cellColor = T.red;
       else if (lower.includes("complet"))             cellColor = T.green;
       else if (lower.includes("progress"))            cellColor = T.accent;

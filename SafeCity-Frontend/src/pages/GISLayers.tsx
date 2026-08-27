@@ -17,7 +17,6 @@ import {
 import { FolderKanban, Loader2, AlertTriangle, CalendarCheck, Filter } from "lucide-react";
 import React, { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { getMapCenterForArea } from "@/data/areaMapCenters";
 import type { Division, District, Tehsil, Project } from "@/api/types";
 import { cn } from "@/lib/utils";
 import { ProjectGanttTree } from "@/components/dashboard/ProjectGanttTree";
@@ -391,23 +390,25 @@ export default function GISLayers() {
     } as const;
   }, [filteredProjects, projectStatusById]);
 
-  const mapView = useMemo(
-    () =>
-      getMapCenterForArea(
-        selectedDivisionId === "all"
-          ? ""
-          : divisions.find((d) => String(d.id) === selectedDivisionId)
-              ?.division_name ?? "",
-        selectedDistrictId === "all"
-          ? undefined
-          : districts.find((d) => String(d.id) === selectedDistrictId)
-              ?.district_name,
-        selectedTehsilId === "all"
-          ? undefined
-          : tehsils.find((t) => String(t.id) === selectedTehsilId)?.tehsil_name
-      ),
-    [selectedDivisionId, selectedDistrictId, selectedTehsilId, divisions, districts, tehsils]
-  );
+  const mapView = useMemo(() => {
+    const coords = filteredProjects
+      .map((project: any) => ({
+        lat: Number(project.latitude),
+        lng: Number(project.longitude),
+      }))
+      .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
+
+    if (coords.length === 0) {
+      return { center: undefined as [number, number] | undefined, zoom: undefined as number | undefined };
+    }
+
+    const center: [number, number] = [
+      coords.reduce((sum, point) => sum + point.lat, 0) / coords.length,
+      coords.reduce((sum, point) => sum + point.lng, 0) / coords.length,
+    ];
+
+    return { center, zoom: coords.length === 1 ? 13 : 9 };
+  }, [filteredProjects]);
 
   const selectedProject = useMemo(
     () =>
