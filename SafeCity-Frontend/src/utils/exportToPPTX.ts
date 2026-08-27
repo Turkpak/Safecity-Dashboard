@@ -57,8 +57,8 @@ const T = {
   redDark:    "991B1B",
   green:      "16A34A",
   greenDark:  "15803D",
-  amber:      "D97706",
-  amberLt:    "F59E0B",
+  amber:      "1D4ED8",
+  amberLt:    "60A5FA",
   slate:      "475569",
   muted:      "64748B",
   border:     "CBD5E1",
@@ -69,10 +69,10 @@ const T = {
   softBlue:   "EFF6FF",
   softGreen:  "F0FDF4",
   softRed:    "FEF2F2",
-  softAmber:  "FFFBEB",
-  gold:       "F59E0B",
+  softAmber:  "EFF6FF",
+  gold:       "2563EB",
   silver:     "94A3B8",
-  bronze:     "B45309",
+  bronze:     "64748B",
   cardBg:     "FAFBFF",
 } as const;
 
@@ -97,9 +97,8 @@ const CONTENT_H = FOOTER_Y - CONTENT_Y - 0.1;
 
 function progressColor(v: number): string {
   if (v >= 75) return T.green;
-  if (v >= 50) return T.accent;
-  if (v >= 25) return T.amber;
-  return T.red;
+  if (v > 0) return T.accent;
+  return T.slate;
 }
 
 function ragColor(rag: string): string {
@@ -168,10 +167,10 @@ function addSlideChrome(
     });
   });
 
-  // Gold accent thin strip
+  // Clean PSCA accent strip — blue plus red; no orange/gold band
   slide.addShape(prs.ShapeType.rect, {
     x: 0, y: HEADER_H - 0.08, w: W, h: 0.03,
-    fill: { color: T.gold }, line: { color: T.gold, width: 0 },
+    fill: { color: T.accent }, line: { color: T.accent, width: 0 },
   });
   // Red accent strip
   slide.addShape(prs.ShapeType.rect, {
@@ -182,12 +181,12 @@ function addSlideChrome(
   // Slide title (left of header)
   slide.addText(title, {
     x: MX, y: 0.1, w: W * 0.56, h: 0.5,
-    fontSize: 16, bold: true, color: T.white, fontFace: FONT, valign: "middle",
+    fontSize: 20, bold: true, color: T.white, fontFace: FONT, valign: "middle",
   });
   // Scope name (below title, still in header)
   slide.addText(trunc(scopeName, 55), {
     x: MX, y: 0.62, w: W * 0.54, h: 0.28,
-    fontSize: 8, color: "93C5FD", fontFace: FONT, valign: "middle",
+    fontSize: 10, color: "93C5FD", fontFace: FONT, valign: "middle",
   });
 
   // Slide number pill (top-right)
@@ -216,11 +215,11 @@ function addSlideChrome(
   });
   slide.addText("PSCA SafeCity  •  Physical Progress Decision-Support", {
     x: MX, y: FOOTER_Y + 0.01, w: CONTENT_W * 0.6, h: 0.22,
-    fontSize: 6.5, color: T.muted, fontFace: FONT, valign: "middle",
+    fontSize: 8, color: T.muted, fontFace: FONT, valign: "middle",
   });
   slide.addText("CONFIDENTIAL", {
     x: MX + CONTENT_W * 0.61, y: FOOTER_Y + 0.01, w: CONTENT_W * 0.39, h: 0.22,
-    fontSize: 6.5, bold: true, color: T.red, fontFace: FONT,
+    fontSize: 8, bold: true, color: T.red, fontFace: FONT,
     align: "right", valign: "middle",
   });
 }
@@ -265,7 +264,7 @@ function addKpiBox(
   // Label
   slide.addText(trunc(label.toUpperCase(), 20), {
     x: x + 0.14, y: y + 0.06, w: w - 0.4, h: 0.2,
-    fontSize: 5.5, bold: true, color: T.muted, fontFace: FONT, valign: "top",
+    fontSize: 8, bold: true, color: T.muted, fontFace: FONT, valign: "top",
   });
 
   // Value
@@ -273,7 +272,7 @@ function addKpiBox(
   const valH = Math.max(0.26, h - 0.52);
   slide.addText(value, {
     x: x + 0.14, y: valY, w: w - 0.2, h: valH,
-    fontSize: Math.min(20, h < 0.8 ? 14 : 18), bold: true,
+    fontSize: Math.min(24, h < 0.8 ? 17 : 22), bold: true,
     color: T.text, fontFace: FONT, valign: "middle",
   });
 
@@ -281,7 +280,7 @@ function addKpiBox(
   if (sub && h >= 0.76) {
     slide.addText(trunc(sub, 24), {
       x: x + 0.14, y: y + h - 0.22, w: w - 0.2, h: 0.18,
-      fontSize: 5.5, color: T.muted, fontFace: FONT, valign: "bottom",
+      fontSize: 7.5, color: T.muted, fontFace: FONT, valign: "bottom",
     });
   }
 }
@@ -297,7 +296,7 @@ function addSectionLabel(
   // Title
   slide.addText(text, {
     x, y, w: CONTENT_W, h: 0.26,
-    fontSize: 10, bold: true, color: T.navy, fontFace: FONT, valign: "middle",
+    fontSize: 14, bold: true, color: T.navy, fontFace: FONT, valign: "middle",
   });
   // Red underline
   slide.addShape(prs.ShapeType.rect, {
@@ -315,7 +314,7 @@ function addSectionLabel(
   if (subtitle) {
     slide.addText(subtitle, {
       x, y: nextY, w: CONTENT_W, h: 0.2,
-      fontSize: 7, color: T.muted, fontFace: FONT, valign: "top",
+      fontSize: 9, color: T.muted, fontFace: FONT, valign: "top",
     });
     nextY += 0.22;
   }
@@ -369,7 +368,7 @@ function addHBarChart(
       });
       slide.addText(String(i + 1), {
         x: x + 0.02, y: ry + rowH * 0.15, w: rowH * 0.55, h: rowH * 0.55,
-        fontSize: 6, bold: true, color: T.white, fontFace: FONT,
+        fontSize: 7.5, bold: true, color: T.white, fontFace: FONT,
         align: "center", valign: "middle",
       });
     }
@@ -378,7 +377,7 @@ function addHBarChart(
     const labelX = showRankBadges ? x + 0.3 : x + 0.06;
     slide.addText(trunc(bar.label, 22), {
       x: labelX, y: ry + 0.02, w: LABEL_W - 0.36, h: rowH - 0.04,
-      fontSize: 7, color: T.text, fontFace: FONT, valign: "middle",
+      fontSize: 8.5, color: T.text, fontFace: FONT, valign: "middle",
     });
 
     // Track
@@ -412,7 +411,7 @@ function addHBarChart(
     if (bar.meta && fillW > 1.5) {
       slide.addText(bar.meta, {
         x: x + LABEL_W + 0.1, y: ry + rowH * 0.22, w: fillW - 0.2, h: rowH * 0.52,
-        fontSize: 5, color: T.white, fontFace: FONT, valign: "middle", align: "right",
+        fontSize: 6.5, color: T.white, fontFace: FONT, valign: "middle", align: "right",
         transparency: 30,
       } as any);
     }
@@ -424,7 +423,7 @@ function addHBarChart(
     });
     slide.addText(`${formatProgress(val)}%`, {
       x: x + LABEL_W + BAR_W + 0.03, y: ry + 0.02, w: VALUE_W - 0.04, h: rowH - 0.04,
-      fontSize: 7, bold: true, color: T.accent, fontFace: FONT,
+      fontSize: 8.5, bold: true, color: T.accent, fontFace: FONT,
       align: "center", valign: "middle",
     });
   });
@@ -474,13 +473,13 @@ function addCountBarChart(
     // Count above bar
     slide.addText(String(bar.value), {
       x: bx, y: by - 0.20, w: BAR_W, h: 0.18,
-      fontSize: 7.5, bold: true, color: T.text, fontFace: FONT,
+      fontSize: 9, bold: true, color: T.text, fontFace: FONT,
       align: "center", valign: "middle",
     });
     // X-axis label
     slide.addText(trunc(bar.label, 10), {
       x: bx, y: y + CHART_H + 0.04, w: BAR_W, h: 0.22,
-      fontSize: 5.5, color: T.muted, fontFace: FONT,
+      fontSize: 7.5, color: T.muted, fontFace: FONT,
       align: "center", valign: "top",
     });
   });
@@ -512,12 +511,12 @@ function addDonutProgress(
   // Center text
   slide.addText(`${formatProgress(actual)}%`, {
     x: x + w * 0.18, y: y + h * 0.33, w: w * 0.64, h: h * 0.28,
-    fontSize: 14, bold: true, color: progressColor(actual), fontFace: FONT,
+    fontSize: 20, bold: true, color: progressColor(actual), fontFace: FONT,
     align: "center", valign: "middle",
   });
   slide.addText(label, {
     x: x + w * 0.18, y: y + h * 0.60, w: w * 0.64, h: 0.18,
-    fontSize: 7, color: T.muted, fontFace: FONT,
+    fontSize: 9, color: T.muted, fontFace: FONT,
     align: "center", valign: "top",
   });
 }
@@ -553,13 +552,13 @@ function addRagStrip(
     // Value
     slide.addText(ind.value, {
       x: ix + 0.36, y: y + 0.06, w: itemW - 0.44, h: h * 0.5,
-      fontSize: 11, bold: true, color: T.text, fontFace: FONT, valign: "middle",
+      fontSize: 13, bold: true, color: T.text, fontFace: FONT, valign: "middle",
     });
 
     // Label
     slide.addText(ind.label.toUpperCase(), {
       x: ix + 0.12, y: y + h * 0.58, w: itemW - 0.2, h: h * 0.35,
-      fontSize: 5.5, color: T.muted, fontFace: FONT, valign: "middle",
+      fontSize: 7.5, color: T.muted, fontFace: FONT, valign: "middle",
     });
   });
 }
@@ -599,14 +598,14 @@ function addRiskMatrix(
     // Value
     slide.addText(String(q.value), {
       x: qx, y: qy + 0.08, w: halfW, h: halfH * 0.55,
-      fontSize: 20, bold: true, color: q.color, fontFace: FONT,
+      fontSize: 24, bold: true, color: q.color, fontFace: FONT,
       align: "center", valign: "middle",
     });
 
     // Label
     slide.addText(q.label, {
       x: qx, y: qy + halfH * 0.6, w: halfW, h: halfH * 0.35,
-      fontSize: 6, bold: true, color: q.color, fontFace: FONT,
+      fontSize: 8, bold: true, color: q.color, fontFace: FONT,
       align: "center", valign: "middle",
     });
   });
@@ -634,7 +633,7 @@ function addPerformanceGapBar(
   // Label
   slide.addText("PERFORMANCE GAP", {
     x: x + 0.12, y: y + 0.04, w: 1.4, h: 0.18,
-    fontSize: 5.5, bold: true, color: T.muted, fontFace: FONT,
+    fontSize: 8, bold: true, color: T.muted, fontFace: FONT,
   });
 
   // Bar track
@@ -657,7 +656,7 @@ function addPerformanceGapBar(
   });
   slide.addText(trunc(gap.worstUnit, 12), {
     x: worstX - 0.5, y: barY + barH + 0.02, w: 1.1, h: 0.15,
-    fontSize: 5, color: T.red, fontFace: FONT, align: "center",
+    fontSize: 7, color: T.red, fontFace: FONT, align: "center",
   });
 
   // Best marker
@@ -668,14 +667,14 @@ function addPerformanceGapBar(
   });
   slide.addText(trunc(gap.bestUnit, 12), {
     x: bestX - 0.5, y: barY - 0.22, w: 1.1, h: 0.15,
-    fontSize: 5, color: T.green, fontFace: FONT, align: "center",
+    fontSize: 7, color: T.green, fontFace: FONT, align: "center",
   });
 
   // Spread label
   const spreadColor = gap.spread > 40 ? T.red : gap.spread > 20 ? T.amber : T.green;
   slide.addText(`${formatProgress(gap.spread)}pp spread  •  ${gap.spreadLabel}`, {
     x: x + w - 2.5, y: y + 0.02, w: 2.4, h: 0.22,
-    fontSize: 6, bold: true, color: spreadColor, fontFace: FONT,
+    fontSize: 8, bold: true, color: spreadColor, fontFace: FONT,
     align: "right", valign: "middle",
   });
 }
@@ -767,7 +766,7 @@ function addCompactTable(
         // Value below bar
         slide.addText(disp, {
           x: cx + 0.05, y: ry + ROW_H * 0.45, w: barW, h: ROW_H * 0.5,
-          fontSize: 5.8, bold: true, color: progressColor(pVal), fontFace: FONT,
+          fontSize: 7.5, bold: true, color: progressColor(pVal), fontFace: FONT,
           align: "center", valign: "middle",
         });
       } else {
@@ -788,7 +787,7 @@ function addCompactTable(
 
         slide.addText(disp, {
           x: textX, y: ry + 0.03, w: textW, h: ROW_H - 0.06,
-          fontSize: 6, color: cellColor, fontFace: FONT,
+          fontSize: 8, color: cellColor, fontFace: FONT,
           align: col.align ?? "left", valign: "middle",
         });
       }
@@ -812,7 +811,7 @@ function addCompactTable(
     });
     slide.addText(`Showing ${display.length} of ${rows.length} project(s)`, {
       x: x + 0.1, y: summY, w: tableW - 0.2, h: 0.22,
-      fontSize: 5.5, color: T.muted, fontFace: FONT, valign: "middle",
+      fontSize: 7.5, color: T.muted, fontFace: FONT, valign: "middle",
     });
   }
 
@@ -844,7 +843,7 @@ function addInsightBox(
   // Heading
   slide.addText(heading.toUpperCase(), {
     x: x + 0.16, y: y + 0.07, w: w - 0.24, h: 0.22,
-    fontSize: 7.5, bold: true, color: T.navy, fontFace: FONT, valign: "top",
+    fontSize: 10, bold: true, color: T.navy, fontFace: FONT, valign: "top",
   });
 
   // Separator
@@ -867,7 +866,7 @@ function addInsightBox(
     });
     slide.addText(b, {
       x: x + 0.28, y: by, w: w - 0.38, h: BULLET_STEP - 0.01,
-      fontSize: 6.5, color: T.text, fontFace: FONT, valign: "middle",
+      fontSize: 8.5, color: T.text, fontFace: FONT, valign: "middle",
     });
   });
 }
@@ -926,7 +925,7 @@ function buildSlide1Title(
   // PSCA branding
   slide.addText("PSCA SAFECITY", {
     x: MX, y: 0.78, w: W - MX * 2, h: 0.44,
-    fontSize: 13, bold: true, color: "93C5FD", fontFace: FONT,
+    fontSize: 16, bold: true, color: "93C5FD", fontFace: FONT,
     align: "center", valign: "middle", charSpacing: 3.5,
   });
 
@@ -940,7 +939,7 @@ function buildSlide1Title(
   // Subtitle
   slide.addText("Physical Progress Decision-Support Report", {
     x: MX, y: 2.22, w: W - MX * 2, h: 0.36,
-    fontSize: 13, color: "C7D2FE", fontFace: FONT,
+    fontSize: 15, color: "C7D2FE", fontFace: FONT,
     align: "center", valign: "middle",
   });
 
@@ -1000,7 +999,7 @@ function buildSlide1Title(
     });
     slide.addText(trunc(k.label, 18), {
       x: kx, y: KPI_Y + KPI_H * 0.58, w: kpiW, h: KPI_H * 0.35,
-      fontSize: 6.5, color: "94A3B8", fontFace: FONT,
+      fontSize: 8, color: "94A3B8", fontFace: FONT,
       align: "center", valign: "middle",
     });
   });
@@ -1008,7 +1007,7 @@ function buildSlide1Title(
   // Generated line
   slide.addText(`Generated: ${dateStr}  |  ${totalSlides} slides`, {
     x: MX, y: 4.98, w: W - MX * 2, h: 0.26,
-    fontSize: 7, color: "6B80A0", fontFace: FONT, align: "center",
+    fontSize: 8.5, color: "6B80A0", fontFace: FONT, align: "center",
   });
 }
 
@@ -1088,7 +1087,7 @@ function buildSlide3Ranking(
   if (!bars.length) {
     slide.addText("No hierarchy units for this scope.", {
       x: MX, y: nextY + 0.5, w: CONTENT_W, h: 0.4,
-      fontSize: 10, color: T.muted, fontFace: FONT, align: "center",
+      fontSize: 12, color: T.muted, fontFace: FONT, align: "center",
     });
     return;
   }
@@ -1109,7 +1108,7 @@ function buildSlide4Load(
   if (!loadBars.length) {
     slide.addText("No project-load data for this scope.", {
       x: MX, y: CONTENT_Y + 0.8, w: CONTENT_W, h: 0.4,
-      fontSize: 10, color: T.muted, fontFace: FONT, align: "center",
+      fontSize: 12, color: T.muted, fontFace: FONT, align: "center",
     });
     return;
   }
@@ -1261,7 +1260,7 @@ function buildSlide8DelayEvidence(
   if (!delayed.length) {
     slide.addText("No delay logs recorded.", {
       x: MX, y: delayNextY + 0.4, w: HALF_W, h: 0.4,
-      fontSize: 9, color: T.green, fontFace: FONT, align: "center",
+      fontSize: 11, color: T.green, fontFace: FONT, align: "center",
     });
   } else {
     const delayBars = delayed.slice(0, 8).map((p) => ({
@@ -1370,14 +1369,14 @@ function buildSlide10Decision(
     });
     slide.addText(String(i + 1), {
       x: MX + 0.16, y: cy + CARD_H / 2 - 0.14, w: 0.28, h: 0.28,
-      fontSize: 8, bold: true, color: T.white, fontFace: FONT,
+      fontSize: 9.5, bold: true, color: T.white, fontFace: FONT,
       align: "center", valign: "middle",
     });
 
     // Bullet text
     slide.addText(b.text, {
       x: MX + 0.54, y: cy + 0.06, w: CONTENT_W - 0.7, h: CARD_H - 0.12,
-      fontSize: 9, color: T.text, fontFace: FONT, valign: "middle",
+      fontSize: 11, color: T.text, fontFace: FONT, valign: "middle",
     });
   });
 
@@ -1386,7 +1385,7 @@ function buildSlide10Decision(
     `Generated: ${dateStr}  ·  ${formatProgress(report.kpis.overallPhysical)}% physical progress`,
     {
       x: MX, y: FOOTER_Y - 0.38, w: CONTENT_W, h: 0.26,
-      fontSize: 7.5, color: T.muted, fontFace: FONT, align: "center",
+      fontSize: 9, color: T.muted, fontFace: FONT, align: "center",
     },
   );
 }

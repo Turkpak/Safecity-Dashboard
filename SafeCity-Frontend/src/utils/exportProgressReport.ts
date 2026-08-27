@@ -1,7 +1,7 @@
 /**
  * exportProgressReport.ts
  * ============================================================
- * Professional chart-led PDF progress report — jsPDF landscape A4.
+ * Professional chart-led PDF progress report — jsPDF A4 portrait.
  *
  * Fixes applied (v3 — no double text, no overlap, clean alignment):
  *   - MY raised to 29 so content never clips the header.
@@ -25,6 +25,9 @@
  */
 
 import jsPDF from "jspdf";
+import { mediaUrl } from "@/api/config";
+import { listDelayLogs, type DelayLogItem } from "@/api/delayLog";
+import { listProgressImages, type ProgressImage } from "@/api/progressImage";
 import type { DashboardPageData } from "@/api/dashboard";
 import { formatProgress } from "./dashboardPhysicalProgress";
 import {
@@ -53,28 +56,28 @@ const NAVY:      Rgb = [17, 31, 70];
 const BLUE:      Rgb = [30, 58, 138];
 const RED:       Rgb = [185, 28, 28];
 const GREEN:     Rgb = [22, 163, 74];
-const AMBER:     Rgb = [217, 119, 6];
+const AMBER:     Rgb = [37, 99, 235]; // warning is rendered as blue in executive reports to avoid orange-heavy visuals
 const SLATE:     Rgb = [71, 85, 105];
 const WHITE:     Rgb = [255, 255, 255];
 const SOFT_BLUE: Rgb = [238, 243, 252];
 const BORDER:    Rgb = [220, 227, 239];
 const TEXT:      Rgb = [25, 35, 56];
 const MUTED:     Rgb = [100, 116, 139];
-const GOLD:      Rgb = [245, 158, 11];
+const GOLD:      Rgb = [37, 99, 235];
 
 // ─────────────────────────────────────────────────────────────
-// PAGE GEOMETRY  (all in mm, landscape A4 = 297 × 210 mm)
+// PAGE GEOMETRY  (all in mm, portrait A4 = 210 × 297 mm)
 // ─────────────────────────────────────────────────────────────
 
-const PW = 297;
-const PH = 210;
-const MX = 11;          // left/right margin
-const HEADER_H = 27;    // header band height  (header + accent strips)
-const MY = HEADER_H + 3;// top of content area  = 30 mm
-const FOOTER_TOP = PH - 10; // top of footer band
-const CW = PW - MX * 2;    // usable content width  = 275 mm
-const CB = FOOTER_TOP - 3;  // content bottom limit  = 197 mm
-const AVAIL = CB - MY;      // total usable height   ≈ 167 mm
+const PW = 210;
+const PH = 297;
+const MX = 12;          // left/right margin for print-safe A4 portrait
+const HEADER_H = 24;    // formal header band
+const MY = HEADER_H + 7;
+const FOOTER_TOP = PH - 15;
+const CW = PW - MX * 2;
+const CB = FOOTER_TOP - 8;  // reserved footer clearance for print/export
+const AVAIL = CB - MY;
 
 // ─────────────────────────────────────────────────────────────
 // LOW-LEVEL HELPERS
@@ -88,9 +91,8 @@ function clamp(v: number): number { return Math.max(0, Math.min(100, v)); }
 
 function progressRgb(v: number): Rgb {
   if (v >= 75) return GREEN;
-  if (v >= 50) return BLUE;
-  if (v >= 25) return AMBER;
-  return RED;
+  if (v > 0) return BLUE;
+  return SLATE;
 }
 
 function trunc(s: string, max = 28): string {
@@ -119,7 +121,7 @@ function hexToRgb(hex: string): Rgb {
 
 function panel(doc: jsPDF, x: number, y: number, w: number, h: number): void {
   // shadow
-  f(doc, [210, 215, 228]); doc.roundedRect(x + 0.6, y + 0.6, w, h, 2, 2, "F");
+  f(doc, [226, 232, 242]); doc.roundedRect(x + 0.45, y + 0.45, w, h, 2, 2, "F");
   // card
   f(doc, WHITE); d(doc, BORDER); doc.setLineWidth(0.35);
   doc.roundedRect(x, y, w, h, 2, 2, "FD");
@@ -159,18 +161,17 @@ function drawHeader(
   d(doc, [35, 58, 105]); doc.setLineWidth(1.8);
   [PW - 40, PW - 28, PW - 16].forEach((sx) => doc.line(sx, 0, sx + 20, 24));
 
-  // Gold accent strip
-  f(doc, GOLD); doc.rect(0, 24, PW, 0.7, "F");
-  // Red accent strip
-  f(doc, RED); doc.rect(0, 24.7, PW, 1.3, "F");
+  // Clean PSCA accent strips — no orange/gold band
+  f(doc, BLUE); doc.rect(0, 24, PW, 0.6, "F");
+  f(doc, RED); doc.rect(0, 24.6, PW, 1.4, "F");
 
   // Logo
   const textX = logo ? 28 : MX;
   if (logo) { try { doc.addImage(logo, "PNG", 10, 3.5, 13, 13); } catch { /* optional */ } }
 
   // Title (line 1)
-  t(doc, WHITE); doc.setFont("helvetica", "bold"); doc.setFontSize(11.5);
-  doc.text("PSCA  PHYSICAL PROGRESS & EXECUTION REPORT", textX, 9);
+  t(doc, WHITE); doc.setFont("helvetica", "bold"); doc.setFontSize(11.2);
+  doc.text("PSCA  PHYSICAL PROGRESS REPORT", textX, 9);
 
   // Scope name (line 2) — only shown ONCE here, never repeated in section titles
   doc.setFont("helvetica", "normal"); doc.setFontSize(7);
@@ -178,11 +179,11 @@ function drawHeader(
   doc.text(trunc(report.scope.scopeName, 80), textX, 15.5);
 
   // Scope-type badge (top-right)
-  f(doc, [25, 45, 90]); doc.roundedRect(PW - 68, 4, 27, 8, 2, 2, "F");
-  t(doc, WHITE); doc.setFont("helvetica", "bold"); doc.setFontSize(5.2);
+  f(doc, [25, 45, 90]); doc.roundedRect(PW - 58, 4, 27, 8, 2, 2, "F");
+  t(doc, WHITE); doc.setFont("helvetica", "bold"); doc.setFontSize(6.2);
   doc.text(
     report.scope.scopeType.replace(/-/g, " ").toUpperCase(),
-    PW - 54.5, 8.5, { align: "center" },
+    PW - 44.5, 8.5, { align: "center" },
   );
 
   // Date + page (top-right, second line)
@@ -191,9 +192,9 @@ function drawHeader(
   doc.text(`${today()}`, PW - MX, 16.5, { align: "right" });
 
   // Page badge
-  f(doc, RED); doc.roundedRect(PW - 68, 14, 18, 7, 2, 2, "F");
+  f(doc, RED); doc.roundedRect(PW - 58, 14, 18, 7, 2, 2, "F");
   t(doc, WHITE); doc.setFont("helvetica", "bold"); doc.setFontSize(6.5);
-  doc.text(`${pageNo} / ${totalPages}`, PW - 59, 18.5, { align: "center" });
+  doc.text(`${pageNo} / ${totalPages}`, PW - 49, 18.5, { align: "center" });
 }
 
 function drawFooter(doc: jsPDF, pageNo: number, totalPages: number): void {
@@ -203,7 +204,7 @@ function drawFooter(doc: jsPDF, pageNo: number, totalPages: number): void {
   d(doc, BLUE); doc.setLineWidth(0.5);
   doc.line(MX, FOOTER_TOP, PW - MX, FOOTER_TOP);
   // Left text
-  t(doc, MUTED); doc.setFont("helvetica", "normal"); doc.setFontSize(5.5);
+  t(doc, MUTED); doc.setFont("helvetica", "normal"); doc.setFontSize(6);
   doc.text("PSCA SafeCity  •  Physical progress analytics  •  CONFIDENTIAL", MX, FOOTER_TOP + 4);
   doc.text(`Page ${pageNo} of ${totalPages}`, PW - MX, FOOTER_TOP + 4, { align: "right" });
 }
@@ -223,27 +224,21 @@ function sectionTitle(
   x: number, y: number,
   subtitle?: string,
 ): number {
-  // Light background band
-  f(doc, [233, 240, 255]);
-  doc.rect(x, y, CW - (x - MX), 7, "F");
+  // Minimal formal heading: dot + title + underline, no heavy full-width band.
+  f(doc, RED); doc.circle(x + 1.6, y + 2.8, 1.15, "F");
 
-  // Red circle dot (left of title)
-  f(doc, RED); doc.circle(x + 2, y + 3.5, 1.3, "F");
+  t(doc, NAVY); doc.setFont("helvetica", "bold"); doc.setFontSize(8.2);
+  doc.text(title, x + 5.5, y + 3.8);
 
-  // Title text
-  t(doc, NAVY); doc.setFont("helvetica", "bold"); doc.setFontSize(8.5);
-  doc.text(title, x + 6.5, y + 5.2);
+  f(doc, RED); doc.roundedRect(x + 5.5, y + 5.5, 21, 0.75, 0.35, 0.35, "F");
 
-  // Red underline bar (under the text, not overlapping it)
-  f(doc, RED); doc.roundedRect(x + 6.5, y + 7, 22, 0.9, 0.4, 0.4, "F");
-
-  let nextY = y + 10;
+  let nextY = y + 8.5;
   if (subtitle) {
-    t(doc, MUTED); doc.setFont("helvetica", "normal"); doc.setFontSize(5.5);
-    doc.text(trunc(subtitle, 90), x + 6.5, nextY);
-    nextY += 4;
+    t(doc, MUTED); doc.setFont("helvetica", "normal"); doc.setFontSize(6.2);
+    doc.text(trunc(subtitle, 96), x + 5.5, nextY);
+    nextY += 3.8;
   }
-  return nextY + 1; // +1 breathing gap before first content element
+  return nextY + 1.2;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -268,7 +263,7 @@ function kpiCard(
   f(doc, accent); doc.circle(x + w - 3.5, y + 3.5, 1.8, "F");
 
   // Label  (top area: y + 5)
-  t(doc, MUTED); doc.setFont("helvetica", "bold"); doc.setFontSize(5.8);
+  t(doc, MUTED); doc.setFont("helvetica", "bold"); doc.setFontSize(6.2);
   doc.text(trunc(label.toUpperCase(), 22), x + 5.5, y + 5.5);
 
   // Value  (middle: y + 13)
@@ -277,7 +272,7 @@ function kpiCard(
 
   // Sub-label  (bottom: y + h - 4)
   if (sub && h >= 22) {
-    t(doc, MUTED); doc.setFont("helvetica", "normal"); doc.setFontSize(5);
+    t(doc, MUTED); doc.setFont("helvetica", "normal"); doc.setFontSize(5.7);
     doc.text(trunc(sub, 26), x + 5.5, y + h - 4);
   }
 }
@@ -316,7 +311,7 @@ function hBarChart(
 
     // Label (vertically centered in the row)
     const labelY = ry + rowH * 0.62;
-    t(doc, TEXT); doc.setFont("helvetica", "normal"); doc.setFontSize(5.8);
+    t(doc, TEXT); doc.setFont("helvetica", "normal"); doc.setFontSize(6.2);
     doc.text(trunc(bar.label, 20), x + 3.5, labelY, { maxWidth: LABEL_W - 5 });
 
     // Track
@@ -351,42 +346,40 @@ function distributionChart(
   const rows = report.distribution;
   const max = Math.max(...rows.map((r) => r.count), 1);
 
-  // Chart area with padding inside the panel
-  const cx = x + 6, cy = y + 5;
-  const cw = w - 12, ch = h - 16;
-
-  // Baseline
-  d(doc, [140, 155, 175]); doc.setLineWidth(0.5);
-  doc.line(cx, cy + ch, cx + cw, cy + ch);
-
-  // Grid lines at 50% and 100%
-  d(doc, [215, 222, 238]); doc.setLineWidth(0.25);
-  [0.5, 1.0].forEach((pct) => doc.line(cx, cy + ch - pct * ch, cx + cw, cy + ch - pct * ch));
-
-  const bGap = 3;
-  const bW = (cw - bGap * (rows.length - 1)) / rows.length;
+  // Compact decision-support bucket bars instead of a tall column chart.
+  const padX = 5;
+  const padTop = 5;
+  const rowH = Math.min(8, (h - padTop - 5) / Math.max(rows.length, 1));
+  const labelW = Math.min(30, w * 0.30);
+  const countW = 12;
+  const barW = w - padX * 2 - labelW - countW - 4;
 
   rows.forEach((row, i) => {
-    const bh = row.count > 0 ? Math.max(1.5, (row.count / max) * ch) : 0;
-    const bx = cx + i * (bW + bGap);
-    const by = cy + ch - bh;
-    const rgb = hexToRgb(row.color);
+    const ry = y + padTop + i * rowH;
+    const value = row.count;
+    const pctW = value > 0 ? Math.max(2, (value / max) * barW) : 0;
+    const isZeroBucket = row.bucket === "0%";
+    const fillRgb: Rgb = isZeroBucket ? RED : value > 0 ? BLUE : [203, 213, 225];
 
-    f(doc, rgb);
-    if (bh > 0) doc.roundedRect(bx, by, bW, bh, 0.8, 0.8, "F");
+    if (i % 2 !== 0) {
+      f(doc, [248, 250, 254]);
+      doc.roundedRect(x + 2, ry - 1.2, w - 4, rowH, 0.7, 0.7, "F");
+    }
 
-    // Count above bar
-    t(doc, TEXT); doc.setFont("helvetica", "bold"); doc.setFontSize(5.5);
-    doc.text(String(row.count), bx + bW / 2, by - 1, { align: "center" });
+    t(doc, TEXT); doc.setFont("helvetica", "normal"); doc.setFontSize(6);
+    doc.text(row.bucket, x + padX, ry + 3.6);
 
-    // Bucket label below baseline
-    t(doc, MUTED); doc.setFont("helvetica", "normal"); doc.setFontSize(4.5);
-    doc.text(row.bucket.replace(/^>/, ""), bx + bW / 2, cy + ch + 4, { align: "center" });
+    f(doc, [226, 232, 242]);
+    doc.roundedRect(x + padX + labelW, ry + 1, barW, 3.8, 1, 1, "F");
+
+    if (pctW > 0) {
+      f(doc, fillRgb);
+      doc.roundedRect(x + padX + labelW, ry + 1, pctW, 3.8, 1, 1, "F");
+    }
+
+    t(doc, fillRgb); doc.setFont("helvetica", "bold"); doc.setFontSize(6.2);
+    doc.text(String(value), x + padX + labelW + barW + countW - 2, ry + 3.8, { align: "right" });
   });
-
-  // Caption
-  t(doc, MUTED); doc.setFontSize(4.8);
-  doc.text("Projects by physical-progress band", x + 4, y + h - 2);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -417,7 +410,7 @@ function dataTable(
   f(doc, NAVY); doc.roundedRect(x, y, w, HEAD_H, 2, 2, "F");
 
   let cx = x + 2.5;
-  t(doc, WHITE); doc.setFont("helvetica", "bold"); doc.setFontSize(5);
+  t(doc, WHITE); doc.setFont("helvetica", "bold"); doc.setFontSize(5.7);
   cols.forEach((c) => {
     const tx = c.align === "right" ? cx + c.w - 2 : c.align === "center" ? cx + c.w / 2 : cx;
     doc.text(c.label.toUpperCase(), tx, y + 4.8, { align: c.align ?? "left" });
@@ -471,7 +464,7 @@ function dataTable(
       else if (lower.includes("progress"))              cellRgb = BLUE;
       else if (lower === "no")                          cellRgb = [60, 140, 60];
 
-      t(doc, cellRgb); doc.setFont("helvetica", "normal"); doc.setFontSize(5.2);
+      t(doc, cellRgb); doc.setFont("helvetica", "normal"); doc.setFontSize(6.2);
       doc.text(display, tx, ry + 4, { align: c.align ?? "left", maxWidth: c.w - 2 });
       cx += c.w;
     });
@@ -510,7 +503,7 @@ function insightPanel(
   insights.slice(0, 4).forEach((ins) => {
     // Square bullet
     f(doc, BLUE); doc.rect(x + 5, iy - 2.5, 2, 2, "F");
-    t(doc, TEXT); doc.setFont("helvetica", "normal"); doc.setFontSize(5.5);
+    t(doc, TEXT); doc.setFont("helvetica", "normal"); doc.setFontSize(6);
     const lines = doc.splitTextToSize(ins, w - 13).slice(0, 2);
     doc.text(lines, x + 9.5, iy);
     iy += lineH + (lines.length > 1 ? 3 : 0);
@@ -553,189 +546,359 @@ function statusBar(
     const lx = x + 5 + col * colW;
     const ly = bY + bH + 5 + row * 6;
     f(doc, hexToRgb(s.color)); doc.circle(lx + 1.5, ly - 1, 1.5, "F");
-    t(doc, TEXT); doc.setFont("helvetica", "normal"); doc.setFontSize(5);
+    t(doc, TEXT); doc.setFont("helvetica", "normal"); doc.setFontSize(5.7);
     doc.text(`${s.label}: ${s.count} (${s.pct}%)`, lx + 4.5, ly);
   });
 }
 
+
 // ─────────────────────────────────────────────────────────────
-// PAGE BUILDERS
+// EVIDENCE HELPERS
+// ─────────────────────────────────────────────────────────────
+
+interface ReportEvidence {
+  delayLogs: DelayLogItem[];
+  progressImages: ProgressImage[];
+}
+
+function asNumber(v: unknown): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function projectIds(report: ReportData): Set<number> {
+  return new Set(report.projects.map((p) => Number(p.id)).filter(Number.isFinite));
+}
+
+function absoluteMediaSrc(src: string): string {
+  const clean = String(src || "").trim();
+  if (!clean) return "";
+  if (/^https?:\/\//i.test(clean) || clean.startsWith("data:")) return clean;
+  return mediaUrl(clean);
+}
+
+function imageSrc(img: ProgressImage): string {
+  return absoluteMediaSrc(String((img as any).image_url ?? (img as any).image ?? ""));
+}
+
+function delayProjectId(log: DelayLogItem): number {
+  return asNumber((log as any).project);
+}
+
+function imageProjectId(img: ProgressImage): number {
+  return asNumber((img as any).project);
+}
+
+function imageActivityId(img: ProgressImage): number {
+  return asNumber((img as any).activity);
+}
+
+function delayActivityId(log: DelayLogItem): number {
+  return asNumber((log as any).activity);
+}
+
+function delayActionBy(log: DelayLogItem): string {
+  const info = log.action_by_info;
+  if (!info) return "—";
+  return info.stakeholder_title || info.stakeholder_type || "—";
+}
+
+function delaySummaryText(log: DelayLogItem, max = 72): string {
+  const pieces = [
+    log.category ? String(log.category) : "Delay",
+    log.issue ? String(log.issue) : "Issue recorded",
+    log.recommended_action ? `Action: ${log.recommended_action}` : "",
+  ].filter(Boolean);
+  return trunc(pieces.join(" — "), max);
+}
+
+function sumDelayDays(logs: DelayLogItem[]): number {
+  return logs.reduce((sum, log) => sum + asNumber((log as any).delay_days), 0);
+}
+
+function groupByProject<T>(items: T[], getId: (item: T) => number): Map<number, T[]> {
+  const map = new Map<number, T[]>();
+  items.forEach((item) => {
+    const id = getId(item);
+    if (!Number.isFinite(id) || id <= 0) return;
+    const arr = map.get(id) ?? [];
+    arr.push(item);
+    map.set(id, arr);
+  });
+  return map;
+}
+
+async function fetchEvidenceForReport(report: ReportData): Promise<ReportEvidence> {
+  const ids = projectIds(report);
+  if (!ids.size) return { delayLogs: [], progressImages: [] };
+
+  // Backend supports unfiltered list endpoints. Fetch once and filter client-side
+  // so all-project reports can show delay details for every project in scope.
+  const [delayRes, imageRes] = await Promise.allSettled([
+    listDelayLogs(),
+    listProgressImages(),
+  ]);
+
+  const delayLogs = delayRes.status === "fulfilled"
+    ? (((delayRes.value as any).data ?? []) as DelayLogItem[])
+    : [];
+  const progressImages = imageRes.status === "fulfilled"
+    ? ((Array.isArray(imageRes.value) ? imageRes.value : []) as ProgressImage[])
+    : [];
+
+  return {
+    delayLogs: delayLogs.filter((log) => ids.has(delayProjectId(log))),
+    progressImages: progressImages.filter((img) => ids.has(imageProjectId(img))),
+  };
+}
+
+function buildDelayDetailRows(report: ReportData, evidence: ReportEvidence, maxRows = 18): Array<Record<string, string | number>> {
+  const projectById = new Map(report.projects.map((p) => [Number(p.id), p]));
+  return evidence.delayLogs
+    .slice()
+    .sort((a, b) => asNumber((b as any).delay_days) - asNumber((a as any).delay_days))
+    .slice(0, maxRows)
+    .map((log) => {
+      const p = projectById.get(delayProjectId(log));
+      return {
+        project: p ? `${p.project_name}${p.district_name ? ` — ${p.district_name}` : ""}` : `Project #${delayProjectId(log)}`,
+        activity: delayActivityId(log) ? `Activity #${delayActivityId(log)}` : "—",
+        days: `${asNumber((log as any).delay_days)}d`,
+        period: `${log.delay_start_date ?? "—"} to ${log.delay_end_date ?? "—"}`,
+        issue: delaySummaryText(log, 78),
+        actionBy: delayActionBy(log),
+      };
+    });
+}
+
+async function drawEvidenceThumbnails(doc: jsPDF, images: ProgressImage[], x: number, y: number, w: number, h: number): Promise<number> {
+  panel(doc, x, y, w, h);
+  t(doc, NAVY); doc.setFont("helvetica", "bold"); doc.setFontSize(7.4);
+  doc.text("PROGRESS IMAGE EVIDENCE", x + 4, y + 6.5);
+  t(doc, MUTED); doc.setFont("helvetica", "normal"); doc.setFontSize(5.8);
+  doc.text("Latest uploaded photos linked with projects/activities.", x + 4, y + 10.5);
+
+  const shown = images.slice(0, 6);
+  if (!shown.length) {
+    drawReportNote(doc, x + 4, y + 17, w - 8, "No progress image evidence is available for this scope.");
+    return y + h;
+  }
+
+  const gap = 3;
+  const cols = 3;
+  const thumbW = (w - 8 - gap * (cols - 1)) / cols;
+  const thumbH = Math.min(29, (h - 18 - gap) / 2);
+  await Promise.all(shown.map(async (img, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const ix = x + 4 + col * (thumbW + gap);
+    const iy = y + 15 + row * (thumbH + gap + 7);
+    if (iy + thumbH + 6 > y + h - 3) return;
+    f(doc, [241, 245, 249]); d(doc, BORDER); doc.roundedRect(ix, iy, thumbW, thumbH + 6, 1.4, 1.4, "FD");
+    const dataUrl = await imageUrlToDataUrl(imageSrc(img));
+    if (dataUrl) {
+      try { doc.addImage(dataUrl, ix + 1.2, iy + 1.2, thumbW - 2.4, thumbH - 2.4); } catch { /* ignore image issues */ }
+    } else {
+      t(doc, MUTED); doc.setFont("helvetica", "normal"); doc.setFontSize(5.5);
+      doc.text("Image unavailable", ix + thumbW / 2, iy + thumbH / 2, { align: "center" });
+    }
+    t(doc, SLATE); doc.setFont("helvetica", "normal"); doc.setFontSize(5.2);
+    const cap = img.caption || img.image_date || `Activity #${imageActivityId(img) || "—"}`;
+    doc.text(trunc(cap, 24), ix + 2, iy + thumbH + 3.8);
+  }));
+  return y + h;
+}
+
+function drawDelaySummaryCards(doc: jsPDF, evidence: ReportEvidence, x: number, y: number, w: number): number {
+  const delayedProjects = new Set(evidence.delayLogs.map(delayProjectId));
+  const delayDays = sumDelayDays(evidence.delayLogs);
+  const imagesForDelayed = evidence.progressImages.filter((img) => delayedProjects.has(imageProjectId(img))).length;
+  const gap = 3;
+  const cardW = (w - gap * 3) / 4;
+  const cards: Array<[string, string, string, Rgb]> = [
+    ["Delay Projects", String(delayedProjects.size), "with log records", delayedProjects.size ? RED : SLATE],
+    ["Delay Days", String(delayDays), "total recorded", delayDays ? RED : SLATE],
+    ["Delay Logs", String(evidence.delayLogs.length), "project/activity level", evidence.delayLogs.length ? RED : SLATE],
+    ["Evidence Images", String(imagesForDelayed), "linked to delayed projects", imagesForDelayed ? GREEN : SLATE],
+  ];
+  cards.forEach(([lbl, val, sub, color], i) => kpiCard(doc, x + i * (cardW + gap), y, cardW, 22, lbl, val, sub, color));
+  return y + 27;
+}
+
+async function buildProjectLevelDelayEvidencePage(
+  doc: jsPDF,
+  report: ReportData,
+  evidence: ReportEvidence,
+  logo: string | null,
+  pageNo: number,
+  totalPages: number,
+): Promise<void> {
+  doc.addPage("a4", "portrait");
+  drawPageBg(doc); drawHeader(doc, report, pageNo, totalPages, logo); drawFooter(doc, pageNo, totalPages);
+
+  let y = sectionTitle(doc, "Project-Level Delay & Evidence Register", MX, MY, "Delay log details and progress images are fetched from backend evidence APIs.");
+  y = drawDelaySummaryCards(doc, evidence, MX, y, CW);
+
+  y = sectionTitle(doc, "Delay Details by Project", MX, y, "Issue, period, delay days and responsible/action party where recorded.");
+  const delayCols: Col[] = [
+    { key: "project", label: "Project", w: CW * 0.22, maxLen: 22 },
+    { key: "activity", label: "Activity", w: CW * 0.12, maxLen: 12 },
+    { key: "days", label: "Days", w: CW * 0.08, align: "center" },
+    { key: "period", label: "Period", w: CW * 0.18, maxLen: 24 },
+    { key: "issue", label: "Issue / Recommended Action", w: CW * 0.30, maxLen: 46 },
+    { key: "actionBy", label: "Action By", w: CW * 0.10, maxLen: 12 },
+  ];
+  const delayRows = buildDelayDetailRows(report, evidence, 10);
+  y += dataTable(doc, MX, y, CW, delayCols, delayRows, 10, 8) + 7;
+
+  if (CB - y > 67) {
+    await drawEvidenceThumbnails(doc, evidence.progressImages, MX, y, CW, Math.min(66, CB - y));
+  } else if (CB - y >= 18) {
+    drawReportNote(doc, MX, y, CW, evidence.progressImages.length ? `${evidence.progressImages.length} progress image(s) are available for this scope. Open selected project report for larger evidence view.` : "No progress image evidence is available for this scope.");
+  }
+}
+
+function drawReportNote(doc: jsPDF, x: number, y: number, w: number, textValue: string): number {
+  f(doc, [248, 250, 252]); d(doc, BORDER); doc.roundedRect(x, y, w, 13, 2, 2, "FD");
+  t(doc, SLATE); doc.setFont("helvetica", "normal"); doc.setFontSize(7);
+  const lines = doc.splitTextToSize(textValue, w - 8).slice(0, 2);
+  doc.text(lines, x + 4, y + 5.4);
+  return y + 15;
+}
+
+// ─────────────────────────────────────────────────────────────
+// PAGE BUILDERS — A4 portrait, print-safe, sequential layout
 // ─────────────────────────────────────────────────────────────
 
 function buildPage1Executive(
   doc: jsPDF, report: ReportData,
   logo: string | null, pageNo: number, totalPages: number,
 ): void {
-  drawPageBg(doc);
-  drawHeader(doc, report, pageNo, totalPages, logo);
-  drawFooter(doc, pageNo, totalPages);
+  drawPageBg(doc); drawHeader(doc, report, pageNo, totalPages, logo); drawFooter(doc, pageNo, totalPages);
 
   let y = MY;
-
-  // ── Row 1: 6 KPI cards ──
-  const GAP = 2.5;
-  const CARD_W = (CW - GAP * 5) / 6;
+  const GAP = 3;
+  const CARD_W = (CW - GAP * 2) / 3;
   const CARD_H = 21;
 
   const cards: Array<[string, string, string, Rgb]> = [
-    ["Physical Progress",          `${formatProgress(report.kpis.overallPhysical)}%`, "Scope average",       BLUE],
-    ["Total Projects",             String(report.kpis.totalProjects),                  "In scope",            NAVY],
-    [report.kpis.activeUnitsLabel, String(report.kpis.activeUnits),                   "Active units",        SLATE],
-    ["Completed",                  String(report.kpis.completedProjects),              "100%",                GREEN],
-    ["In Progress",                String(report.kpis.inProgressProjects),             "0–100%",              BLUE],
-    ["Attention",                  String(report.attentionProjects.length),            "<25% or delayed",     RED],
+    ["Physical Progress", `${formatProgress(report.kpis.overallPhysical)}%`, "Scope average", BLUE],
+    ["Total Projects", String(report.kpis.totalProjects), "In current scope", NAVY],
+    [report.kpis.activeUnitsLabel, String(report.kpis.activeUnits), "Hierarchy units", SLATE],
+    ["Completed", String(report.kpis.completedProjects), "100% physical", GREEN],
+    ["In Progress", String(report.kpis.inProgressProjects), "Active execution", BLUE],
+    ["Attention", String(report.attentionProjects.length), "Low progress/delay", RED],
   ];
+
   cards.forEach(([lbl, val, sub, acc], i) => {
-    kpiCard(doc, MX + i * (CARD_W + GAP), y, CARD_W, CARD_H, lbl, val, sub, acc);
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    kpiCard(doc, MX + col * (CARD_W + GAP), y + row * (CARD_H + GAP), CARD_W, CARD_H, lbl, val, sub, acc);
   });
-  y += CARD_H + 4;
+  y += CARD_H * 2 + GAP + 7;
 
-  // ── Row 2: ranking chart (left 62%) + distribution (right 38%) ──
-  const LEFT_W = CW * 0.60;
-  const RIGHT_W = CW - LEFT_W - 4;
+  y = sectionTitle(doc, `${report.kpis.activeUnitsLabel} Progress Ranking`, MX, y, "A layman-readable comparison of physical progress by area.");
+  hBarChart(doc, buildHierarchyBars(report.hierarchyUnits, 9), MX, y, CW, 56);
+  y += 61;
 
-  // Section labels — no scope-name subtitle (it's already in the header)
-  const rankY = sectionTitle(doc,
-    `${report.kpis.activeUnitsLabel} Physical Progress Ranking`, MX, y);
-  const distY = sectionTitle(doc, "Progress Distribution", MX + LEFT_W + 4, y);
+  y = sectionTitle(doc, "Project Progress Distribution", MX, y, "Number of projects in each physical-progress bucket.");
+  distributionChart(doc, report, MX, y, CW, 50);
+  y += 55;
 
-  // Charts fill remaining height, leaving room for insight strip
-  const INSIGHT_H = 18;
-  const chartH = CB - Math.max(rankY, distY) - INSIGHT_H - 4;
-
-  const rankBars = buildHierarchyBars(report.hierarchyUnits, 10);
-  hBarChart(doc, rankBars, MX, rankY, LEFT_W, chartH);
-  distributionChart(doc, report, MX + LEFT_W + 4, distY, RIGHT_W, chartH);
-
-  // ── Insight strip pinned to bottom ──
-  const insY = CB - INSIGHT_H;
-  insightPanel(doc, report.insights.slice(0, 3), MX, insY, CW, INSIGHT_H);
+  const remaining = CB - y;
+  if (remaining >= 24) {
+    insightPanel(doc, report.insights.slice(0, 4), MX, y, CW, Math.min(remaining, 36), "Executive Insights");
+  }
 }
 
 function buildPage2Comparison(
   doc: jsPDF, report: ReportData,
   logo: string | null, pageNo: number, totalPages: number,
 ): void {
-  doc.addPage("a4", "landscape");
-  drawPageBg(doc);
-  drawHeader(doc, report, pageNo, totalPages, logo);
-  drawFooter(doc, pageNo, totalPages);
+  doc.addPage("a4", "portrait");
+  drawPageBg(doc); drawHeader(doc, report, pageNo, totalPages, logo); drawFooter(doc, pageNo, totalPages);
 
-  const LEFT_W = CW * 0.52, RIGHT_W = CW - LEFT_W - 4;
-  const HALF_H = Math.floor((CB - MY - 28) / 2); // space for two charts + titles
+  let y = MY;
+  y = sectionTitle(doc, `Project Load by ${report.kpis.activeUnitsLabel}`, MX, y, "Where the project workload is concentrated.");
+  const loadBars = buildProjectLoadBars(report.hierarchyUnits, 10).map((b) => ({ ...b, color: "#2563EB" }));
+  hBarChart(doc, loadBars, MX, y, CW, 54, Math.max(...loadBars.map((b) => b.value), 1));
+  y += 60;
 
-  // ── Left column ──
-  const topTitle = sectionTitle(doc, "Top Performing Projects", MX, MY,
-    "Top 8 by physical progress");
-  const topH = HALF_H;
-  hBarChart(doc, buildTopProjectBars(report.topProjects, 8), MX, topTitle, LEFT_W, topH);
+  y = sectionTitle(doc, "Top Performing Projects", MX, y, "Top projects by physical progress, with geography context.");
+  hBarChart(doc, buildTopProjectBars(report.topProjects, 8), MX, y, CW, 54);
+  y += 60;
 
-  const attnStart = topTitle + topH + 4;
-  const attnTitle = sectionTitle(doc, "Projects Requiring Attention", MX, attnStart,
-    "At 0%, below 25%, or delay-affected");
-  const attnH = CB - attnTitle - 2;
-  hBarChart(doc, buildAttentionBars(report.attentionProjects, 6), MX, attnTitle, LEFT_W, attnH);
+  y = sectionTitle(doc, "Projects Requiring Attention", MX, y, "0%, below 25%, or delay-affected projects.");
+  hBarChart(doc, buildAttentionBars(report.attentionProjects, 8), MX, y, CW, 54);
+  y += 60;
 
-  // ── Right column ──
-  const loadTitle = sectionTitle(doc, `Project Load by ${report.kpis.activeUnitsLabel}`,
-    MX + LEFT_W + 4, MY);
-  const loadBars = buildProjectLoadBars(report.hierarchyUnits, 10).map((b) => ({
-    ...b, color: "#3b82f6",
-  }));
-  const loadH = HALF_H;
-  hBarChart(doc, loadBars, MX + LEFT_W + 4, loadTitle, RIGHT_W, loadH,
-    Math.max(...loadBars.map((b) => b.value), 1));
-
-  const statusStart = loadTitle + loadH + 4;
-  const statusTitle = sectionTitle(doc, "Status Composition", MX + LEFT_W + 4, statusStart);
-  const statusH = CB - statusTitle - 2;
-  statusBar(doc, report, MX + LEFT_W + 4, statusTitle, RIGHT_W, statusH);
+  if (CB - y >= 18) drawReportNote(doc, MX, y, CW, "Priority should be placed on low-progress and delay-affected projects before reviewing normally progressing work.");
 }
 
 function buildPage3Execution(
   doc: jsPDF, report: ReportData,
   logo: string | null, pageNo: number, totalPages: number,
 ): void {
-  doc.addPage("a4", "landscape");
-  drawPageBg(doc);
-  drawHeader(doc, report, pageNo, totalPages, logo);
-  drawFooter(doc, pageNo, totalPages);
+  doc.addPage("a4", "portrait");
+  drawPageBg(doc); drawHeader(doc, report, pageNo, totalPages, logo); drawFooter(doc, pageNo, totalPages);
 
-  const LEFT_W = CW * 0.48, RIGHT_W = CW - LEFT_W - 4;
+  let y = MY;
   const profile = buildAttentionProfile(report.projects);
 
-  // ── Left: 6 attention-profile mini-cards ──
-  const attnTitle = sectionTitle(doc, "Attention & Exception Profile", MX, MY);
-
+  y = sectionTitle(doc, "Execution Attention Profile", MX, y, "Simple indicators showing where management follow-up is needed.");
+  const GAP = 3;
+  const MINI_W = (CW - GAP * 2) / 3;
+  const MINI_H = 23;
   const items: Array<[string, number, Rgb]> = [
-    ["At 0%",        profile.zeroProgress,    RED],
-    ["Below 25%",    profile.below25,         AMBER],
-    ["25–50%",       profile.between25and50,  AMBER],
-    ["Above 75%",    profile.above75,         GREEN],
-    ["Completed",    profile.completed,       GREEN],
-    ["With Delays",  profile.withDelay,       RED],
+    ["At 0%", profile.zeroProgress, RED],
+    ["Below 25%", profile.below25, BLUE],
+    ["25-50%", profile.between25and50, SLATE],
+    ["Above 75%", profile.above75, GREEN],
+    ["Completed", profile.completed, GREEN],
+    ["With Delays", profile.withDelay, RED],
   ];
-  const MINI_W = (LEFT_W - 3) / 2;
-  const MINI_H = 20;
-  const MINI_GAP = 2.5;
-
   items.forEach(([lbl, val, acc], i) => {
-    const col = i % 2, row = Math.floor(i / 2);
-    kpiCard(doc,
-      MX + col * (MINI_W + MINI_GAP),
-      attnTitle + row * (MINI_H + MINI_GAP),
-      MINI_W, MINI_H,
-      lbl, String(val), "", acc);
+    const col = i % 3, row = Math.floor(i / 3);
+    kpiCard(doc, MX + col * (MINI_W + GAP), y + row * (MINI_H + GAP), MINI_W, MINI_H, lbl, String(val), "project(s)", acc);
   });
+  y += MINI_H * 2 + GAP + 8;
 
-  // ── Right: bottom-progress chart ──
-  const bottomTitle = sectionTitle(doc, "Lowest Progress Projects",
-    MX + LEFT_W + 4, MY,
-    "Projects needing immediate attention");
-  const bottomH = CB - bottomTitle - 22;
-  hBarChart(doc, buildAttentionBars(report.bottomProjects, 10),
-    MX + LEFT_W + 4, bottomTitle, RIGHT_W, bottomH);
+  y = sectionTitle(doc, "Status Composition", MX, y, "Completed, in-progress, delayed and pending projects.");
+  statusBar(doc, report, MX, y, CW, 42);
+  y += 49;
 
-  // ── Full-width insight at bottom ──
-  const INSIGHT_H = 18;
-  insightPanel(doc, report.insights, MX, CB - INSIGHT_H, CW, INSIGHT_H, "Decision Signals");
+  y = sectionTitle(doc, "Lowest Progress Projects", MX, y, "Projects that require immediate progress review.");
+  hBarChart(doc, buildAttentionBars(report.bottomProjects, 8), MX, y, CW, 55);
+  y += 60;
+
+  if (CB - y >= 22) insightPanel(doc, report.insights.slice(0, 4), MX, y, CW, CB - y, "Decision Signals");
 }
 
 function buildPage4Register(
   doc: jsPDF, report: ReportData,
   logo: string | null, pageNo: number, totalPages: number,
 ): void {
-  doc.addPage("a4", "landscape");
-  drawPageBg(doc);
-  drawHeader(doc, report, pageNo, totalPages, logo);
-  drawFooter(doc, pageNo, totalPages);
+  doc.addPage("a4", "portrait");
+  drawPageBg(doc); drawHeader(doc, report, pageNo, totalPages, logo); drawFooter(doc, pageNo, totalPages);
 
-  const titleEnd = sectionTitle(doc, "Management Project Register", MX, MY,
-    "Attention projects first · no elapsed time · no schedule variance");
+  const titleEnd = sectionTitle(doc, "Management Project Register", MX, MY, "Attention projects first. No elapsed-time or schedule-variance columns.");
 
   const sorted = [
     ...report.attentionProjects,
-    ...report.projects
-      .filter((p) => !report.attentionProjects.some((a) => a.id === p.id))
-      .sort((a, b) => a.physical_progress - b.physical_progress),
+    ...report.projects.filter((p) => !report.attentionProjects.some((a) => a.id === p.id)).sort((a, b) => a.physical_progress - b.physical_progress),
   ];
 
   const cols: Col[] = [
-    { key: "project",  label: "Project",   w: CW * 0.30, maxLen: 29 },
-    { key: "division", label: "Division",  w: CW * 0.13, maxLen: 13 },
-    { key: "district", label: "District",  w: CW * 0.12, maxLen: 12 },
-    { key: "tehsil",   label: "Tehsil",    w: CW * 0.10, maxLen: 11 },
-    { key: "physical", label: "Physical%", w: CW * 0.10, align: "right" },
-    { key: "status",   label: "Status",    w: CW * 0.12, align: "center" },
-    { key: "delay",    label: "Delay",     w: CW * 0.13, align: "center" },
+    { key: "project", label: "Project", w: CW * 0.31, maxLen: 24 },
+    { key: "division", label: "Division", w: CW * 0.13, maxLen: 11 },
+    { key: "district", label: "District", w: CW * 0.13, maxLen: 11 },
+    { key: "tehsil", label: "Tehsil", w: CW * 0.12, maxLen: 11 },
+    { key: "physical", label: "Physical", w: CW * 0.10, align: "right" },
+    { key: "status", label: "Status", w: CW * 0.12, align: "center", maxLen: 12 },
+    { key: "delay", label: "Delay", w: CW * 0.09, align: "center" },
   ];
-
-  // Max rows that fit in remaining height
-  const ROW_H = 6;
-  const HEAD_H = 7;
-  const availH = CB - titleEnd - 2;
-  const maxRows = Math.min(18, Math.floor((availH - HEAD_H) / ROW_H));
-
+  const ROW_H = 7;
+  const maxRows = Math.min(25, Math.floor((CB - titleEnd - 9) / ROW_H));
   dataTable(doc, MX, titleEnd, CW, cols, buildManagementTableRows(sorted, maxRows), maxRows, ROW_H);
 }
 
@@ -743,44 +906,73 @@ function buildPage5DecisionSummary(
   doc: jsPDF, report: ReportData,
   logo: string | null, pageNo: number, totalPages: number,
 ): void {
-  doc.addPage("a4", "landscape");
-  drawPageBg(doc);
-  drawHeader(doc, report, pageNo, totalPages, logo);
-  drawFooter(doc, pageNo, totalPages);
+  doc.addPage("a4", "portrait");
+  drawPageBg(doc); drawHeader(doc, report, pageNo, totalPages, logo); drawFooter(doc, pageNo, totalPages);
 
-  const LEFT_W = CW * 0.55, RIGHT_W = CW - LEFT_W - 4;
-
-  // ── Left: decision bullets ──
-  const decEnd = sectionTitle(doc, "Decision Summary", MX, MY,
-    "Key findings and recommended management actions");
-
+  let y = sectionTitle(doc, "Decision Summary", MX, MY, "Key findings and recommended management actions.");
   const bullets = buildDecisionBullets(report);
-  let by = decEnd;
-  bullets.forEach((b) => {
-    if (by > CB - 30) return;
-    f(doc, BLUE); doc.circle(MX + 3.5, by + 1.5, 1.5, "F");
-    t(doc, TEXT); doc.setFont("helvetica", "normal"); doc.setFontSize(6.2);
-    const lines = doc.splitTextToSize(b, LEFT_W - 12).slice(0, 2);
-    doc.text(lines, MX + 8, by + 3);
-    by += lines.length > 1 ? 10 : 7;
+  bullets.slice(0, 7).forEach((b, i) => {
+    if (y > CB - 18) return;
+    f(doc, i < 2 ? RED : BLUE); doc.circle(MX + 3.5, y + 2, 1.8, "F");
+    t(doc, TEXT); doc.setFont("helvetica", "normal"); doc.setFontSize(7.4);
+    const lines = doc.splitTextToSize(b, CW - 14).slice(0, 3);
+    doc.text(lines, MX + 8, y + 4);
+    y += 8 + (lines.length - 1) * 4;
   });
 
-  // Insight panel below bullets (only if enough space)
-  const insH = 22;
-  if (by + insH + 4 <= CB) {
-    insightPanel(doc, report.insights, MX, by + 3, LEFT_W, insH);
+  y += 4;
+  if (y + 46 <= CB) {
+    y = sectionTitle(doc, "Progress Distribution", MX, y);
+    distributionChart(doc, report, MX, y, CW, 46);
+    y += 52;
+  }
+  if (CB - y >= 22) insightPanel(doc, report.insights.slice(0, 4), MX, y, CW, CB - y, "Management Notes");
+}
+
+async function drawEvidenceStrip(doc: jsPDF, evidence: ReportEvidence, x: number, y: number, w: number, h: number): Promise<void> {
+  panel(doc, x, y, w, h);
+  t(doc, NAVY); doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+  doc.text("DELAY LOGS & PROGRESS EVIDENCE", x + 4, y + 7);
+  d(doc, BORDER); doc.line(x + 4, y + 9, x + w - 4, y + 9);
+
+  const delays = evidence.delayLogs.slice(0, 5);
+  const images = evidence.progressImages.slice(0, 4);
+  let cy = y + 16;
+  if (delays.length) {
+    delays.forEach((log) => {
+      if (cy > y + h - 20) return;
+      f(doc, [254, 242, 242]); d(doc, [252, 165, 165]); doc.roundedRect(x + 4, cy - 5, w - 8, 13, 1.5, 1.5, "FD");
+      t(doc, RED); doc.setFont("helvetica", "bold"); doc.setFontSize(6.4);
+      doc.text(`${log.delay_days ?? 0} day(s)`, x + 7, cy);
+      t(doc, TEXT); doc.setFont("helvetica", "normal"); doc.setFontSize(6.1);
+      doc.text(trunc(delaySummaryText(log, 74), 74), x + 27, cy);
+      t(doc, MUTED); doc.setFontSize(5.4);
+      doc.text(`${log.delay_start_date ?? "—"} to ${log.delay_end_date ?? "—"} · ${delayActionBy(log)}`, x + 27, cy + 4.3);
+      cy += 15;
+    });
+  } else {
+    cy = drawReportNote(doc, x + 4, cy - 4, w - 8, "No delay records are available for this project scope.");
   }
 
-  // ── Right: distribution + status ──
-  const distEnd = sectionTitle(doc, "Progress Distribution", MX + LEFT_W + 4, MY);
-  const distH = Math.floor((CB - MY - 28) / 2);
-  distributionChart(doc, report, MX + LEFT_W + 4, distEnd, RIGHT_W, distH);
-
-  const statusStart = distEnd + distH + 4;
-  const statusEnd = sectionTitle(doc, "Status Composition", MX + LEFT_W + 4, statusStart);
-  const statusH = CB - statusEnd - 2;
-  if (statusH >= 20) {
-    statusBar(doc, report, MX + LEFT_W + 4, statusEnd, RIGHT_W, statusH);
+  if (images.length) {
+    const imgW = (w - 17) / 4;
+    const imgY = Math.min(y + h - 38, cy + 2);
+    await Promise.all(images.map(async (img, i) => {
+      const src = imageSrc(img);
+      const dataUrl = src ? await imageUrlToDataUrl(src) : null;
+      const ix = x + 4 + i * (imgW + 3);
+      f(doc, [241, 245, 249]); d(doc, BORDER); doc.roundedRect(ix, imgY, imgW, 33, 1.5, 1.5, "FD");
+      if (dataUrl) {
+        try { doc.addImage(dataUrl, ix + 1.5, imgY + 1.5, imgW - 3, 24); } catch { /* ignore image issues */ }
+      } else {
+        t(doc, MUTED); doc.setFont("helvetica", "normal"); doc.setFontSize(5.5);
+        doc.text("Image unavailable", ix + imgW / 2, imgY + 13, { align: "center" });
+      }
+      t(doc, SLATE); doc.setFont("helvetica", "normal"); doc.setFontSize(5.2);
+      doc.text(trunc(img.caption ?? img.image_date ?? `Activity #${imageActivityId(img) || "—"}`, 22), ix + 2, imgY + 30);
+    }));
+  } else if (y + h - cy >= 14) {
+    drawReportNote(doc, x + 4, y + h - 18, w - 8, "No progress image evidence is available for this scope.");
   }
 }
 
@@ -806,9 +998,9 @@ function buildAllTehsilsReport(doc: jsPDF, r: ReportData, logo: string | null): 
   buildPage2Comparison(doc, r, logo, 2, 3);
   buildPage4Register(doc, r, logo, 3, 3);
 }
-function buildAllProjectsReport(doc: jsPDF, r: ReportData, logo: string | null): void {
+async function buildAllProjectsReport(doc: jsPDF, r: ReportData, logo: string | null, evidence: ReportEvidence): Promise<void> {
   buildPage1Executive(doc, r, logo, 1, 2);
-  buildPage4Register(doc, r, logo, 2, 2);
+  await buildProjectLevelDelayEvidencePage(doc, r, evidence, logo, 2, 2);
 }
 function buildSelectedDivisionReport(doc: jsPDF, r: ReportData, logo: string | null): void {
   buildPage1Executive(doc, r, logo, 1, 5);
@@ -829,81 +1021,75 @@ function buildSelectedTehsilReport(doc: jsPDF, r: ReportData, logo: string | nul
   buildPage4Register(doc, r, logo, 3, 3);
 }
 
-function buildSelectedProjectReport(doc: jsPDF, r: ReportData, logo: string | null): void {
-  // ── Page 1: project executive summary ──
-  drawPageBg(doc);
-  drawHeader(doc, r, 1, 2, logo);
-  drawFooter(doc, 1, 2);
+
+async function buildSelectedProjectReport(doc: jsPDF, r: ReportData, logo: string | null, evidence: ReportEvidence): Promise<void> {
+  // Page 1: formal project executive summary
+  drawPageBg(doc); drawHeader(doc, r, 1, 2, logo); drawFooter(doc, 1, 2);
 
   const proj = r.projects[0];
-  const LEFT_W = CW * 0.35, RIGHT_W = CW - LEFT_W - 5;
+  let y = MY;
 
-  // 6 KPI cards (2-column, 3-row)
-  const CARD_W = (LEFT_W - 2.5) / 2, CARD_H = 22, CARD_GAP = 2.5;
-  const projCards: Array<[string, string, Rgb]> = [
-    ["Physical Progress", `${formatProgress(r.kpis.overallPhysical)}%`, BLUE],
-    ["Status",            proj ? proj.status.replace(/_/g, " ") : "—",  SLATE],
-    ["Delay Recorded",    proj?.has_delay ? "Yes" : "No",                RED],
-    ["Projects",          String(r.kpis.totalProjects),                  NAVY],
-    ["Completed",         String(r.kpis.completedProjects),              GREEN],
-    ["In Progress",       String(r.kpis.inProgressProjects),             BLUE],
+  y = sectionTitle(doc, "Project Executive Summary", MX, y, proj?.project_name ?? r.scope.scopeName);
+
+  const GAP = 3;
+  const CARD_W = (CW - GAP * 2) / 3;
+  const CARD_H = 22;
+  const cards: Array<[string, string, string, Rgb]> = [
+    ["Physical Progress", `${formatProgress(r.kpis.overallPhysical)}%`, "Project progress", BLUE],
+    ["Financial", `${formatProgress(proj?.financial_progress ?? 0)}%`, "If available", SLATE],
+    ["Status", proj ? proj.status.replace(/_/g, " ") : "-", "Current state", proj?.has_delay ? RED : BLUE],
+    ["Delay Logs", String(evidence.delayLogs.length), "Recorded issues", evidence.delayLogs.length ? RED : SLATE],
+    ["Evidence Images", String(evidence.progressImages.length), "Progress photos", evidence.progressImages.length ? GREEN : SLATE],
+    ["Attention", r.attentionProjects.length ? "Yes" : "No", "Management flag", r.attentionProjects.length ? RED : GREEN],
   ];
-  projCards.forEach(([lbl, val, acc], i) => {
-    kpiCard(doc,
-      MX + (i % 2) * (CARD_W + CARD_GAP),
-      MY + Math.floor(i / 2) * (CARD_H + CARD_GAP),
-      CARD_W, CARD_H, lbl, val, "", acc);
+  cards.forEach(([lbl, val, sub, acc], i) => {
+    const col = i % 3, row = Math.floor(i / 3);
+    kpiCard(doc, MX + col * (CARD_W + GAP), y + row * (CARD_H + GAP), CARD_W, CARD_H, lbl, val, sub, acc);
   });
+  y += CARD_H * 2 + GAP + 8;
 
-  // Right: project details
-  const detEnd = sectionTitle(doc, "Project Details",
-    MX + LEFT_W + 5, MY,
-    proj?.project_name ?? r.scope.scopeName);
-
-  const details = [
-    ["Division",  proj?.division_name ?? "—"],
-    ["District",  proj?.district_name ?? "—"],
-    ["Tehsil",    proj?.tehsil_name   ?? "—"],
-    ["Physical",  `${formatProgress(r.kpis.overallPhysical)}%`],
-    ["Financial", `${formatProgress(proj?.financial_progress ?? 0)}%`],
-    ["Status",    proj?.status?.replace(/_/g, " ") ?? "—"],
+  y = sectionTitle(doc, "Project Location and Scope", MX, y);
+  const infoRows = [
+    { label: "Division", value: proj?.division_name ?? "-" },
+    { label: "District", value: proj?.district_name ?? "-" },
+    { label: "Tehsil", value: proj?.tehsil_name ?? "-" },
+    { label: "Project", value: proj?.project_name ?? r.scope.scopeName },
   ];
-
-  details.forEach(([key, val], i) => {
-    const dy = detEnd + i * 8;
-    t(doc, MUTED); doc.setFont("helvetica", "bold"); doc.setFontSize(6);
-    doc.text(key.toUpperCase(), MX + LEFT_W + 5, dy);
-    t(doc, TEXT); doc.setFont("helvetica", "normal"); doc.setFontSize(7);
-    doc.text(String(val), MX + LEFT_W + 25, dy);
+  panel(doc, MX, y, CW, 44);
+  infoRows.forEach((row, i) => {
+    const iy = y + 8 + i * 8;
+    t(doc, MUTED); doc.setFont("helvetica", "bold"); doc.setFontSize(6.4);
+    doc.text(row.label.toUpperCase(), MX + 5, iy);
+    t(doc, TEXT); doc.setFont("helvetica", "normal"); doc.setFontSize(7.4);
+    doc.text(trunc(String(row.value), 78), MX + 34, iy);
   });
+  y += 50;
 
-  // Insight panel below details
-  const insY = detEnd + details.length * 8 + 4;
-  const insH = Math.min(28, CB - insY - 2);
-  if (insH >= 16) {
-    insightPanel(doc, r.insights, MX + LEFT_W + 5, insY, RIGHT_W, insH, "Project Observations");
+  if (CB - y >= 28) {
+    insightPanel(doc, r.insights.slice(0, 4), MX, y, CW, Math.min(34, CB - y), "Project Observations");
   }
 
-  // ── Page 2: execution register ──
-  doc.addPage("a4", "landscape");
-  drawPageBg(doc);
-  drawHeader(doc, r, 2, 2, logo);
-  drawFooter(doc, 2, 2);
+  // Page 2: delay logs and evidence images
+  doc.addPage("a4", "portrait");
+  drawPageBg(doc); drawHeader(doc, r, 2, 2, logo); drawFooter(doc, 2, 2);
 
-  const regEnd = sectionTitle(doc, "Project Execution Register", MX, MY);
-  const cols: Col[] = [
-    { key: "project",  label: "Project / Activity", w: CW * 0.34, maxLen: 33 },
-    { key: "physical", label: "Physical%",           w: CW * 0.12, align: "right" },
-    { key: "status",   label: "Status",              w: CW * 0.14, align: "center" },
-    { key: "delay",    label: "Delay",               w: CW * 0.11, align: "center" },
-    { key: "division", label: "Division",            w: CW * 0.15, maxLen: 14 },
-    { key: "district", label: "District",            w: CW * 0.14, maxLen: 14 },
-  ];
-  const ROW_H = 6;
-  const availH = CB - regEnd - 2;
-  const maxRows = Math.min(20, Math.floor((availH - 7) / ROW_H));
-  dataTable(doc, MX, regEnd, CW,
-    cols, buildManagementTableRows(r.projects, maxRows), maxRows, ROW_H);
+  y = MY;
+  y = sectionTitle(doc, "Project Execution Evidence", MX, y, "Delay log records and progress images attached to delayed/active work.");
+  await drawEvidenceStrip(doc, evidence, MX, y, CW, Math.min(118, CB - y));
+  y += 124;
+
+  if (CB - y >= 55) {
+    y = sectionTitle(doc, "Project Register Snapshot", MX, y);
+    const cols: Col[] = [
+      { key: "project", label: "Project / Activity", w: CW * 0.42, maxLen: 36 },
+      { key: "physical", label: "Physical", w: CW * 0.14, align: "right" },
+      { key: "status", label: "Status", w: CW * 0.18, align: "center" },
+      { key: "delay", label: "Delay", w: CW * 0.12, align: "center" },
+      { key: "district", label: "District", w: CW * 0.14, maxLen: 14 },
+    ];
+    const maxRows = Math.min(8, Math.floor((CB - y - 8) / 7));
+    dataTable(doc, MX, y, CW, cols, buildManagementTableRows(r.projects, maxRows), maxRows, 7);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -937,17 +1123,18 @@ export async function exportProgressReport(
   );
 
   const logo = await imageUrlToDataUrl("/Assets/psca logo.png");
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const evidence = await fetchEvidenceForReport(report);
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
   switch (scopeType) {
     case "all-divisions":      buildAllDivisionsReport(doc, report, logo);      break;
     case "all-districts":      buildAllDistrictsReport(doc, report, logo);      break;
     case "all-tehsils":        buildAllTehsilsReport(doc, report, logo);        break;
-    case "all-projects":       buildAllProjectsReport(doc, report, logo);       break;
+    case "all-projects":       await buildAllProjectsReport(doc, report, logo, evidence);       break;
     case "selected-division":  buildSelectedDivisionReport(doc, report, logo);  break;
     case "selected-district":  buildSelectedDistrictReport(doc, report, logo);  break;
     case "selected-tehsil":    buildSelectedTehsilReport(doc, report, logo);    break;
-    case "selected-project":   buildSelectedProjectReport(doc, report, logo);   break;
+    case "selected-project":   await buildSelectedProjectReport(doc, report, logo, evidence);   break;
     default:                   buildAllDivisionsReport(doc, report, logo);
   }
 
