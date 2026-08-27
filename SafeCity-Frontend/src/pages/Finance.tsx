@@ -925,7 +925,6 @@ useEffect(() => {
                       fill="url(#colorFlowTotal)"
                       radius={[4, 4, 0, 0]}
                       name="Total (M)"
-                      barCategoryGap="18%"
                     />
                     {flowChartData.some((x) => Number((x as any).revenueM) > 0) && (
                       <Line

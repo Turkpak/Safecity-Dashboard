@@ -106,55 +106,18 @@ function getProjectStatusIcon(status: ProjectStatus) {
   });
 }
 
-const MOCK_DATA = {
-  cameras: [
-    // Lahore
-    { id: 1, pos: [31.5204, 74.3587], status: "Online", type: "PTZ", alerts: 2, label: "Mall Road Sector 1" },
-    { id: 2, pos: [31.5497, 74.3436], status: "Offline", type: "Fixed", alerts: 0, label: "Gulberg Main Blvd" },
-    // Rawalpindi
-    { id: 101, pos: [33.5651, 73.0169], status: "Online", type: "PTZ", alerts: 1, label: "Saddar Metro Station" },
-    { id: 102, pos: [33.5900, 73.0300], status: "Online", type: "Fixed", alerts: 0, label: "Murree Road Intersection" },
-    // Gujranwala
-    { id: 201, pos: [32.1877, 74.1945], status: "Online", type: "PTZ", alerts: 3, label: "GT Road Central" },
-    { id: 202, pos: [32.1600, 74.2100], status: "Offline", type: "Fixed", alerts: 0, label: "Sialkot Bypass" },
-  ],
-  incidents: [
-    // Lahore
-    { id: 1, pos: [31.5100, 74.3300], type: "Traffic Accident", severity: "High", time: "10:15 AM", status: "Responding" },
-    // Rawalpindi
-    { id: 101, pos: [33.5750, 73.0200], type: "Suspicious Activity", severity: "Medium", time: "11:20 AM", status: "Pending" },
-    // Gujranwala
-    { id: 201, pos: [32.1950, 74.2000], type: "Fire Alert", severity: "High", time: "09:45 AM", status: "Responding" },
-  ],
-  patrols: [
-    // Lahore
-    { id: 1, pos: [31.5300, 74.3400], label: "Dolphin Unit 102", status: "Active", type: "Motorcycle", color: "emerald-500" },
-    // Rawalpindi
-    { id: 101, pos: [33.5550, 73.0100], label: "PRU Unit 88", status: "Active", type: "Car", color: "blue-500" },
-    // Gujranwala
-    { id: 201, pos: [32.1750, 74.1850], label: "Warden 42", status: "Active", type: "Motorcycle", color: "emerald-500" },
-  ],
-  stations: [
-    { id: 1, pos: [31.5250, 74.3600], name: "Model Town PS", units: 12, radius: 2000 },
-    { id: 101, pos: [33.5600, 73.0150], name: "Civil Lines Pindi", units: 18, radius: 2000 },
-    { id: 201, pos: [32.1850, 74.1900], name: "City PS Gujranwala", units: 14, radius: 2000 },
-  ],
-  traffic: [
-    { id: 1, path: [[31.520, 74.358], [31.540, 74.358], [31.560, 74.350]], level: "High", speed: "12 km/h" },
-    { id: 2, path: [[31.500, 74.300], [31.520, 74.320], [31.540, 74.340]], level: "Low", speed: "45 km/h" },
-  ],
-  construction: [
-    { id: 1, pos: [31.5350, 74.3550], label: "Flyover Project B", progress: "45%", image: "https://images.unsplash.com/photo-1541888946425-d81bb19480c5?auto=format&fit=crop&w=300&q=80" },
-    { id: 2, pos: [31.4850, 74.3150], label: "Underpass Sector 4", progress: "70%", image: "https://images.unsplash.com/photo-1503387762-592dea58ef21?auto=format&fit=crop&w=300&q=80" },
-    { id: 3, pos: [31.5100, 74.3650], label: "Orange Line Exp", progress: "25%", image: "https://images.unsplash.com/photo-1590644365607-1c5a519a9a37?auto=format&fit=crop&w=300&q=80" },
-  ]
+const EMPTY_LAYER_DATA: Record<string, any[]> = {
+  cameras: [],
+  incidents: [],
+  patrols: [],
+  stations: [],
+  traffic: [],
+  construction: [],
 };
 
-const CITY_COORDINATES: Record<string, [number, number]> = {
-  lahore: [31.5204, 74.3587],
-  rawalpindi: [33.5651, 73.0169],
-  gujranwala: [32.1877, 74.1945],
-};
+// Fallback center is used only when neither project geometry nor filter center is available.
+// Operational layers are intentionally empty until backend/API data is connected.
+const DEFAULT_MAP_CENTER: [number, number] = [31.5204, 74.3587];
 
 // Component to handle map center and zoom changes (e.g. from area filter)
 function MapCenterHandler({ center, zoom }: { center: [number, number]; zoom?: number }) {
@@ -252,8 +215,8 @@ export function CityMap({
   onProjectSelect?: (projectId: number) => void;
 }) {
   const [isMounted, setIsMounted] = useState(false);
-  const [constructionSites, setConstructionSites] = useState(MOCK_DATA.construction);
-  const cityCenter = CITY_COORDINATES[city.toLowerCase()] || CITY_COORDINATES.lahore;
+  const [constructionSites, setConstructionSites] = useState<any[]>([]);
+  const cityCenter = DEFAULT_MAP_CENTER;
   const center = filterCenter ?? cityCenter;
   const zoom = filterZoom ?? 12;
   const [isLegendCollapsed, setIsLegendCollapsed] = useState(false);
@@ -272,19 +235,19 @@ export function CityMap({
   };
 
   // Filter data based on search query AND active layers
-  const filteredCameras = (activeLayers.has("cameras") ? MOCK_DATA.cameras : []).filter(cam =>
+  const filteredCameras = (activeLayers.has("cameras") ? EMPTY_LAYER_DATA.cameras : []).filter(cam =>
     !searchQuery || cam.label.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  const filteredIncidents = (activeLayers.has("incidents") ? MOCK_DATA.incidents : []).filter(inc =>
+  const filteredIncidents = (activeLayers.has("incidents") ? EMPTY_LAYER_DATA.incidents : []).filter(inc =>
     !searchQuery || inc.type.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  const filteredPatrols = (activeLayers.has("patrols") ? MOCK_DATA.patrols : []).filter(unit =>
+  const filteredPatrols = (activeLayers.has("patrols") ? EMPTY_LAYER_DATA.patrols : []).filter(unit =>
     !searchQuery || unit.label.toLowerCase().includes(searchQuery.toLowerCase())
   );
   const filteredConstruction = activeLayers.has("construction") ? constructionSites : [];
-  const filteredTraffic = activeLayers.has("traffic") ? MOCK_DATA.traffic : [];
-  const filteredStations = activeLayers.has("stations") ? MOCK_DATA.stations : [];
-  const filteredHotspots = activeLayers.has("hotspots") ? MOCK_DATA.incidents : [];
+  const filteredTraffic = activeLayers.has("traffic") ? EMPTY_LAYER_DATA.traffic : [];
+  const filteredStations = activeLayers.has("stations") ? EMPTY_LAYER_DATA.stations : [];
+  const filteredHotspots = activeLayers.has("hotspots") ? EMPTY_LAYER_DATA.incidents : [];
 
   useEffect(() => {
     setIsMounted(true);

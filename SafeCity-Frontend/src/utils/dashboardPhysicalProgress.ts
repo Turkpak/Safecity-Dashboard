@@ -90,7 +90,7 @@ export function safeNumber(value: unknown): number | null {
 }
 
 // ============================================================
-// 2. normalizeProgress
+// 2. normalizeProgress / clampProgress
 // ============================================================
 
 /**
@@ -107,6 +107,12 @@ export function normalizeProgress(value: unknown): number {
   if (n === null) return 0;
   return Math.max(0, Math.min(100, n));
 }
+
+/**
+ * Alias for normalizeProgress.
+ * Exported so consumers can use the name from the spec (`clampProgress`).
+ */
+export const clampProgress = normalizeProgress;
 
 // ============================================================
 // 3. ID helpers — robust field-name resolution
