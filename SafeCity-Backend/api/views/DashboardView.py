@@ -197,9 +197,15 @@ def _project_metrics(project, physical_progress=None, has_physical_data=None):
     )
 
     if physical_progress is None:
-        project_progress_map = calculate_project_physical_progress_map([project.id])
+        project_progress_map = calculate_project_physical_progress_map(
+            [project.id]
+        )
         has_physical_data = project.id in project_progress_map
-        physical_progress = project_progress_map.get(project.id, 0.0)
+        physical_progress = project_progress_map.get(
+            project.id,
+            0.0
+        )
+
     elif has_physical_data is None:
         has_physical_data = True
 
@@ -213,6 +219,33 @@ def _project_metrics(project, physical_progress=None, has_physical_data=None):
 
     budget_utilized = _number(
         project.budget_utilized
+    )
+
+    # --------------------------------------------------------
+    # Financial Progress Overview fields
+    # --------------------------------------------------------
+
+    allocation_total_cost = _number(
+        project.allocation_total_cost
+    )
+
+    pd_release_total_cost = _number(
+        project.pd_release_total_cost
+    )
+
+    spending_release_total_cost = _number(
+        project.spending_release_total_cost
+    )
+
+    pifra_utilization_total_cost = _number(
+        project.pifra_utilization_total_cost
+    )
+
+    # IMPORTANT:
+    # Use the value already stored in Project.
+    # Do NOT calculate this again.
+    percentage_utilization_total = _number(
+        project.percentage_utilization_total
     )
 
     if total_budget:
@@ -245,19 +278,15 @@ def _project_metrics(project, physical_progress=None, has_physical_data=None):
     # --------------------------------------------------------
 
     if has_delay:
-
         status = "in_delay"
 
     elif physical_progress >= 100:
-
         status = "completed"
 
     elif physical_progress > 0:
-
         status = "in_progress"
 
     else:
-
         status = "pending"
 
     # --------------------------------------------------------
@@ -330,7 +359,10 @@ def _project_metrics(project, physical_progress=None, has_physical_data=None):
             else None
         ),
 
-        # Financial
+        # ----------------------------------------------------
+        # Existing financial fields
+        # ----------------------------------------------------
+
         "total_budget":
             round(total_budget, 2),
 
@@ -347,6 +379,25 @@ def _project_metrics(project, physical_progress=None, has_physical_data=None):
                 2
             ),
 
+        # ----------------------------------------------------
+        # NEW: Financial Progress Overview
+        # ----------------------------------------------------
+
+        "allocation_total_cost":
+            round(allocation_total_cost, 2),
+
+        "pd_release_total_cost":
+            round(pd_release_total_cost, 2),
+
+        "spending_release_total_cost":
+            round(spending_release_total_cost, 2),
+
+        "pifra_utilization_total_cost":
+            round(pifra_utilization_total_cost, 2),
+
+        "percentage_utilization_total":
+            round(percentage_utilization_total, 2),
+
         # Progress
         "physical_progress":
             physical_progress,
@@ -357,8 +408,8 @@ def _project_metrics(project, physical_progress=None, has_physical_data=None):
         "overall_progress":
             overall_progress,
 
-        # Physical-data validity (0% can still be valid)
-        "has_physical_data": bool(has_physical_data),
+        "has_physical_data":
+            bool(has_physical_data),
 
         # Status
         "status":
@@ -367,7 +418,6 @@ def _project_metrics(project, physical_progress=None, has_physical_data=None):
         "has_delay":
             has_delay,
     }
-
 
 # ============================================================
 # Summary
@@ -448,10 +498,35 @@ def _summary_payload(
 
 def _project_scope_summary(project_rows):
 
-    count = len(project_rows)
+    if not project_rows:
+        return {
+            "total_projects": 0,
+
+            "physical_progress": 0.0,
+            "has_physical_data": False,
+
+            "financial_progress": 0.0,
+            "overall_progress": 0.0,
+
+            "total_budget": 0.0,
+            "total_consume": 0.0,
+            "remaining_budget": 0.0,
+
+            # Financial Progress Overview
+            "allocation_total_cost": 0.0,
+            "pd_release_total_cost": 0.0,
+            "spending_release_total_cost": 0.0,
+            "pifra_utilization_total_cost": 0.0,
+            "percentage_utilization_total": 0.0,
+        }
+
+    # ========================================================
+    # Physical Progress
+    # ========================================================
 
     physical_rows = [
-        row for row in project_rows
+        row
+        for row in project_rows
         if row.get("has_physical_data") is True
     ]
 
@@ -459,22 +534,27 @@ def _project_scope_summary(project_rows):
 
         physical = round(
             sum(
-                row["physical_progress"]
+                row.get("physical_progress", 0.0)
                 for row in physical_rows
-            ) / len(physical_rows),
+            )
+            / len(physical_rows),
             2
         )
 
     else:
         physical = 0.0
 
+    # ========================================================
+    # Existing Financial Progress
+    # ========================================================
+
     total_budget = sum(
-        row["total_budget"]
+        row.get("total_budget", 0.0)
         for row in project_rows
     )
 
     total_consume = sum(
-        row["total_consume"]
+        row.get("total_consume", 0.0)
         for row in project_rows
     )
 
@@ -494,51 +574,289 @@ def _project_scope_summary(project_rows):
     else:
         financial = 0.0
 
-    return _summary_payload(
-        project_rows,
-        physical,
-        financial,
-        total_budget,
-        total_consume
+    # ========================================================
+    # Financial Progress Overview
+    #
+    # IMPORTANT:
+    # Every project value is simply ADDED.
+    #
+    # No percentage formula is used here.
+    # ========================================================
+
+    allocation_total_cost = sum(
+        row.get("allocation_total_cost", 0.0)
+        for row in project_rows
     )
 
+    pd_release_total_cost = sum(
+        row.get("pd_release_total_cost", 0.0)
+        for row in project_rows
+    )
+
+    spending_release_total_cost = sum(
+        row.get("spending_release_total_cost", 0.0)
+        for row in project_rows
+    )
+
+    pifra_utilization_total_cost = sum(
+        row.get("pifra_utilization_total_cost", 0.0)
+        for row in project_rows
+    )
+
+    # IMPORTANT:
+    # Sum the already-stored Project percentage values.
+    # DO NOT calculate PIFRA / Allocation here.
+    percentage_utilization_total = sum(
+        row.get("percentage_utilization_total", 0.0)
+        for row in project_rows
+    )
+
+    # ========================================================
+    # Return
+    # ========================================================
+
+    return {
+
+        "total_projects":
+            len(project_rows),
+
+        "physical_progress":
+            round(physical, 2),
+
+        "has_physical_data":
+            bool(physical_rows),
+
+        "financial_progress":
+            round(financial, 2),
+
+        "overall_progress":
+            round(
+                (
+                    physical +
+                    financial
+                ) / 2,
+                2
+            ),
+
+        "total_budget":
+            round(total_budget, 2),
+
+        "total_consume":
+            round(total_consume, 2),
+
+        "remaining_budget":
+            round(
+                max(
+                    total_budget -
+                    total_consume,
+                    0.0
+                ),
+                2
+            ),
+
+        # ====================================================
+        # Financial Progress Overview
+        # ====================================================
+
+        "allocation_total_cost":
+            round(
+                allocation_total_cost,
+                2
+            ),
+
+        "pd_release_total_cost":
+            round(
+                pd_release_total_cost,
+                2
+            ),
+
+        "spending_release_total_cost":
+            round(
+                spending_release_total_cost,
+                2
+            ),
+
+        "pifra_utilization_total_cost":
+            round(
+                pifra_utilization_total_cost,
+                2
+            ),
+
+        "percentage_utilization_total":
+            round(
+                percentage_utilization_total,
+                2
+            ),
+    }
 
 # ============================================================
 # Hierarchy
 # ============================================================
 
 def _average_metric_rows(rows):
-    """Average immediate children while preserving physical-data validity.
 
-    Physical progress excludes children with no valid Primavera physical data,
-    but includes genuine 0% children. Legacy financial/overall fields retain
-    their previous simple-average behavior.
-    """
     if not rows:
+
         return {
             "project_count": 0,
+
             "physical_progress": 0.0,
             "has_physical_data": False,
+
             "financial_progress": 0.0,
             "overall_progress": 0.0,
+
+            "total_budget": 0.0,
+            "total_consume": 0.0,
+            "remaining_budget": 0.0,
+
+            "allocation_total_cost": 0.0,
+            "pd_release_total_cost": 0.0,
+            "spending_release_total_cost": 0.0,
+            "pifra_utilization_total_cost": 0.0,
+            "percentage_utilization_total": 0.0,
         }
 
-    physical_rows = [row for row in rows if row.get("has_physical_data") is True]
+    physical_rows = [
+        row
+        for row in rows
+        if row.get("has_physical_data") is True
+    ]
+
     physical_progress = (
-        round(sum(row.get("physical_progress", 0.0) for row in physical_rows) / len(physical_rows), 2)
-        if physical_rows else 0.0
+        round(
+            sum(
+                row.get(
+                    "physical_progress",
+                    0.0
+                )
+                for row in physical_rows
+            )
+            / len(physical_rows),
+            2
+        )
+        if physical_rows
+        else 0.0
     )
 
     return {
-        "project_count": sum(row.get("project_count", 1) for row in rows),
-        "physical_progress": physical_progress,
-        "has_physical_data": bool(physical_rows),
-        "financial_progress": round(
-            sum(row.get("financial_progress", 0.0) for row in rows) / len(rows), 2
-        ),
-        "overall_progress": round(
-            sum(row.get("overall_progress", 0.0) for row in rows) / len(rows), 2
-        ),
+
+        "project_count":
+            sum(
+                row.get(
+                    "project_count",
+                    1
+                )
+                for row in rows
+            ),
+
+        "physical_progress":
+            physical_progress,
+
+        "has_physical_data":
+            bool(physical_rows),
+
+        "financial_progress":
+            round(
+                sum(
+                    row.get(
+                        "financial_progress",
+                        0.0
+                    )
+                    for row in rows
+                )
+                / len(rows),
+                2
+            ),
+
+        "overall_progress":
+            round(
+                sum(
+                    row.get(
+                        "overall_progress",
+                        0.0
+                    )
+                    for row in rows
+                )
+                / len(rows),
+                2
+            ),
+
+        # ----------------------------------------------------
+        # Financial Progress Overview
+        # ----------------------------------------------------
+
+        "total_budget":
+            sum(
+                row.get(
+                    "total_budget",
+                    0.0
+                )
+                for row in rows
+            ),
+
+        "total_consume":
+            sum(
+                row.get(
+                    "total_consume",
+                    0.0
+                )
+                for row in rows
+            ),
+
+        "remaining_budget":
+            sum(
+                row.get(
+                    "remaining_budget",
+                    0.0
+                )
+                for row in rows
+            ),
+
+        "allocation_total_cost":
+            sum(
+                row.get(
+                    "allocation_total_cost",
+                    0.0
+                )
+                for row in rows
+            ),
+
+        "pd_release_total_cost":
+            sum(
+                row.get(
+                    "pd_release_total_cost",
+                    0.0
+                )
+                for row in rows
+            ),
+
+        "spending_release_total_cost":
+            sum(
+                row.get(
+                    "spending_release_total_cost",
+                    0.0
+                )
+                for row in rows
+            ),
+
+        "pifra_utilization_total_cost":
+            sum(
+                row.get(
+                    "pifra_utilization_total_cost",
+                    0.0
+                )
+                for row in rows
+            ),
+
+        "percentage_utilization_total":
+            sum(
+                row.get(
+                    "percentage_utilization_total",
+                    0.0
+                )
+                for row in rows
+            ),
     }
 
 
@@ -627,12 +945,55 @@ def _all_hierarchy_rows(
 
         row = {
             "id": obj.id,
+
             "name": getattr(obj, name_attr),
-            "project_count": summary["total_projects"],
-            "physical_progress": summary["physical_progress"],
-            "has_physical_data": summary.get("has_physical_data", False),
-            "financial_progress": summary["financial_progress"],
-            "overall_progress": summary["overall_progress"],
+
+            "project_count":
+                summary["total_projects"],
+
+            "physical_progress":
+                summary["physical_progress"],
+
+            "has_physical_data":
+                summary.get(
+                    "has_physical_data",
+                    False
+                ),
+
+            "financial_progress":
+                summary["financial_progress"],
+
+            "overall_progress":
+                summary["overall_progress"],
+
+            # ----------------------------------------------------
+            # Financial Progress Overview
+            # ----------------------------------------------------
+
+            "allocation_total_cost":
+                summary["allocation_total_cost"],
+
+            "pd_release_total_cost":
+                summary["pd_release_total_cost"],
+
+            "spending_release_total_cost":
+                summary["spending_release_total_cost"],
+
+            "pifra_utilization_total_cost":
+                summary["pifra_utilization_total_cost"],
+
+            "percentage_utilization_total":
+                summary["percentage_utilization_total"],
+
+            # Existing summary financial fields
+            "total_budget":
+                summary["total_budget"],
+
+            "total_consume":
+                summary["total_consume"],
+
+            "remaining_budget":
+                summary["remaining_budget"],
         }
 
         if page == "provinces":
@@ -848,7 +1209,7 @@ class DashboardPageDataView(APIView):
         # ----------------------------------------------------
 
         cache_key = (
-            f"dashboard_page_data_contextual_physical_v4_{canonical_page}"
+            f"dashboard_page_data_contextual_physical_v5_{canonical_page}"
         )
 
         cached_data = cache.get(

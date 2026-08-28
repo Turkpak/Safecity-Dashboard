@@ -27,6 +27,17 @@ export interface DashboardSummary {
   total_budget: number;
   total_consume: number;
   remaining_budget: number;
+
+  // Financial Progress Overview
+  allocation_total_cost: number;
+  pd_release_total_cost: number;
+  spending_release_total_cost: number;
+  pifra_utilization_total_cost: number;
+
+  // IMPORTANT:
+  // This comes from the project data.
+  // Do NOT calculate it in frontend.
+  percentage_utilization_total: number;
 }
 
 export interface DashboardChart {
@@ -43,6 +54,16 @@ export interface HierarchyRow {
   has_physical_data?: boolean;
   financial_progress: number;
   overall_progress: number;
+
+  // Financial Progress Overview
+  allocation_total_cost: number;
+  pd_release_total_cost: number;
+  spending_release_total_cost: number;
+  pifra_utilization_total_cost: number;
+
+  // Keep this field.
+  // Backend provides the value.
+  percentage_utilization_total: number;
 }
 
 export interface DivisionRow {
@@ -53,6 +74,13 @@ export interface DivisionRow {
   has_physical_data?: boolean;
   financial_progress: number;
   overall_progress: number;
+
+  // Financial Progress Overview
+  allocation_total_cost: number;
+  pd_release_total_cost: number;
+  spending_release_total_cost: number;
+  pifra_utilization_total_cost: number;
+  percentage_utilization_total: number;
 
   // Legacy alias for "zone" — populated from Zone on the backend.
   division?: number;
@@ -70,6 +98,13 @@ export interface DistrictRow {
   financial_progress: number;
   overall_progress: number;
 
+  // Financial Progress Overview
+  allocation_total_cost: number;
+  pd_release_total_cost: number;
+  spending_release_total_cost: number;
+  pifra_utilization_total_cost: number;
+  percentage_utilization_total: number;
+
   district?: number;
   district_name?: string;
   circle?: number;
@@ -80,7 +115,6 @@ export interface DistrictRow {
   zone?: number;
   zone_name?: string;
 }
-
 export interface TehsilRow {
   id: number;
   name: string;
@@ -89,6 +123,13 @@ export interface TehsilRow {
   has_physical_data?: boolean;
   financial_progress: number;
   overall_progress: number;
+
+  // Financial Progress Overview
+  allocation_total_cost: number;
+  pd_release_total_cost: number;
+  spending_release_total_cost: number;
+  pifra_utilization_total_cost: number;
+  percentage_utilization_total: number;
 
   tehsil?: number;
   tehsil_name?: string;
@@ -106,7 +147,6 @@ export interface TehsilRow {
   zone?: number;
   zone_name?: string;
 }
-
 export interface DashboardProject {
   id: number;
 
@@ -130,6 +170,14 @@ export interface DashboardProject {
   budget_utilized?: number | string | null;
   budget_variance?: number | string | null;
   budget_remaining?: number | string | null;
+
+    allocation_total_cost?: number | string | null;
+  pd_release_total_cost?: number | string | null;
+  spending_release_total_cost?: number | string | null;
+  pifra_utilization_total_cost?: number | string | null;
+
+  // Do NOT calculate this in frontend.
+  percentage_utilization_total?: number | string | null;
 
   physical_progress: number;
   has_physical_data?: boolean;
@@ -276,6 +324,21 @@ const normalizeProject = (
     row.budget_remaining ??
     row.remaining_budget ??
     0,
+
+  allocation_total_cost:
+    row.allocation_total_cost ?? 0,
+
+  pd_release_total_cost:
+    row.pd_release_total_cost ?? 0,
+
+  spending_release_total_cost:
+    row.spending_release_total_cost ?? 0,
+
+  pifra_utilization_total_cost:
+    row.pifra_utilization_total_cost ?? 0,
+
+  percentage_utilization_total:
+    row.percentage_utilization_total ?? 0,
 
   physical_progress:
     Number(

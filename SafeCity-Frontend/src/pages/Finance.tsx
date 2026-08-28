@@ -83,18 +83,8 @@ export default function Finance() {
     }
     return map;
   }, [projects]);
-useEffect(() => {
-  console.log("PROJECTS:", projects);
-  console.log(
-    "FINANCIAL PROJECT DATA:",
-    projects.map((p) => ({
-      id: p.id,
-      name: p.project_name,
-      allocation: p.allocation_total_cost,
-      pifra: p.pifra_utilization_total_cost,
-    }))
-  );
-}, [projects]);
+
+
   const { data: divisions = [], isLoading: divisionsLoading } = useQuery({
     queryKey: ["finance", "list-division"],
     queryFn: () => listDivisions(),
@@ -131,6 +121,28 @@ useEffect(() => {
     enabled: isAllFilters,
     staleTime: 60 * 1000,
   });
+// useEffect(() => {
+//   console.log("========== FINANCE DEBUG ==========");
+
+//   console.log("PROJECT SUMMARY:", projectSummary);
+
+//   console.log("PROJECTS:", projects);
+
+//   console.log("PROJECT COUNT:", projects.length);
+
+//   console.log(
+//     "FINANCIAL DATA:",
+//     projects.map((p) => ({
+//       id: p.id,
+//       name: p.project_name,
+//       allocation: p.allocation_total_cost,
+//       pifra: p.pifra_utilization_total_cost,
+//     }))
+//   );
+
+//   console.log("===================================");
+// }, [projects, projectSummary]);
+
 
   const filteredProjects = useMemo((): Project[] => {
     if (selectedDivisionId === "all") return projects;

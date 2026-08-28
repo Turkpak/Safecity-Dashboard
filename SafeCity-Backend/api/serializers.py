@@ -579,7 +579,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
             'allocation_capital_cost',
             'allocation_revenue_cost',
             'allocation_total_cost',
-            'pifra_utilization_total_cost',
+
             'pd_release_capital_cost',
             'pd_release_cost',
             'pd_release_total_cost',

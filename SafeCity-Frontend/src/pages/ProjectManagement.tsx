@@ -260,6 +260,40 @@ const deleteProjectMutation = useMutation({
     selectedDistrictId,
     selectedTehsilId,
   ]);
+useEffect(() => {
+  const capital = parseFloat(allocationCapital) || 0;
+  const revenue = parseFloat(allocationRevenue) || 0;
+
+  setAllocationTotal(String(capital + revenue));
+}, [allocationCapital, allocationRevenue]);
+
+useEffect(() => {
+  const capital = parseFloat(pdReleaseCapital) || 0;
+  const revenue = parseFloat(pdReleaseRevenue) || 0;
+
+  setPdReleaseTotal(String(capital + revenue));
+}, [pdReleaseCapital, pdReleaseRevenue]);
+
+useEffect(() => {
+  const capital = parseFloat(spendingReleaseCapital) || 0;
+  const revenue = parseFloat(spendingReleaseRevenue) || 0;
+
+  setSpendingReleaseTotal(String(capital + revenue));
+}, [spendingReleaseCapital, spendingReleaseRevenue]);
+
+useEffect(() => {
+  const capital = parseFloat(pifraCapital) || 0;
+  const revenue = parseFloat(pifraRevenue) || 0;
+
+  setPifraTotal(String(capital + revenue));
+}, [pifraCapital, pifraRevenue]);
+
+useEffect(() => {
+  const capital = Number(utilPctCapital) || 0;
+  const revenue = Number(utilPctRevenue) || 0;
+
+  setUtilPctTotal(String(capital + revenue));
+}, [utilPctCapital, utilPctRevenue]);
 
   // Handle XER file upload
   const handleXERFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1422,7 +1456,9 @@ const deleteProjectMutation = useMutation({
                             </div>
                             <div className="space-y-2">
                               <Label>Total Cost (M)</Label>
-                              <Input value={allocationTotal} onChange={(e) => setAllocationTotal(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 643.615" />
+                              <Input value={allocationTotal} 
+                              // onChange={(e) => setAllocationTotal(e.target.value)} 
+                              type="number" min={0} step="any" placeholder="e.g. 643.615" />
                             </div>
                           </div>
                         )}
@@ -1446,7 +1482,9 @@ const deleteProjectMutation = useMutation({
                             </div>
                             <div className="space-y-2">
                               <Label>Total Cost (M)</Label>
-                              <Input value={pdReleaseTotal} onChange={(e) => setPdReleaseTotal(e.target.value)} type="number" min={0} step="any" />
+                              <Input value={pdReleaseTotal} o
+                              // nChange={(e) => setPdReleaseTotal(e.target.value)} 
+                              type="number" min={0} step="any" />
                             </div>
                           </div>
                         )}
@@ -1470,7 +1508,9 @@ const deleteProjectMutation = useMutation({
                             </div>
                             <div className="space-y-2">
                               <Label>Total Cost (M)</Label>
-                              <Input value={spendingReleaseTotal} onChange={(e) => setSpendingReleaseTotal(e.target.value)} type="number" min={0} step="any" />
+                              <Input value={spendingReleaseTotal} 
+                              // onChange={(e) => setSpendingReleaseTotal(e.target.value)} 
+                              type="number" min={0} step="any" />
                             </div>
                           </div>
                         )}
@@ -1494,7 +1534,9 @@ const deleteProjectMutation = useMutation({
                             </div>
                             <div className="space-y-2">
                               <Label>Total Cost (M)</Label>
-                              <Input value={pifraTotal} onChange={(e) => setPifraTotal(e.target.value)} type="number" min={0} step="any" />
+                              <Input value={pifraTotal} 
+                              // onChange={(e) => setPifraTotal(e.target.value)} 
+                              type="number" min={0} step="any" />
                             </div>
                             <div className="space-y-2">
                               <Label>Date</Label>
@@ -1522,7 +1564,9 @@ const deleteProjectMutation = useMutation({
                             </div>
                             <div className="space-y-2">
                               <Label>Total Cost %</Label>
-                              <Input value={utilPctTotal} onChange={(e) => setUtilPctTotal(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 38.53" />
+                              <Input value={utilPctTotal} 
+                              // onChange={(e) => setUtilPctTotal(e.target.value)} 
+                              type="number" min={0} step="any" placeholder="e.g. 38.53" />
                             </div>
                           </div>
                         )}
@@ -2697,7 +2741,9 @@ const deleteProjectMutation = useMutation({
                       </div>
                       <div className="space-y-2">
                         <Label>Total Cost (M)</Label>
-                        <Input value={allocationTotal} onChange={(e) => setAllocationTotal(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 643.615" />
+                        <Input value={allocationTotal} 
+                        // onChange={(e) => setAllocationTotal(e.target.value)} 
+                        type="number" min={0} step="any" placeholder="e.g. 643.615" />
                       </div>
                     </div>
                   )}
@@ -2721,7 +2767,9 @@ const deleteProjectMutation = useMutation({
                       </div>
                       <div className="space-y-2">
                         <Label>Total Cost (M)</Label>
-                        <Input value={pdReleaseTotal} onChange={(e) => setPdReleaseTotal(e.target.value)} type="number" min={0} step="any" />
+                        <Input value={pdReleaseTotal} 
+                        // onChange={(e) => setPdReleaseTotal(e.target.value)} 
+                        type="number" min={0} step="any" />
                       </div>
                     </div>
                   )}
@@ -2745,7 +2793,9 @@ const deleteProjectMutation = useMutation({
                       </div>
                       <div className="space-y-2">
                         <Label>Total Cost (M)</Label>
-                        <Input value={spendingReleaseTotal} onChange={(e) => setSpendingReleaseTotal(e.target.value)} type="number" min={0} step="any" />
+                        <Input value={spendingReleaseTotal} 
+                        // onChange={(e) => setSpendingReleaseTotal(e.target.value)} 
+                        type="number" min={0} step="any" />
                       </div>
                     </div>
                   )}
@@ -2769,7 +2819,9 @@ const deleteProjectMutation = useMutation({
                       </div>
                       <div className="space-y-2">
                         <Label>Total Cost (M)</Label>
-                        <Input value={pifraTotal} onChange={(e) => setPifraTotal(e.target.value)} type="number" min={0} step="any" />
+                        <Input value={pifraTotal} 
+                        // onChange={(e) => setPifraTotal(e.target.value)}
+                         type="number" min={0} step="any" />
                       </div>
                       <div className="space-y-2">
                         <Label>Date</Label>
@@ -2797,7 +2849,9 @@ const deleteProjectMutation = useMutation({
                       </div>
                       <div className="space-y-2">
                         <Label>Total Cost %</Label>
-                        <Input value={utilPctTotal} onChange={(e) => setUtilPctTotal(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 38.53" />
+                        <Input value={utilPctTotal} 
+                        // onChange={(e) => setUtilPctTotal(e.target.value)}
+                         type="number" min={0} step="any" placeholder="e.g. 38.53" />
                       </div>
                     </div>
                   )}

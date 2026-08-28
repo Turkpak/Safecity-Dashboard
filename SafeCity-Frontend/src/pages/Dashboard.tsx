@@ -32,7 +32,7 @@ import {
   listTehsils,
   listTopProjects,
 } from "@/api";
-
+import FinancialProgressOverviewChart from "@/components/dashboard/FinancialProgressOverviewChart";
 import type { Division, District, Tehsil, Project, TopProject } from "@/api/types";
 import { getDashboardPageData, type DashboardView } from "@/api/dashboard";
 import {
@@ -1381,16 +1381,51 @@ export default function Dashboard() {
       return Number.isFinite(n) ? n : 0;
     };
     // Financial utilization % (All divisions / scoped)
-    const sumBudgetAllocated = scopeProjects.reduce(
-      (acc, p) => acc + num((p as any)?.total_budget_allocated),
-      0,
-    );
-    const sumBudgetUtilized = scopeProjects.reduce(
-      (acc, p) => acc + num((p as any)?.budget_utilized),
-      0,
-    );
-    const utilizationPct =
-      sumBudgetAllocated > 0 ? clamp01((sumBudgetUtilized / sumBudgetAllocated) * 100) : 0;
+    // const sumBudgetAllocated = scopeProjects.reduce(
+    //   (acc, p) => acc + num((p as any)?.total_budget_allocated),
+    //   0,
+    // );
+    // const sumBudgetUtilized = scopeProjects.reduce(
+    //   (acc, p) => acc + num((p as any)?.budget_utilized),
+    //   0,
+    // );
+    // const utilizationPct =
+    //   sumBudgetAllocated > 0 ? clamp01((sumBudgetUtilized / sumBudgetAllocated) * 100) : 0;
+
+    // Financial Progress Overview now sums the detailed cost-breakdown
+// fields instead of total_budget_allocated/budget_utilized — scoped to
+// whatever division/district/tehsil/all-projects is currently selected
+// (scopeProjects already reflects that).
+const sumAllocation = scopeProjects.reduce(
+  (acc, p) => acc + num((p as any)?.allocation_total_cost),
+  0,
+);
+const sumPdRelease = scopeProjects.reduce(
+  (acc, p) => acc + num((p as any)?.pd_release_total_cost),
+  0,
+);
+const sumSpendingRelease = scopeProjects.reduce(
+  (acc, p) => acc + num((p as any)?.spending_release_total_cost),
+  0,
+);
+const sumPifraUtilization = scopeProjects.reduce(
+  (acc, p) => acc + num((p as any)?.pifra_utilization_total_cost),
+  0,
+);
+const percentageUtilizationTotal = scopeProjects.reduce(
+  (acc, p) =>
+    acc + num((p as any)?.percentage_utilization_total),
+  0,
+);
+
+// percentage_utilization_total is a rate, not a cost — recomputed the
+// same way Project.save() computes it, but on the scope's SUMMED
+// totals rather than a single project's.
+// const percentageUtilizationTotal =
+//   sumAllocation > 0 ? clamp01((sumPifraUtilization / sumAllocation) * 100) : 0;
+
+const formatCost = (value: number) =>
+  new Intl.NumberFormat("en-PK", { maximumFractionDigits: 0 }).format(value);
 
     // Physical progress % from the backend project metrics.
     const physicalPct = (() => {
@@ -1428,9 +1463,9 @@ export default function Dashboard() {
     const absVariance = Math.abs(variance);
 
     // Financial donut (percent-based): planned=100, actual=util%, variance=remaining to 100
-    const financialPlanned = 100;
-    const financialActual = utilizationPct;
-    const absFinancialVariance = Math.max(0, 100 - financialActual);
+    // const financialPlanned = 100;
+    // const financialActual = utilizationPct;
+    // const absFinancialVariance = Math.max(0, 100 - financialActual);
 
     // Overall progress donut (physical, percent-based)
     // ── CANONICAL SOURCE: currentScopePhysical (closure variable) ──
@@ -1451,22 +1486,22 @@ export default function Dashboard() {
       totalForPie > 0 ? (absVariance / totalForPie) * 100 : 0;
 
     // Calculate totals for financial pie chart normalization
-    const maxFinancialValue = Math.max(financialPlanned, financialActual);
-    const totalForFinancialPie = maxFinancialValue + absFinancialVariance;
+    // const maxFinancialValue = Math.max(financialPlanned, financialActual);
+    // const totalForFinancialPie = maxFinancialValue + absFinancialVariance;
 
     // Normalize values for financial progress pie chart
-    const normalizedFinancialPlanned =
-      totalForFinancialPie > 0
-        ? (financialPlanned / totalForFinancialPie) * 100
-        : 0;
-    const normalizedFinancialActual =
-      totalForFinancialPie > 0
-        ? (financialActual / totalForFinancialPie) * 100
-        : 0;
-    const normalizedFinancialVariance =
-      totalForFinancialPie > 0
-        ? (absFinancialVariance / totalForFinancialPie) * 100
-        : 0;
+    // const normalizedFinancialPlanned =
+    //   totalForFinancialPie > 0
+    //     ? (financialPlanned / totalForFinancialPie) * 100
+    //     : 0;
+    // const normalizedFinancialActual =
+    //   totalForFinancialPie > 0
+    //     ? (financialActual / totalForFinancialPie) * 100
+    //     : 0;
+    // const normalizedFinancialVariance =
+    //   totalForFinancialPie > 0
+    //     ? (absFinancialVariance / totalForFinancialPie) * 100
+    //     : 0;
 
     const isSelectedProjectInThisScope =
       projectCardsInteractive &&
@@ -1627,22 +1662,24 @@ export default function Dashboard() {
                       <Pie
                         data={[
                           {
-                            name: "Planned",
-                            value: normalizedFinancialPlanned,
-                            originalValue: financialPlanned,
+                            name: "Allocation",
+                            value: sumAllocation,
                             fill: "#60a5fa",
                           },
                           {
-                            name: "Actual",
-                            value: normalizedFinancialActual,
-                            originalValue: financialActual,
-                            fill: "#22c55e",
+                            name: "PD Release",
+                            value: sumPdRelease,
+                            fill: "#f59e0b",
                           },
                           {
-                            name: "Variance",
-                            value: normalizedFinancialVariance,
-                            originalValue: absFinancialVariance,
-                            fill: "#ef4444",
+                            name: "Spending Release",
+                            value: sumSpendingRelease,
+                            fill: "#a855f7",
+                          },
+                          {
+                            name: "Pifra Utilization",
+                            value: sumPifraUtilization,
+                            fill: "#22c55e",
                           },
                         ]}
                         cx="50%"
@@ -1661,7 +1698,7 @@ export default function Dashboard() {
                           content={({ viewBox }: any) => {
                             const cx = viewBox?.cx ?? 0;
                             const cy = viewBox?.cy ?? 0;
-                            const valueText = `${financialActual.toFixed(1)}%`;
+                            const valueText = `${percentageUtilizationTotal.toFixed(1)}%`;
                             return (
                               <g>
                                 <text
@@ -1682,13 +1719,13 @@ export default function Dashboard() {
                                   className="font-medium uppercase tracking-wider fill-muted-foreground"
                                   style={{ fontSize: isMobile ? 9 : 10 }}
                                 >
-                                  Actual
+                                  Utilization
                                 </text>
                               </g>
                             );
                           }}
                         />
-                        {["#60a5fa", "#22c55e", "#ef4444"].map((fill, index) => (
+                        {["#60a5fa", "#f59e0b", "#a855f7", "#22c55e"].map((fill, index) => (
                           <Cell
                             key={`cell-f-${index}`}
                             fill={fill}
@@ -1705,15 +1742,7 @@ export default function Dashboard() {
                           fontSize: isMobile ? "11px" : "13px",
                           boxShadow: "0 10px 40px -10px rgba(0,0,0,0.15)",
                         }}
-                        formatter={(
-                          value: number,
-                          name: string,
-                          props: any,
-                        ) => {
-                          const originalValue =
-                            props.payload?.originalValue ?? value;
-                          return [`${originalValue.toFixed(1)}%`, name];
-                        }}
+                        formatter={(value: number, name: string) => [formatCost(value), name]}
                       />
                       <Legend
                         verticalAlign="bottom"
@@ -1727,16 +1756,15 @@ export default function Dashboard() {
                         iconSize={8}
                         formatter={(value) => {
                           let itemValue = 0;
-                          if (value === "Planned") itemValue = financialPlanned;
-                          else if (value === "Actual")
-                            itemValue = financialActual;
-                          else if (value === "Variance")
-                            itemValue = absFinancialVariance;
+                          if (value === "Allocation") itemValue = sumAllocation;
+                          else if (value === "PD Release") itemValue = sumPdRelease;
+                          else if (value === "Spending Release") itemValue = sumSpendingRelease;
+                          else if (value === "Pifra Utilization") itemValue = sumPifraUtilization;
                           return (
                             <span className="text-muted-foreground font-medium">
                               {value}{" "}
                               <span className="font-semibold text-foreground">
-                                {itemValue.toFixed(1)}%
+                                {formatCost(itemValue)}
                               </span>
                             </span>
                           );
@@ -1750,7 +1778,28 @@ export default function Dashboard() {
 
             {/* Overall Progress Donut Chart — extracted to ProgressOverviewChart */}
             <ProgressOverviewChart value={currentScopePhysical} />
+
+                    {/* ===== NEW: Financial Progress Overview Chart ===== */}
+        {/* {!selectedMilestoneKey && !isSelectedProjectInThisScope && (
+          <div className="w-full">
+            <FinancialProgressOverviewChart
+              projects={apiProjects}
+              divisions={apiDivisions}
+              districts={apiDistricts}
+              tehsils={apiTehsils}
+              viewType={viewType}
+              selectedItemType={selectedItemType}
+              selectedItemId={selectedItemId}
+              parentDivisionId={parentDivisionId}
+              parentDistrictId={parentDistrictId}
+              isMobile={isMobile}
+              isTablet={isTablet}
+            />
           </div>
+        )} */}
+        {/* ===== END NEW ===== */}
+          </div>
+          
         )}
 
         {/* Milestone details should appear beneath Overall Progress (and replace the old charts when selected) */}

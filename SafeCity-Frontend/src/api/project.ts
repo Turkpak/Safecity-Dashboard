@@ -44,14 +44,49 @@ function normalizeProjectFeature(f: {
 }
 
 export async function listProjects(): Promise<Project[]> {
-  const data = await get<ListProjectResponse | Project[] | Array<{ id?: number; properties?: Record<string, unknown> }>>(LIST);
+  const data = await get<
+    ListProjectResponse |
+    Project[] |
+    Array<{
+      id?: number;
+      properties?: Record<string, unknown>;
+    }>
+  >(LIST);
+
+  console.log("RAW LIST PROJECT RESPONSE:", data);
+
   if (!data) return [];
-  if (typeof data === "object" && "features" in data && Array.isArray((data as ListProjectResponse).features)) {
-    return (data as ListProjectResponse).features.map((f) => normalizeProjectFeature(f));
+
+  if (
+    typeof data === "object" &&
+    "features" in data &&
+    Array.isArray((data as ListProjectResponse).features)
+  ) {
+    console.log(
+      "GEOJSON FEATURES:",
+      (data as ListProjectResponse).features
+    );
+
+    return (data as ListProjectResponse).features.map((f) =>
+      normalizeProjectFeature(f)
+    );
   }
+
   if (Array.isArray(data)) {
-    return data.map((f) => normalizeProjectFeature(f as { id?: number; properties?: Record<string, unknown> }));
+    console.log("PROJECT ARRAY:", data);
+
+    return data.map((f) =>
+      normalizeProjectFeature(
+        f as {
+          id?: number;
+          properties?: Record<string, unknown>;
+        }
+      )
+    );
   }
+
+  console.log("UNEXPECTED PROJECT RESPONSE:", data);
+
   return [];
 }
 
