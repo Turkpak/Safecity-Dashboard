@@ -8,3 +8,13 @@ vite.config.ts.*
 .env
 .env.local
 *.log
+# Generated and heavy local artifacts
+node_modules/
+dist/
+.vite/
+attached_assets/
+*.zip
+*.rar
+*.7z
+all-git-files.txt
+*.tsbuildinfo

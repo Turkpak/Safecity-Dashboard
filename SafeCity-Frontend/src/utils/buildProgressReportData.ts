@@ -140,12 +140,12 @@ function toProjectSummary(p: DashboardProject): ProjectSummaryRow {
 
 function buildDistribution(projects: ProjectSummaryRow[]): DistributionBucket[] {
   const buckets: Array<{ bucket: string; min: number; max: number; color: string }> = [
-    { bucket: "0%",       min: 0,    max: 0,   color: "#ef4444" },
-    { bucket: ">0–25%",  min: 0.01, max: 25,  color: "#f97316" },
-    { bucket: ">25–50%", min: 25.01,max: 50,  color: "#f59e0b" },
-    { bucket: ">50–75%", min: 50.01,max: 75,  color: "#3b82f6" },
-    { bucket: ">75–<100%",min:75.01,max:99.99,color: "#10b981" },
-    { bucket: "100%",    min: 100,  max: 100, color: "#22c55e" },
+    { bucket: "0%",       min: 0,    max: 0,   color: "#b91c1c" },
+    { bucket: ">0–25%",  min: 0.01, max: 25,  color: "#2563eb" },
+    { bucket: ">25–50%", min: 25.01,max: 50,  color: "#1e3a8a" },
+    { bucket: ">50–75%", min: 50.01,max: 75,  color: "#2563eb" },
+    { bucket: ">75–<100%",min:75.01,max:99.99,color: "#16a34a" },
+    { bucket: "100%",    min: 100,  max: 100, color: "#16a34a" },
   ];
   return buckets.map((b) => ({
     bucket: b.bucket,

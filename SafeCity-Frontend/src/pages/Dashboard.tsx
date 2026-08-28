@@ -32,7 +32,7 @@ import {
   listTehsils,
   listTopProjects,
 } from "@/api";
-import FinancialProgressOverviewChart from "@/components/dashboard/FinancialProgressOverviewChart";
+
 import type { Division, District, Tehsil, Project, TopProject } from "@/api/types";
 import { getDashboardPageData, type DashboardView } from "@/api/dashboard";
 import {
@@ -1380,52 +1380,34 @@ export default function Dashboard() {
       const n = Number(v);
       return Number.isFinite(n) ? n : 0;
     };
-    // Financial utilization % (All divisions / scoped)
-    // const sumBudgetAllocated = scopeProjects.reduce(
-    //   (acc, p) => acc + num((p as any)?.total_budget_allocated),
-    //   0,
-    // );
-    // const sumBudgetUtilized = scopeProjects.reduce(
-    //   (acc, p) => acc + num((p as any)?.budget_utilized),
-    //   0,
-    // );
-    // const utilizationPct =
-    //   sumBudgetAllocated > 0 ? clamp01((sumBudgetUtilized / sumBudgetAllocated) * 100) : 0;
+    // Financial Progress Overview — real project-level cost fields,
+    // aggregated across the currently visible scope.
+    const sumAllocation = scopeProjects.reduce(
+      (acc, p) => acc + num((p as any)?.allocation_total_cost),
+      0,
+    );
+    const sumPdRelease = scopeProjects.reduce(
+      (acc, p) => acc + num((p as any)?.pd_release_total_cost),
+      0,
+    );
+    const sumSpendingRelease = scopeProjects.reduce(
+      (acc, p) => acc + num((p as any)?.spending_release_total_cost),
+      0,
+    );
+    const sumPifraUtilization = scopeProjects.reduce(
+      (acc, p) => acc + num((p as any)?.pifra_utilization_total_cost),
+      0,
+    );
 
-    // Financial Progress Overview now sums the detailed cost-breakdown
-// fields instead of total_budget_allocated/budget_utilized — scoped to
-// whatever division/district/tehsil/all-projects is currently selected
-// (scopeProjects already reflects that).
-const sumAllocation = scopeProjects.reduce(
-  (acc, p) => acc + num((p as any)?.allocation_total_cost),
-  0,
-);
-const sumPdRelease = scopeProjects.reduce(
-  (acc, p) => acc + num((p as any)?.pd_release_total_cost),
-  0,
-);
-const sumSpendingRelease = scopeProjects.reduce(
-  (acc, p) => acc + num((p as any)?.spending_release_total_cost),
-  0,
-);
-const sumPifraUtilization = scopeProjects.reduce(
-  (acc, p) => acc + num((p as any)?.pifra_utilization_total_cost),
-  0,
-);
-const percentageUtilizationTotal = scopeProjects.reduce(
-  (acc, p) =>
-    acc + num((p as any)?.percentage_utilization_total),
-  0,
-);
+    // Scope-level financial utilization must be calculated from summed
+    // monetary totals, not by adding project-level percentages.
+    const percentageUtilizationTotal =
+      sumSpendingRelease > 0
+        ? clamp01((sumPifraUtilization / sumSpendingRelease) * 100)
+        : 0;
 
-// percentage_utilization_total is a rate, not a cost — recomputed the
-// same way Project.save() computes it, but on the scope's SUMMED
-// totals rather than a single project's.
-// const percentageUtilizationTotal =
-//   sumAllocation > 0 ? clamp01((sumPifraUtilization / sumAllocation) * 100) : 0;
-
-const formatCost = (value: number) =>
-  new Intl.NumberFormat("en-PK", { maximumFractionDigits: 0 }).format(value);
+    const formatCost = (value: number) =>
+      new Intl.NumberFormat("en-PK", { maximumFractionDigits: 0 }).format(value);
 
     // Physical progress % from the backend project metrics.
     const physicalPct = (() => {
@@ -1462,10 +1444,7 @@ const formatCost = (value: number) =>
     const variance = avgActual - avgPlanned;
     const absVariance = Math.abs(variance);
 
-    // Financial donut (percent-based): planned=100, actual=util%, variance=remaining to 100
-    // const financialPlanned = 100;
-    // const financialActual = utilizationPct;
-    // const absFinancialVariance = Math.max(0, 100 - financialActual);
+    // Financial donut now displays the four real financial cost categories.
 
     // Overall progress donut (physical, percent-based)
     // ── CANONICAL SOURCE: currentScopePhysical (closure variable) ──
@@ -1485,23 +1464,6 @@ const formatCost = (value: number) =>
     const normalizedVariance =
       totalForPie > 0 ? (absVariance / totalForPie) * 100 : 0;
 
-    // Calculate totals for financial pie chart normalization
-    // const maxFinancialValue = Math.max(financialPlanned, financialActual);
-    // const totalForFinancialPie = maxFinancialValue + absFinancialVariance;
-
-    // Normalize values for financial progress pie chart
-    // const normalizedFinancialPlanned =
-    //   totalForFinancialPie > 0
-    //     ? (financialPlanned / totalForFinancialPie) * 100
-    //     : 0;
-    // const normalizedFinancialActual =
-    //   totalForFinancialPie > 0
-    //     ? (financialActual / totalForFinancialPie) * 100
-    //     : 0;
-    // const normalizedFinancialVariance =
-    //   totalForFinancialPie > 0
-    //     ? (absFinancialVariance / totalForFinancialPie) * 100
-    //     : 0;
 
     const isSelectedProjectInThisScope =
       projectCardsInteractive &&
@@ -1677,7 +1639,7 @@ const formatCost = (value: number) =>
                             fill: "#a855f7",
                           },
                           {
-                            name: "Pifra Utilization",
+                            name: "PIFRA Utilization",
                             value: sumPifraUtilization,
                             fill: "#22c55e",
                           },
@@ -1742,7 +1704,10 @@ const formatCost = (value: number) =>
                           fontSize: isMobile ? "11px" : "13px",
                           boxShadow: "0 10px 40px -10px rgba(0,0,0,0.15)",
                         }}
-                        formatter={(value: number, name: string) => [formatCost(value), name]}
+                        formatter={(value: number, name: string) => [
+                          formatCost(value),
+                          name,
+                        ]}
                       />
                       <Legend
                         verticalAlign="bottom"
@@ -1758,8 +1723,10 @@ const formatCost = (value: number) =>
                           let itemValue = 0;
                           if (value === "Allocation") itemValue = sumAllocation;
                           else if (value === "PD Release") itemValue = sumPdRelease;
-                          else if (value === "Spending Release") itemValue = sumSpendingRelease;
-                          else if (value === "Pifra Utilization") itemValue = sumPifraUtilization;
+                          else if (value === "Spending Release")
+                            itemValue = sumSpendingRelease;
+                          else if (value === "PIFRA Utilization")
+                            itemValue = sumPifraUtilization;
                           return (
                             <span className="text-muted-foreground font-medium">
                               {value}{" "}
@@ -1778,28 +1745,7 @@ const formatCost = (value: number) =>
 
             {/* Overall Progress Donut Chart — extracted to ProgressOverviewChart */}
             <ProgressOverviewChart value={currentScopePhysical} />
-
-                    {/* ===== NEW: Financial Progress Overview Chart ===== */}
-        {/* {!selectedMilestoneKey && !isSelectedProjectInThisScope && (
-          <div className="w-full">
-            <FinancialProgressOverviewChart
-              projects={apiProjects}
-              divisions={apiDivisions}
-              districts={apiDistricts}
-              tehsils={apiTehsils}
-              viewType={viewType}
-              selectedItemType={selectedItemType}
-              selectedItemId={selectedItemId}
-              parentDivisionId={parentDivisionId}
-              parentDistrictId={parentDistrictId}
-              isMobile={isMobile}
-              isTablet={isTablet}
-            />
           </div>
-        )} */}
-        {/* ===== END NEW ===== */}
-          </div>
-          
         )}
 
         {/* Milestone details should appear beneath Overall Progress (and replace the old charts when selected) */}

@@ -283,8 +283,8 @@ export function buildProgressTrend(projects: ProjectSummaryRow[]): ProgressTrend
   const total = Math.max(projects.length, 1);
   const bands = [
     { label: "Not Started (0%)",    min: 0,     max: 0,     color: "#DC2626" },
-    { label: "Early (1–25%)",       min: 0.01,  max: 25,    color: "#F97316" },
-    { label: "Mid (26–50%)",        min: 25.01, max: 50,    color: "#EAB308" },
+    { label: "Early (1–25%)",       min: 0.01,  max: 25,    color: "#2563EB" },
+    { label: "Mid (26–50%)",        min: 25.01, max: 50,    color: "#1E40AF" },
     { label: "Advanced (51–75%)",   min: 50.01, max: 75,    color: "#3B82F6" },
     { label: "Near Complete (76–99%)", min: 75.01, max: 99.99, color: "#10B981" },
     { label: "Completed (100%)",    min: 100,   max: 100,   color: "#059669" },
@@ -401,7 +401,12 @@ export function buildSeverityBullets(report: ReportData): DecisionBullet[] {
   // Financial utilization insight
   const fin = report.financialSummary;
   if (fin && fin.totalBudget > 0) {
-    if (fin.utilizationPct < 20) {
+    if (fin.utilizationPct > 100) {
+      bullets.push({
+        text: `Budget utilization exceeds allocation at ${formatProgress(fin.utilizationPct)}% — financial review required.`,
+        severity: "critical",
+      });
+    } else if (fin.utilizationPct < 20) {
       bullets.push({
         text: `Budget utilization at ${formatProgress(fin.utilizationPct)}% — significant underspend detected.`,
         severity: "warning",
@@ -409,7 +414,7 @@ export function buildSeverityBullets(report: ReportData): DecisionBullet[] {
     } else if (fin.utilizationPct > 90) {
       bullets.push({
         text: `Budget utilization at ${formatProgress(fin.utilizationPct)}% — near full utilization.`,
-        severity: "positive",
+        severity: "info",
       });
     }
   }
@@ -493,30 +498,30 @@ export function buildHierarchyBars(units: HierarchyUnit[], maxItems = 15): Chart
         ? "#22c55e"
         : u.physical_progress >= 25
         ? "#3b82f6"
-        : "#f59e0b",
+        : "#2563EB",
     meta: `${u.project_count} project(s)`,
   }));
 }
 
 export function buildTopProjectBars(projects: ProjectSummaryRow[], maxItems = 10): ChartBar[] {
   return projects.slice(0, maxItems).map((p) => ({
-    label: p.project_name,
+    label: `${p.project_name}${p.district_name ? ` — ${p.district_name}` : ""}`,
     value: p.physical_progress,
     color:
       p.physical_progress >= 75
         ? "#22c55e"
         : p.physical_progress >= 25
         ? "#3b82f6"
-        : "#f59e0b",
+        : "#2563EB",
     meta: `${p.division_name} / ${p.district_name}`,
   }));
 }
 
 export function buildAttentionBars(projects: ProjectSummaryRow[], maxItems = 10): ChartBar[] {
   return projects.slice(0, maxItems).map((p) => ({
-    label: p.project_name,
+    label: `${p.project_name}${p.district_name ? ` — ${p.district_name}` : ""}`,
     value: p.physical_progress,
-    color: p.has_delay ? "#ef4444" : "#f59e0b",
+    color: p.has_delay || p.physical_progress === 0 ? "#DC2626" : "#1E3A8A",
     meta: p.has_delay
       ? "Delay recorded"
       : p.physical_progress === 0
