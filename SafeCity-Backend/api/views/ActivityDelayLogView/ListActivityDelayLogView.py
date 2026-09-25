@@ -1,7 +1,7 @@
 from ..common_imports import *
 
 class ActivityDelayLogListView(APIView):
-
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         project_id = request.query_params.get("project")
         activity_id = request.query_params.get("activity")

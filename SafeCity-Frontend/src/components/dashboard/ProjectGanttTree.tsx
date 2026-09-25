@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   MoreVertical,
   Plus,
@@ -9,6 +10,7 @@ import {
   CornerDownRight,
   ChevronDown,
   AlertTriangle,
+  Trash2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -25,9 +27,9 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { updateTaskActual, createProgressImage, addDelayLog, listStakeholders } from "@/api";
+import { updateTaskActual, createProgressImage, addDelayLog, listStakeholders, deleteProjectActivity } from "@/api";
 import type { Stakeholder } from "@/api/types";
-
+import { usePermissions } from "@/hooks/usePermissions";
 type FlatGanttRow = {
   id: string;
   label: string;
@@ -123,6 +125,13 @@ export function ProjectGanttTree({
   onProgressSaved?: () => void | Promise<void>;
   readOnly?: boolean;
 }) {
+
+  const { getPermission } = usePermissions();
+  const dashboardPermission = getPermission("Citywise Progress", null);
+  const canCreate = dashboardPermission.can_create;
+  const canUpdate = dashboardPermission.can_update;
+  const canDelete = dashboardPermission.can_delete;
+  const canUseOptions = canCreate || canUpdate || canDelete;
   const expandedStorageKey = useMemo(() => `safecity:ganttExpanded:${projectId ?? "unknown"}`, [projectId]);
   const [expanded, setExpanded] = useState<Set<string>>(() => {
     try {
@@ -136,6 +145,7 @@ export function ProjectGanttTree({
   });
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   // Restore expanded state when project changes (tab switching can remount the component).
   useEffect(() => {
@@ -184,20 +194,27 @@ export function ProjectGanttTree({
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
   const [stakeholdersLoaded, setStakeholdersLoaded] = useState(false);
   const [stakeholdersLoading, setStakeholdersLoading] = useState(false);
+  const [stakeholdersError, setStakeholdersError] = useState<string | null>(null);
 
   const loadStakeholders = async (): Promise<void> => {
     if (stakeholdersLoading) return;
     try {
       setStakeholdersLoading(true);
+      setStakeholdersError(null);
       const list = await listStakeholders();
       setStakeholders(Array.isArray(list) ? list : []);
       setStakeholdersLoaded(true);
     } catch (err) {
       setStakeholders([]);
       setStakeholdersLoaded(false); // allow retry on next open
+      const message =
+        err instanceof Error && /permission|forbidden|403/i.test(err.message)
+          ? "The Super Admin has not allowed you to view stakeholders."
+          : "Stakeholders could not be loaded. Please try again.";
+      setStakeholdersError(message);
       toast({
         title: "Failed to load stakeholders",
-        description: err instanceof Error ? err.message : "Please try again.",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -573,7 +590,7 @@ export function ProjectGanttTree({
                 {!readOnly && (
                   <div className="w-20 border-l border-border/60 flex items-center justify-center">
                     {/* Show options only for leaf subtasks (not parent WBS rows). */}
-                    {!t.hasChildren && t.depth >= 2 ? (
+                    {!t.hasChildren && t.depth >= 2 && canUseOptions ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
@@ -585,69 +602,97 @@ export function ProjectGanttTree({
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onSelect={(e) => {
-                              e.preventDefault();
-                              setDelayRow(t);
-                              setDelayStartDate(t.start ?? "");
-                              setDelayEndDate(t.end ?? t.start ?? "");
-                              setDelayCategory("");
-                              const role = user?.role ?? user?.stakeholder_type ?? "";
-                              setDelayOriginator(role ? String(role) : "—");
-                              // Default "Action by" to the logged-in user's stakeholder id if available.
-                              const sid = (user as any)?.stakeholder_id;
-                              setDelayActionBy(sid != null ? String(sid) : "");
-                              setDelayIssue("");
-                              setDelayRecommendedAction("");
-                              setDelayOpen(true);
-                            }}
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Delay
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={(e) => {
-                              e.preventDefault();
-                              if (!onOpenAddDocument) {
-                                toast({
-                                  title: "Documents not available here",
-                                  description:
-                                    "Open the Photos & Docs tab to add documents for this project.",
-                                });
-                                return;
-                              }
-                              if (!t.db_id || !Number.isFinite(t.db_id)) {
-                                toast({
-                                  title: "Cannot attach document",
-                                  description:
-                                    "Missing activity id from API. Please refresh and try again.",
-                                  variant: "destructive",
-                                });
-                                return;
-                              }
-                              onOpenAddDocument(t.id, t.label, t.db_id);
-                            }}
-                          >
-                            <FileText className="h-4 w-4 mr-2" />
-                            Add documents
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={(e) => {
-                              e.preventDefault();
-                              setActiveRow(t);
-                              setProgressValue(
-                                typeof t.progress === "number" && Number.isFinite(t.progress)
-                                  ? t.progress
-                                  : 0,
-                              );
-                              setProgressDate(new Date().toISOString().slice(0, 10));
-                              setProgressImages([]);
-                              setProgressOpen(true);
-                            }}
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add progress
-                          </DropdownMenuItem>
+                          {canCreate && (
+                            <>
+                              <DropdownMenuItem
+                                onSelect={(e) => {
+                                  e.preventDefault();
+                                  setDelayRow(t);
+                                  setDelayStartDate(t.start ?? "");
+                                  setDelayEndDate(t.end ?? t.start ?? "");
+                                  setDelayCategory("");
+                                  const role = user?.role ?? user?.stakeholder_type ?? "";
+                                  setDelayOriginator(role ? String(role) : "—");
+                                  setDelayActionBy("");
+                                  setDelayIssue("");
+                                  setDelayRecommendedAction("");
+                                  setDelayOpen(true);
+                                }}
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Delay
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={(e) => {
+                                  e.preventDefault();
+                                  if (!onOpenAddDocument) {
+                                    toast({
+                                      title: "Documents not available here",
+                                      description:
+                                        "Open the Photos & Docs tab to add documents for this project.",
+                                    });
+                                    return;
+                                  }
+                                  if (!t.db_id || !Number.isFinite(t.db_id)) {
+                                    toast({
+                                      title: "Cannot attach document",
+                                      description:
+                                        "Missing activity id from API. Please refresh and try again.",
+                                      variant: "destructive",
+                                    });
+                                    return;
+                                  }
+                                  onOpenAddDocument(t.id, t.label, t.db_id);
+                                }}
+                              >
+                                <FileText className="h-4 w-4 mr-2" />
+                                Add documents
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {(canCreate || canUpdate) && (
+                            <DropdownMenuItem
+                              onSelect={(e) => {
+                                e.preventDefault();
+                                setActiveRow(t);
+                                setProgressValue(
+                                  typeof t.progress === "number" && Number.isFinite(t.progress)
+                                    ? t.progress
+                                    : 0,
+                                );
+                                setProgressDate(new Date().toISOString().slice(0, 10));
+                                setProgressImages([]);
+                                setProgressOpen(true);
+                              }}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add progress
+                            </DropdownMenuItem>
+                          )}
+                          {canDelete && (
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onSelect={async (e) => {
+                                e.preventDefault();
+                                if (!t.db_id || !Number.isFinite(t.db_id)) return;
+                                if (!window.confirm(`Delete activity "${t.label}"?`)) return;
+                                try {
+                                  await deleteProjectActivity(t.db_id);
+                                  toast({ title: "Deleted", description: "Activity deleted successfully." });
+                                  await onProgressSaved?.();
+                                } catch (error) {
+                                  toast({
+                                    title: "Delete failed",
+                                    description: error instanceof Error ? error.message : "Could not delete activity.",
+                                    variant: "destructive",
+                                  });
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete activity
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     ) : (
@@ -744,12 +789,11 @@ export function ProjectGanttTree({
                   </Select>
                 ) : (
                   <div className="space-y-2">
-                    <Input
-                      value={delayActionBy}
-                      onChange={(e) => setDelayActionBy(e.target.value)}
-                      placeholder={stakeholdersLoading ? "Loading stakeholders..." : "Enter stakeholder id (e.g. 1)"}
-                      inputMode="numeric"
-                    />
+                    <p className="text-sm text-destructive">
+                      {stakeholdersLoading
+                        ? "Loading stakeholders..."
+                        : stakeholdersError ?? "No stakeholders available."}
+                    </p>
                     {!stakeholdersLoading && (
                       <Button type="button" variant="outline" size="sm" onClick={() => void loadStakeholders()}>
                         Retry load stakeholders
@@ -1041,6 +1085,7 @@ export function ProjectGanttTree({
                           title: "Image uploaded",
                           description: files.length === 1 ? "Progress image uploaded successfully." : `${files.length} images uploaded successfully.`,
                         });
+                        await queryClient.invalidateQueries({ queryKey: ["progress-images", projectId] });
                       } catch (err) {
                         toast({
                           title: "Failed to upload image",
@@ -1108,6 +1153,8 @@ export function ProjectGanttTree({
                   });
                   setProgressOpen(false);
                   await onProgressSaved?.();
+                  await queryClient.invalidateQueries({ queryKey: ["progress-images", projectId] });
+                  await queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
                 } catch (err) {
                   toast({
                     title: "Failed to save progress",

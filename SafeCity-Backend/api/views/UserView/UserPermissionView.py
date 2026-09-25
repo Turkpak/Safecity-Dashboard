@@ -2,7 +2,11 @@ from ..common_imports import *
 
 class IsSuperAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
-        return request.user.role == "super_admin"
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, "role", None) == "super_admin"
+        )
 
 class UserPermissionViewSet(viewsets.ModelViewSet):
     serializer_class = UserPermissionSerializer

@@ -200,6 +200,12 @@ export default function UserManagement() {
     const rowKey = permissionRowKey(sidebar_label, sub_label);
     setNewUserPermissions((prev) => {
       const current = prev[rowKey] ?? { create: false, read: false, update: false, delete: false };
+      if (key === "read" && !value) {
+        return { ...prev, [rowKey]: { ...current, read: false, create: false, update: false, delete: false } };
+      }
+      if (key !== "read" && value && !current.read) {
+        return { ...prev, [rowKey]: { ...current, [key]: false } };
+      }
       return { ...prev, [rowKey]: { ...current, [key]: value } };
     });
   }
@@ -263,9 +269,9 @@ export default function UserManagement() {
             sidebar_label: row.sidebar_label,
             sub_label: row.sub_label,
             can_view: p.read ?? false,
-            can_create: p.create ?? false,
-            can_update: p.update ?? false,
-            can_delete: p.delete ?? false,
+            can_create: (p.read ?? false) && (p.create ?? false),
+            can_update: (p.read ?? false) && (p.update ?? false),
+            can_delete: (p.read ?? false) && (p.delete ?? false),
           })
         );
       }
@@ -334,6 +340,19 @@ export default function UserManagement() {
     );
   }
 
+  function permissionControlVisibility(row: PermissionRow) {
+    const viewOnlyPage =
+      row.sub_label == null &&
+      ["Finance & Budget", "GIS Layers", "City Comparison"].includes(row.sidebar_label);
+    const createProjectPage =
+      row.sidebar_label === "Project Management" && row.sub_label === "Create";
+
+    return {
+      showRead: !createProjectPage,
+      showCrud: !viewOnlyPage,
+    };
+  }
+
   /** Toggle one CRUD flag for the selected user and a page row; create or update via API */
   async function handlePermissionToggle(
     sidebar_label: string,
@@ -351,14 +370,16 @@ export default function UserManagement() {
     setIsUpdatingPermission(true);
     try {
       if (perm) {
+        const nextCanView = key === "can_view" ? value : perm.can_view;
+        const crudAllowed = nextCanView;
         const payload = {
           user: userId,
           sidebar_label,
           sub_label: sub_label ?? undefined,
-          can_view: key === "can_view" ? value : perm.can_view,
-          can_create: key === "can_create" ? value : perm.can_create,
-          can_update: key === "can_update" ? value : perm.can_update,
-          can_delete: key === "can_delete" ? value : perm.can_delete,
+          can_view: nextCanView,
+          can_create: crudAllowed && (key === "can_create" ? value : perm.can_create),
+          can_update: crudAllowed && (key === "can_update" ? value : perm.can_update),
+          can_delete: crudAllowed && (key === "can_delete" ? value : perm.can_delete),
         };
         await updateUserPermission(perm.id, payload);
       } else {
@@ -367,9 +388,9 @@ export default function UserManagement() {
           sidebar_label,
           sub_label,
           can_view: key === "can_view" ? value : false,
-          can_create: key === "can_create" ? value : false,
-          can_update: key === "can_update" ? value : false,
-          can_delete: key === "can_delete" ? value : false,
+          can_create: false,
+          can_update: false,
+          can_delete: false,
         });
       }
       await queryClient.invalidateQueries({ queryKey: ["users-with-permissions"] });
@@ -545,6 +566,7 @@ export default function UserManagement() {
                         const p = getNewUserPerm(row.sidebar_label, row.sub_label);
                         const isGroup = row.kind === "group";
                         const groupId = row.groupId;
+                        const { showRead, showCrud } = permissionControlVisibility(row);
                         return (
                           <TableRow key={permissionRowKey(row.sidebar_label, row.sub_label)}>
                             <TableCell className="font-medium">
@@ -569,7 +591,7 @@ export default function UserManagement() {
                               )}
                             </TableCell>
                             <TableCell className="text-center">
-                              {!isGroup ? (
+                              {!isGroup && showRead ? (
                                 <Checkbox
                                   checked={p.read ?? false}
                                   onCheckedChange={(c) =>
@@ -579,7 +601,7 @@ export default function UserManagement() {
                               ) : null}
                             </TableCell>
                             <TableCell className="text-center">
-                              {!isGroup ? (
+                              {!isGroup && showCrud ? (
                                 <Checkbox
                                   checked={p.create ?? false}
                                   onCheckedChange={(c) =>
@@ -589,7 +611,7 @@ export default function UserManagement() {
                               ) : null}
                             </TableCell>
                             <TableCell className="text-center">
-                              {!isGroup ? (
+                              {!isGroup && showCrud ? (
                                 <Checkbox
                                   checked={p.update ?? false}
                                   onCheckedChange={(c) =>
@@ -599,7 +621,7 @@ export default function UserManagement() {
                               ) : null}
                             </TableCell>
                             <TableCell className="text-center">
-                              {!isGroup ? (
+                              {!isGroup && showCrud ? (
                                 <Checkbox
                                   checked={p.delete ?? false}
                                   onCheckedChange={(c) =>
@@ -868,6 +890,7 @@ export default function UserManagement() {
                       const disabled = isUpdatingPermission;
                       const isGroup = row.kind === "group";
                       const groupId = row.groupId;
+                      const { showRead, showCrud } = permissionControlVisibility(row);
                       return (
                         <TableRow key={`${row.sidebar_label}|${row.sub_label ?? ""}`}>
                           <TableCell className="font-medium">
@@ -893,7 +916,7 @@ export default function UserManagement() {
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex justify-center">
-                              {!isGroup ? (
+                              {!isGroup && showRead ? (
                                 <Checkbox
                                   checked={canView}
                                   disabled={disabled}
@@ -906,7 +929,7 @@ export default function UserManagement() {
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex justify-center">
-                              {!isGroup ? (
+                              {!isGroup && showCrud ? (
                                 <Checkbox
                                   checked={canCreate}
                                   disabled={disabled}
@@ -919,7 +942,7 @@ export default function UserManagement() {
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex justify-center">
-                              {!isGroup ? (
+                              {!isGroup && showCrud ? (
                                 <Checkbox
                                   checked={canUpdate}
                                   disabled={disabled}
@@ -932,7 +955,7 @@ export default function UserManagement() {
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex justify-center">
-                              {!isGroup ? (
+                              {!isGroup && showCrud ? (
                                 <Checkbox
                                   checked={canDelete}
                                   disabled={disabled}

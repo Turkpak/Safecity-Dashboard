@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from api.models import Project, ProjectActivity, ActivityDelayLog, ProgressImage
 from datetime import datetime
 from django.db.models import Prefetch
-
+from ..common_imports import *
 
 def get_delay_info(activity):
     # Read from prefetched cache instead of querying.
@@ -75,7 +75,7 @@ def has_delay(tasks):
 
 
 class ProjectGanttAllView(APIView):
-
+    permission_classes = [IsAuthenticated]
     def get(self, request):
 
         project_id = request.query_params.get("project_id")

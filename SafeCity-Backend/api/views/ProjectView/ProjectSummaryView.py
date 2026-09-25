@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from ..common_imports import *
 
 class ProjectSummaryView(APIView):
-
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         try:
             project_id = request.query_params.get("project_id")

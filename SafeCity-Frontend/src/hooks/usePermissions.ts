@@ -64,6 +64,24 @@ export function usePermissions() {
       getPermission(sidebarLabel, subLabel ?? null).can_view,
     [getPermission]
   );
+  const canCreate = useMemo(
+  () => (sidebarLabel: string, subLabel?: string | null) =>
+    getPermission(sidebarLabel, subLabel ?? null).can_create,
+  [getPermission]
+);
+  const canUpdate = useMemo(
+    () => (sidebarLabel: string, subLabel?: string | null) =>
+      getPermission(sidebarLabel, subLabel ?? null).can_update,
+    [getPermission]
+  );
+  const canDelete = useMemo(
+    () => (sidebarLabel: string, subLabel?: string | null) =>
+      getPermission(sidebarLabel, subLabel ?? null).can_delete,
+    [getPermission]
+  );
 
-  return { getPermission, canView, isSuperAdmin: superAdmin };
+return { getPermission, canView, canCreate, canUpdate, canDelete, isSuperAdmin: superAdmin };
+
+
 }
+

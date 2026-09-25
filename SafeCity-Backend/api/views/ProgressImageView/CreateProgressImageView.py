@@ -4,7 +4,9 @@ from ..common_imports import *
 class ProgressImageCreateViewSet(viewsets.ModelViewSet):
     queryset = ProgressImage.objects.all()
     serializer_class = ProgressImageSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [HasSidebarPermission]
+    sidebar_label = "Citywise Progress"
+    sub_label = None
 
     def create(self, request, *args, **kwargs):
         try:

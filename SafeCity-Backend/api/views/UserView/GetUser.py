@@ -1,24 +1,34 @@
 from ..common_imports import *
 
 class GetUserView(viewsets.ViewSet):
-    queryset = MyUser.objects.all()
-    serializer_class = MyUserSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
         try:
             user_id = request.query_params.get("id")
             email = request.query_params.get("email")
-            
-            if user_id:
-                queryset = MyUser.objects.filter(id=user_id).first()
-                if not queryset:
+            requester = request.user
+            is_admin = requester.role == "super_admin"
+
+            if user_id or email:
+                lookup = {"id": user_id} if user_id else {"email": email}
+                target = MyUser.objects.filter(**lookup).first()
+                if not target:
                     return ApiResponse(
                         status=status.HTTP_404_NOT_FOUND,
                         message="User not found.",
                         http_status=status.HTTP_404_NOT_FOUND
                     ).create_response()
-                serializer = MyUserSerializer(queryset)
+
+                # Non-admins may only look up themselves
+                if not is_admin and target.id != requester.id:
+                    return ApiResponse(
+                        status=status.HTTP_403_FORBIDDEN,
+                        message="You do not have permission to view this user.",
+                        http_status=status.HTTP_403_FORBIDDEN
+                    ).create_response()
+
+                serializer = MyUserSerializer(target)
                 return ApiResponse(
                     status=status.HTTP_200_OK,
                     message="User Found.",
@@ -26,15 +36,10 @@ class GetUserView(viewsets.ViewSet):
                     http_status=status.HTTP_200_OK
                 ).create_response()
 
-            elif email:
-                queryset = MyUser.objects.filter(email=email).first()
-                if not queryset:
-                    return ApiResponse(
-                        status=status.HTTP_404_NOT_FOUND,
-                        message="User not found.",
-                        http_status=status.HTTP_404_NOT_FOUND
-                    ).create_response()
-                serializer = MyUserSerializer(queryset)
+            # No params: bulk listing
+            if not is_admin:
+                # Non-admins get only their own record, not the whole directory
+                serializer = MyUserSerializer(requester)
                 return ApiResponse(
                     status=status.HTTP_200_OK,
                     message="User Found.",
@@ -42,15 +47,15 @@ class GetUserView(viewsets.ViewSet):
                     http_status=status.HTTP_200_OK
                 ).create_response()
 
-            else:
-                queryset = MyUser.objects.all()
-                serializer = MyUserSerializer(queryset, many=True)
-                return ApiResponse(
-                    status=status.HTTP_200_OK,
-                    message="All Users Found.",
-                    data=serializer.data,
-                    http_status=status.HTTP_200_OK
-                ).create_response()
+            queryset = MyUser.objects.all()
+            serializer = MyUserSerializer(queryset, many=True)
+            return ApiResponse(
+                status=status.HTTP_200_OK,
+                message="All Users Found.",
+                data=serializer.data,
+                http_status=status.HTTP_200_OK
+            ).create_response()
+
         except serializers.ValidationError as e:
             return ApiResponse(
                 status=status.HTTP_400_BAD_REQUEST,

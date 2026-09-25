@@ -16,23 +16,30 @@ class UserCreateView(viewsets.ViewSet):
             # Save the user
             user = serializer.save()  # Calls serializer.create()
 
-            # Generate JWT tokens
-            refresh = RefreshToken.for_user(user)
-            token_data = {
-                "refresh": str(refresh),
-                "access": str(refresh.access_token),
-            }
-
-            # Return response
             return ApiResponse(
                 status=status.HTTP_201_CREATED,
-                message="User created successfully.",
-                data={
-                    "user": MyUserSerializer(user).data,
-                    "tokens": token_data
-                },
+                message="User created successfully. Please log in.",
+                data={"user": MyUserSerializer(user).data},
                 http_status=status.HTTP_201_CREATED
             ).create_response()
+
+            # Generate JWT tokens
+            # refresh = RefreshToken.for_user(user)
+            # token_data = {
+            #     "refresh": str(refresh),
+            #     "access": str(refresh.access_token),
+            # }
+
+            # # Return response
+            # return ApiResponse(
+            #     status=status.HTTP_201_CREATED,
+            #     message="User created successfully.",
+            #     data={
+            #         "user": MyUserSerializer(user).data,
+            #         "tokens": token_data
+            #     },
+            #     http_status=status.HTTP_201_CREATED
+            # ).create_response()
 
         except IntegrityError:
             return ApiResponse(

@@ -12,39 +12,23 @@ class StandardResultsSetPagination(PageNumberPagination):
     max_page_size = 100
 
 class ListProjectDocumentView(viewsets.ViewSet):
-    """
-    ViewSet to list Project Documents.
-    Optional query params:
-        ?project=1       → filter by project ID
-        ?activity=2      → filter by activity ID
-        ?page=1          → pagination
-        ?page_size=10    → custom page size
-    """
-
+    permission_classes = [HasSidebarPermission]
+    sidebar_label = "Citywise Progress"
+    sub_label = None
     pagination_class = StandardResultsSetPagination
 
     def list(self, request):
-        # Get query params
         project_id = request.query_params.get("project")
         activity_id = request.query_params.get("activity")
 
-        # Base queryset
         queryset = ProjectDocument.objects.all().order_by("-uploaded_at")
-
-        # Apply filters if present
         if project_id:
             queryset = queryset.filter(project_id=project_id)
         if activity_id:
             queryset = queryset.filter(activity_id=activity_id)
 
-        # Apply pagination
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(queryset, request)
-        serializer = ProjectDocumentSerializer(
-            page, many=True, context={"request": request}
-        )
+        serializer = ProjectDocumentSerializer(page, many=True, context={"request": request})
 
-        return paginator.get_paginated_response({
-            "success": True,
-            "data": serializer.data
-        })
+        return paginator.get_paginated_response({"success": True, "data": serializer.data})

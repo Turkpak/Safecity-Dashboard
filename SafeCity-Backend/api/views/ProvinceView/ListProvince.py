@@ -6,6 +6,8 @@ class ListProvinceView(viewsets.ViewSet):
     permission_classes = [IsAuthenticated, HasSidebarPermission] 
     sidebar_label = "Area Management"
     sub_label = "Province"
+    get_permission_fallback_label = "Project Management"
+    get_permission_fallback_sub_label = "Create"
 
     def list(self, request, *args, **kwargs):
         try:

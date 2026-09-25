@@ -16,17 +16,10 @@ class MyUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = MyUser
         fields = [
-            "id",
-            "email",
-            "full_name",
-            "first_name",
-            "last_name",
-            # "company_name",
-            "role",             # Added role
-            "stakeholder",      # Assign stakeholder if needed
-            "is_active",
-            "password",
+            "id", "email", "full_name", "first_name", "last_name",
+            "role", "stakeholder", "is_active", "password",
         ]
+        read_only_fields = ["role", "is_active"]  # <-- client cannot set these
         extra_kwargs = {
             "password": {"write_only": True},
         }
@@ -35,17 +28,18 @@ class MyUserSerializer(serializers.ModelSerializer):
         return f"{obj.first_name} {obj.last_name}"
 
     def create(self, validated_data):
+        # role/is_active are already stripped by read_only_fields —
+        # never trust validated_data for privilege, always set explicitly here
         password = validated_data.pop("password", None)
-        user = MyUser(**validated_data)
+        validated_data.pop("role", None)
+        validated_data.pop("is_active", None)
 
-        # Set password properly
+        user = MyUser(**validated_data)
+        user.role = "contractor"      # hardcoded lowest-privilege default
+        user.is_staff = False
+        user.is_active = True
         if password:
             user.set_password(password)
-
-        # Super admin automatically sets is_staff=True for admin or themselves
-        if validated_data.get("role") in ["admin", "super_admin"]:
-            user.is_staff = True
-
         user.save()
         return user
 
@@ -104,6 +98,14 @@ class UserPermissionSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'sub_label': {'required': False, 'allow_null': True, 'allow_blank': True},
         }
+
+    def validate(self, attrs):
+        can_view = attrs.get('can_view', getattr(self.instance, 'can_view', False))
+        if not can_view:
+            attrs['can_create'] = False
+            attrs['can_update'] = False
+            attrs['can_delete'] = False
+        return attrs
 
 class UserWithPermissionsSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()

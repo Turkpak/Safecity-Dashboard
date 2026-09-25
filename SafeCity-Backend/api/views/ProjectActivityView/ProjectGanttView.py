@@ -3,13 +3,14 @@ from rest_framework.response import Response
 from rest_framework import status
 from ..common_imports import *
 from api.models import Project, ProjectActivity
-from api.serializers import TaskSerializer  # import your serializer
-
+from api.serializers import TaskSerializer  
+from django.shortcuts import get_object_or_404
 from api.models import TaskDependency
 
 class ProjectGanttView(APIView):
-
+    permission_classes = [IsAuthenticated]
     def get(self, request, project_id):
+        project = get_object_or_404(Project, id=project_id)
         try:
             project = Project.objects.get(id=project_id)
 

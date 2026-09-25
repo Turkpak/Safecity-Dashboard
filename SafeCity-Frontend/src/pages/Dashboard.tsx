@@ -340,29 +340,29 @@ export default function Dashboard() {
 
   useEffect(() => {
     const scopeResult = getCurrentScopeRows(currentScopeContext);
-    console.log("[Physical Scope Debug]", {
-      viewType,
-      level: currentScopeContext.level,
-      scopeType: scopeResult.scopeType,
-      selectedDivisionId: currentScopeContext.selectedDivisionId,
-      selectedDistrictId: currentScopeContext.selectedDistrictId,
-      selectedTehsilId: currentScopeContext.selectedTehsilId,
-      selectedProjectForDetails: selectedProjectForDetails?.id,
-      rowCount: currentScopeRowsForProgress.length,
-      rows: currentScopeRowsForProgress.map((r: any) => ({
-        id: r.id,
-        name:
-          r.name ??
-          r.division_name ??
-          r.zone_name ??
-          r.district_name ??
-          r.circle_name ??
-          r.tehsil_name ??
-          r.project_name,
-        physical_progress: r.physical_progress,
-      })),
-      currentScopePhysical,
-    });
+    // console.log("[Physical Scope Debug]", {
+    //   viewType,
+    //   level: currentScopeContext.level,
+    //   scopeType: scopeResult.scopeType,
+    //   selectedDivisionId: currentScopeContext.selectedDivisionId,
+    //   selectedDistrictId: currentScopeContext.selectedDistrictId,
+    //   selectedTehsilId: currentScopeContext.selectedTehsilId,
+    //   selectedProjectForDetails: selectedProjectForDetails?.id,
+    //   rowCount: currentScopeRowsForProgress.length,
+    //   rows: currentScopeRowsForProgress.map((r: any) => ({
+    //     id: r.id,
+    //     name:
+    //       r.name ??
+    //       r.division_name ??
+    //       r.zone_name ??
+    //       r.district_name ??
+    //       r.circle_name ??
+    //       r.tehsil_name ??
+    //       r.project_name,
+    //     physical_progress: r.physical_progress,
+    //   })),
+    //   currentScopePhysical,
+    // });
   }, [viewType, currentScopeContext, selectedProjectForDetails, currentScopeRowsForProgress, currentScopePhysical]);
 
   const toSlug = (value: string) =>

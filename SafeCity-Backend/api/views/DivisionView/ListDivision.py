@@ -4,6 +4,8 @@ class ListDivisionView(viewsets.ViewSet):
     permission_classes = [IsAuthenticated, HasSidebarPermission] 
     sidebar_label = "Area Management"
     sub_label = "Division"
+    get_permission_fallback_label = "Project Management"
+    get_permission_fallback_sub_label = "Create"
     def list(self, request, *args, **kwargs):
         try:
             division_id = request.query_params.get("id")

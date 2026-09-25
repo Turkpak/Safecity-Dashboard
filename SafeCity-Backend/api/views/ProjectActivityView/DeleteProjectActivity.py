@@ -3,7 +3,9 @@ from ..common_imports import *
 class ProjectActivityDeleteView(viewsets.ViewSet):
     queryset = ProjectActivity.objects.all()
     serializer_class = ProjectActivitySerializer
-    permission_classes = [AllowAny]
+    permission_classes = [HasSidebarPermission]
+    sidebar_label = "Citywise Progress"
+    sub_label = None
 
     def destroy(self, request, *args, **kwargs):
         activity_id = kwargs.get('pk')

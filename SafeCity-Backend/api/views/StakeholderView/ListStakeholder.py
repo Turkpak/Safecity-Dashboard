@@ -5,6 +5,8 @@ class ListStakeholderView(viewsets.ViewSet):
     serializer_class = StakeholderSerializer
     permission_classes = [IsAuthenticated, HasSidebarPermission] 
     sidebar_label = "Stakeholders"
+    get_permission_fallback_label = "Project Management"
+    get_permission_fallback_sub_label = "Create"
 
     def list(self, request, *args, **kwargs):
         stakeholder_id = request.query_params.get("id")

@@ -4,6 +4,9 @@ from api.serializers import ProgressImageSerializer
 
 
 class ListProgressImageView(viewsets.ViewSet):
+    permission_classes = [HasSidebarPermission]
+    sidebar_label = "Citywise Progress"
+    sub_label = None
 
     def list(self, request, *args, **kwargs):
         try:
@@ -30,17 +33,9 @@ class ListProgressImageView(viewsets.ViewSet):
                     http_status=status.HTTP_200_OK
                 ).create_response()
 
-            # ✅ Case 2: Filter by activity (MOST IMPORTANT)
+            # ✅ Case 2: Filter by activity
             elif activity_id:
                 images = ProgressImage.objects.filter(activity_id=activity_id)
-
-                if not images.exists():
-                    return ApiResponse(
-                        status=status.HTTP_404_NOT_FOUND,
-                        message="No images found for this activity.",
-                        http_status=status.HTTP_404_NOT_FOUND
-                    ).create_response()
-
                 serializer = ProgressImageSerializer(images, many=True)
                 return ApiResponse(
                     status=status.HTTP_200_OK,
@@ -52,14 +47,6 @@ class ListProgressImageView(viewsets.ViewSet):
             # ✅ Case 3: Filter by project
             elif project_id:
                 images = ProgressImage.objects.filter(project_id=project_id)
-
-                if not images.exists():
-                    return ApiResponse(
-                        status=status.HTTP_404_NOT_FOUND,
-                        message="No images found for this project.",
-                        http_status=status.HTTP_404_NOT_FOUND
-                    ).create_response()
-
                 serializer = ProgressImageSerializer(images, many=True)
                 return ApiResponse(
                     status=status.HTTP_200_OK,
@@ -92,6 +79,5 @@ class ListProgressImageView(viewsets.ViewSet):
             return ApiResponse(
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 message="Server error.",
-                data=str(e),
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             ).create_response()
