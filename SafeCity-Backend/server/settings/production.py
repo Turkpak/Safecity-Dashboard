@@ -5,9 +5,9 @@ import os
 DEBUG = False
 
 ALLOWED_HOSTS = [
-    "sdasurvey.cloud",
-    "www.sdasurvey.cloud",
-    "72.61.229.127",
+    "safecity.nespakprogresscenter.com",
+    "www.safecity.nespakprogresscenter.com",
+    "10.1.10.1",
     "localhost",
     "127.0.0.1"
 ]
@@ -19,10 +19,10 @@ SECRET_KEY = secrets.get("SECRET_KEY", "dev-secret-key")
 DATABASES = {
     "default": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": secrets.get("DB_NAME", "skardusurvey_db"),
-        "USER": secrets.get("DB_USER", "skardusurvey_user"),
-        "PASSWORD": secrets.get("DB_PASSWORD", "skardusurvey123"),
-        "HOST": "72.61.229.127",
+        "NAME": secrets.get("DB_NAME", "safecity"),
+        "USER": secrets.get("DB_USER", "postgres"),
+        "PASSWORD": secrets.get("DB_PASSWORD", "Postgres"),
+        "HOST": "10.1.10.1",
         "PORT": "5432",
     }
 }
@@ -41,8 +41,21 @@ LOGGING = {
     },
 }
 
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOWED_ORIGINS = [
+    "https://safecity.nespakprogresscenter.com",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://safecity.nespakprogresscenter.com",
+]
 SECURE_BROWSER_XSS_FILTER = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
