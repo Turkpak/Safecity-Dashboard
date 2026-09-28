@@ -1,36 +1,53 @@
 import { apiUrl } from "./config";
 import type { ApiEnvelope } from "./types";
 
-const AUTH_TOKEN_KEY = "safecity_access_token";
-const REFRESH_TOKEN_KEY = "safecity_refresh_token";
-
-export function getAccessToken(): string | null {
-  return localStorage.getItem(AUTH_TOKEN_KEY);
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const cookie = document.cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`));
+  return cookie ? decodeURIComponent(cookie.slice(name.length + 1)) : null;
 }
 
-export function getRefreshToken(): string | null {
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
-}
-
-export function setTokens(access: string, refresh?: string | null): void {
-  localStorage.setItem(AUTH_TOKEN_KEY, access);
-  if (refresh) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
+async function ensureCsrfCookie(): Promise<void> {
+  if (!getCookie("csrftoken")) {
+    await fetch(apiUrl("csrf/"), { credentials: "include" });
   }
 }
 
-export function clearTokens(): void {
-  localStorage.removeItem(AUTH_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-}
+export async function fetchWithSession(url: string, init: RequestInit = {}): Promise<Response> {
+  const method = (init.method ?? "GET").toUpperCase();
+  const isUnsafe = !["GET", "HEAD", "OPTIONS", "TRACE"].includes(method);
+  if (isUnsafe) await ensureCsrfCookie();
 
-function getAuthHeaders(): Record<string, string> {
-  const token = getAccessToken();
-  const headers: Record<string, string> = {};
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+  const headers = new Headers(init.headers);
+  const csrfToken = getCookie("csrftoken");
+  if (isUnsafe && csrfToken) headers.set("X-CSRFToken", csrfToken);
+
+  const requestInit: RequestInit = { ...init, headers, credentials: "include" };
+  let response = await fetch(url, requestInit);
+  const pathname = new URL(url, window.location.href).pathname;
+  const isAuthEndpoint = pathname.includes("/login-user/");
+
+  if (response.status === 401 && !isAuthEndpoint) {
+    await ensureCsrfCookie();
+    const refreshHeaders = new Headers();
+    const currentCsrfToken = getCookie("csrftoken");
+    if (currentCsrfToken) refreshHeaders.set("X-CSRFToken", currentCsrfToken);
+    const refreshResponse = await fetch(apiUrl("login-user/refresh/"), {
+      method: "POST",
+      headers: refreshHeaders,
+      credentials: "include",
+    });
+    if (refreshResponse.ok) {
+      response = await fetch(url, requestInit);
+    } else if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("safecity:session-expired"));
+    }
   }
-  return headers;
+
+  return response;
 }
 
 async function parseResponse<T>(res: Response): Promise<T> {
@@ -71,11 +88,8 @@ export async function requestRaw<T = unknown>(
 ): Promise<T> {
   const { method = "GET", body, headers = {}, formData } = options;
   const url = apiUrl(path);
-  const authHeaders = getAuthHeaders();
-
   const isJson = !formData && body !== undefined;
   const requestHeaders: Record<string, string> = {
-    ...authHeaders,
     ...headers,
   };
   if (isJson) {
@@ -86,11 +100,10 @@ export async function requestRaw<T = unknown>(
   if (formData) requestBody = formData;
   else if (body !== undefined) requestBody = JSON.stringify(body);
 
-  const res = await fetch(url, {
+  const res = await fetchWithSession(url, {
     method,
     headers: requestHeaders,
     body: requestBody,
-    credentials: "include",
   });
 
   const text = await res.text();
@@ -115,7 +128,7 @@ export interface RequestOptions {
 }
 
 /**
- * Call the backend API. Uses Authorization: Bearer if token is present.
+ * Call the backend API using HttpOnly authentication cookies.
  * Throws on non-2xx or when backend returns status >= 400 in envelope.
  * Returns the `data` part of the API response.
  */
@@ -125,11 +138,8 @@ export async function request<T = unknown>(
 ): Promise<T> {
   const { method = "GET", body, headers = {}, formData } = options;
   const url = apiUrl(path);
-  const authHeaders = getAuthHeaders();
-
   const isJson = !formData && body !== undefined;
   const requestHeaders: Record<string, string> = {
-    ...authHeaders,
     ...headers,
   };
   if (isJson) {
@@ -143,11 +153,10 @@ export async function request<T = unknown>(
     requestBody = JSON.stringify(body);
   }
 
-  const res = await fetch(url, {
+  const res = await fetchWithSession(url, {
     method,
     headers: requestHeaders,
     body: requestBody,
-    credentials: "include",
   });
 
   return parseResponse<T>(res);

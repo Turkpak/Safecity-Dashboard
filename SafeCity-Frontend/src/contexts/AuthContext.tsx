@@ -7,18 +7,16 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
-import { getAccessToken, clearTokens } from "@/api/client";
+import { logout as apiLogout } from "@/api/auth";
 import type { LoginResponse } from "@/api/types";
 
 const USER_STORAGE_KEY = "safecity_user";
 const SESSION_EXPIRES_AT_KEY = "safecity_session_expires_at";
 const DEFAULT_SESSION_MS = 60 * 60 * 1000; // 60 minutes (match backend ACCESS_TOKEN_LIFETIME)
 
-/** All localStorage keys used for auth/session — clear every one on logout */
+/** Nonsecret local state used for navigation and session expiry. */
 const AUTH_STORAGE_KEYS = [
   "safecity_user",
-  "safecity_access_token",
-  "safecity_refresh_token",
   "userRole",
   "safecity_session_expires_at",
 ] as const;
@@ -26,7 +24,17 @@ const AUTH_STORAGE_KEYS = [
 function getStoredUser(): LoginResponse | null {
   try {
     const raw = localStorage.getItem(USER_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as LoginResponse) : null;
+    if (!raw) return null;
+    const stored = JSON.parse(raw) as LoginResponse & Record<string, unknown>;
+    let changed = false;
+    for (const key of ["token", "access", "refresh"]) {
+      if (key in stored) {
+        delete stored[key];
+        changed = true;
+      }
+    }
+    if (changed) localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(stored));
+    return stored;
   } catch {
     return null;
   }
@@ -40,11 +48,8 @@ function getSessionExpiresAt(): number | null {
 }
 
 function isSessionExpired(): boolean {
-  const token = getAccessToken();
-  if (!token) return true;
   const expiresAt = getSessionExpiresAt();
-  if (!expiresAt) return false; // backwards compatible for existing logins
-  return Date.now() >= expiresAt;
+  return expiresAt !== null && Date.now() >= expiresAt;
 }
 
 interface AuthContextValue {
@@ -60,14 +65,14 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<LoginResponse | null>(() => {
     if (typeof window === "undefined") return null;
-    const token = getAccessToken();
-    if (token && isSessionExpired()) {
+    localStorage.removeItem("safecity_access_token");
+    localStorage.removeItem("safecity_refresh_token");
+    if (isSessionExpired()) {
       AUTH_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
-      clearTokens();
       return null;
     }
     const stored = getStoredUser();
-    if (!token || !stored) return null;
+    if (!stored) return null;
     return stored;
   });
 
@@ -86,16 +91,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     setUser(null);
-    clearTokens();
     AUTH_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+    void apiLogout().catch(() => undefined);
   }, [setUser]);
 
   useEffect(() => {
     const syncAuthState = () => {
-      const token = getAccessToken();
-      if (!token || isSessionExpired()) {
+      if (!getStoredUser() || isSessionExpired()) {
         setUserState(null);
-        clearTokens();
         AUTH_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
       }
     };
@@ -108,11 +111,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         syncAuthState();
       }
     };
+    const onSessionExpired = () => {
+      setUserState(null);
+      AUTH_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+    };
     window.addEventListener("storage", onStorage);
+    window.addEventListener("safecity:session-expired", onSessionExpired);
 
     const interval = window.setInterval(syncAuthState, 1000);
     return () => {
       window.removeEventListener("storage", onStorage);
+      window.removeEventListener("safecity:session-expired", onSessionExpired);
       window.clearInterval(interval);
     };
   }, []);
@@ -120,9 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      // Token is the source of truth for API authentication.
-      // User details may load slightly later (or be missing in storage during first login).
-      isAuthenticated: !!getAccessToken() && !isSessionExpired(),
+      isAuthenticated: !!user && !isSessionExpired(),
       setUser,
       startSession,
       logout,

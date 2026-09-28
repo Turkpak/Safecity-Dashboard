@@ -79,6 +79,8 @@ router.register(r'update-project-document', UpdateProjectDocumentView, basename=
 
 urlpatterns = [
 
+    path('csrf/', csrf_token_view, name='csrf-token'),
+
     path('api/', include(router.urls)),
 
     path('', include(router.urls)),

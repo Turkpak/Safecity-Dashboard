@@ -29,6 +29,7 @@ import { createProjectDocument, listProjectDocuments, updateProjectDocument } fr
 import { mediaUrl } from "@/api/config";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/usePermissions";
 
 
 import {
@@ -80,6 +81,9 @@ export function MilestoneDetailsPanel({
   const [tab, setTab] = useState<"gantt" | "wbs" | "photos" | "logs">("gantt");
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const dashboardPermission = usePermissions().getPermission("Citywise Progress", null);
+  const canManageMedia = dashboardPermission.can_create || dashboardPermission.can_update;
+  const canUpdateMedia = dashboardPermission.can_update;
 
   // Dialogs opened from Gantt activity options (three dots)
   const [addPhotoDialogOpen, setAddPhotoDialogOpen] = useState(false);
@@ -310,7 +314,7 @@ export function MilestoneDetailsPanel({
                   delayLogs={delayLogs}
                   onAddDelayLog={handleAddDelayLog}
                   onDeleteDelayLog={handleDeleteDelayLog}
-                  onOpenAddPhoto={openAddPhotoFromGantt}
+                  onOpenAddPhoto={canManageMedia ? openAddPhotoFromGantt : undefined}
                 />
                 {/* Overall Progress Summary with Delay Impact - beneath Gantt chart */}
                 {/* Delay Logs removed (were hardcoded) */}
@@ -435,7 +439,7 @@ export function MilestoneDetailsPanel({
                   tasks={flatGanttTasks as any}
                   projectName={milestoneTitle}
                   projectId={ganttProjectId}
-                  onOpenAddDocument={openAddDocumentFromGantt}
+                  onOpenAddDocument={canManageMedia ? openAddDocumentFromGantt : undefined}
                   onDelayLogSaved={onProjectGanttRefresh}
                   onProgressSaved={onProjectGanttRefresh}
                 />
@@ -449,7 +453,7 @@ export function MilestoneDetailsPanel({
                     delayLogs={delayLogs}
                     onAddDelayLog={handleAddDelayLog}
                     onDeleteDelayLog={handleDeleteDelayLog}
-                    onOpenAddPhoto={openAddPhotoFromGantt}
+                    onOpenAddPhoto={canManageMedia ? openAddPhotoFromGantt : undefined}
                   />
                   {/* Delay Logs removed (were hardcoded) */}
                 </>
@@ -588,7 +592,7 @@ export function MilestoneDetailsPanel({
                                 className="w-full h-full object-cover"
                                 loading="lazy"
                               />
-                              <div className="absolute top-1 right-1 flex gap-1">
+                              {canManageMedia && <div className="absolute top-1 right-1 flex gap-1">
                                 <Button
                                   type="button"
                                   size="icon"
@@ -614,7 +618,7 @@ export function MilestoneDetailsPanel({
                                 >
                                   <Download className="h-3.5 w-3.5" />
                                 </Button>
-                              </div>
+                              </div>}
                             </div>
                             <CardContent className="p-3 space-y-2">
                               <div className="text-sm font-semibold leading-snug line-clamp-2" title={item.caption ?? ""}>
@@ -637,7 +641,7 @@ export function MilestoneDetailsPanel({
                                 >
                                   Activity #{item.activity}
                                 </Button>
-                                <Button
+                                {canUpdateMedia && <Button
                                   type="button"
                                   size="sm"
                                   variant="outline"
@@ -659,7 +663,7 @@ export function MilestoneDetailsPanel({
                                   }}
                                 >
                                   Update
-                                </Button>
+                                </Button>}
                               </div>
                             </CardContent>
                           </Card>
@@ -715,7 +719,7 @@ export function MilestoneDetailsPanel({
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0 pl-6 sm:pl-0">
+                            {canManageMedia && <div className="flex items-center gap-1 shrink-0 pl-6 sm:pl-0">
                               {href ? (
                                 <Button type="button" size="sm" variant="ghost" className="h-8 gap-1" asChild>
                                   <a href={href} target="_blank" rel="noreferrer">
@@ -723,7 +727,7 @@ export function MilestoneDetailsPanel({
                                   </a>
                                 </Button>
                               ) : null}
-                              <Button
+                              {canUpdateMedia && <Button
                                 type="button"
                                 size="sm"
                                 variant="outline"
@@ -741,8 +745,8 @@ export function MilestoneDetailsPanel({
                                 }}
                               >
                                 Update
-                              </Button>
-                            </div>
+                              </Button>}
+                            </div>}
                           </div>
                         );
                       })}

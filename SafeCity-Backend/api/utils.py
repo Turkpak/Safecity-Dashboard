@@ -19,6 +19,55 @@ from rest_framework.pagination import PageNumberPagination
 from django.utils.text import slugify
 from datetime import datetime, date
 from django.db.models import Avg, Max, Min
+from django.conf import settings
+from django.middleware.csrf import CsrfViewMiddleware
+from django.core.exceptions import PermissionDenied
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.settings import api_settings
+
+ACCESS_TOKEN_COOKIE = "safecity_access_token"
+REFRESH_TOKEN_COOKIE = "safecity_refresh_token"
+
+
+class CSRFCheck(CsrfViewMiddleware):
+    def _reject(self, request, reason):
+        return reason
+
+
+def enforce_csrf(request):
+    check = CSRFCheck(lambda request: None)
+    check.process_request(request)
+    reason = check.process_view(request, lambda request: None, (), {})
+    if reason:
+        raise PermissionDenied(f"CSRF Failed: {reason}")
+
+
+class CookieJWTAuthentication(JWTAuthentication):
+    def authenticate(self, request):
+        raw_token = request.COOKIES.get(ACCESS_TOKEN_COOKIE)
+        if not raw_token:
+            return None
+
+        validated_token = self.get_validated_token(raw_token)
+        enforce_csrf(request)
+        return self.get_user(validated_token), validated_token
+
+
+def set_auth_cookies(response, tokens):
+    cookie_options = {
+        "httponly": True,
+        "secure": not settings.DEBUG,
+        "samesite": "Strict",
+        "path": "/",
+    }
+    response.set_cookie(ACCESS_TOKEN_COOKIE, tokens["access"], max_age=int(api_settings.ACCESS_TOKEN_LIFETIME.total_seconds()), **cookie_options)
+    if "refresh" in tokens:
+        response.set_cookie(REFRESH_TOKEN_COOKIE, tokens["refresh"], max_age=int(api_settings.REFRESH_TOKEN_LIFETIME.total_seconds()), **cookie_options)
+
+
+def clear_auth_cookies(response):
+    response.delete_cookie(ACCESS_TOKEN_COOKIE, path="/", samesite="Strict")
+    response.delete_cookie(REFRESH_TOKEN_COOKIE, path="/", samesite="Strict")
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)

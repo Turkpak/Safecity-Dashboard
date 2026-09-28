@@ -37,9 +37,6 @@ export interface LoginResponse {
   first_name: string;
   last_name: string;
   id: number;
-  token?: string;
-  refresh?: string;
-  access?: string;
   is_admin?: boolean;
   /** From backend: super_admin | contractor | consultant */
   role?: string;
