@@ -4,7 +4,9 @@ from ..common_imports import *
 class ProjectActivityCreateView(viewsets.ModelViewSet):
     queryset = ProjectActivity.objects.all()
     serializer_class = ProjectActivitySerializer
-    permission_classes = [AllowAny]
+    permission_classes = [HasSidebarPermission]
+    sidebar_label = "Project Management"
+    sub_label = "Create"
 
     def create(self, request, *args, **kwargs):
         try:

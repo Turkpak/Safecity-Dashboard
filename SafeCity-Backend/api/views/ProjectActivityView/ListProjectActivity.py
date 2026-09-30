@@ -2,6 +2,9 @@ from ..common_imports import *
 from rest_framework.decorators import action
 
 class ListProjectActivityView(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated, HasSidebarPermission]
+    sidebar_label = "Project Management"
+    sub_label = "View"
     def list(self, request):
         project_id = request.query_params.get("project")
         if project_id:

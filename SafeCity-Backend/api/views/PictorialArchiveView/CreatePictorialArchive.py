@@ -4,7 +4,9 @@ class PictorialArchiveCreateView(viewsets.ViewSet):
     parser_classes = [MultiPartParser, FormParser]
     queryset = PictorialArchive.objects.all()
     serializer_class = PictorialArchiveSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [HasSidebarPermission]
+    sidebar_label = "Project Management"
+    sub_label = "Create"
 
     def create(self, request, *args, **kwargs):
         try:

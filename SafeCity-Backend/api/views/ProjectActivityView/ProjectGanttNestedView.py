@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from api.models import Project, ProjectActivity, ActivityDelayLog, ProgressImage, ProjectDocument
 from datetime import datetime
-
+from ..common_imports import *
 def get_activity_images(activity):
     images = ProgressImage.objects.filter(activity=activity)
     image_list = []
@@ -89,7 +89,9 @@ def has_delay(tasks):
     return False
 
 class ProjectGanttNestedView(APIView):
-
+    permission_classes = [IsAuthenticated, HasSidebarPermission]
+    sidebar_label = "Project Management"
+    sub_label = "View"
     def get(self, request, project_id):
         project = get_object_or_404(Project, id=project_id)
 

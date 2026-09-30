@@ -3,7 +3,9 @@ from api.models import ProgressImage
 
 
 class DeleteProgressImageView(viewsets.ViewSet):
-
+    permission_classes = [IsAuthenticated, HasSidebarPermission]
+    sidebar_label = "Project Management"
+    sub_label = "View"
     def destroy(self, request, pk=None):
         try:
             image = ProgressImage.objects.filter(pk=pk).first()

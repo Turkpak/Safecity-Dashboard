@@ -3,7 +3,9 @@ from ..common_imports import *
 class PictorialArchiveUpdateView(viewsets.ViewSet):
     queryset = PictorialArchive.objects.all()
     serializer_class = PictorialArchiveSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [HasSidebarPermission]
+    sidebar_label = "Project Management"
+    sub_label = "Create" 
 
     def update(self, request, *args, **kwargs):
         archive_id = kwargs.get('pk')

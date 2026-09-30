@@ -4,7 +4,9 @@ from api.serializers import ProgressImageSerializer
 
 
 class ProgressImageUpdateView(viewsets.ViewSet):
-
+    permission_classes = [IsAuthenticated, HasSidebarPermission]
+    sidebar_label = "Project Management"
+    sub_label = "View"
     def update(self, request, pk=None):
         try:
             image = ProgressImage.objects.get(pk=pk)

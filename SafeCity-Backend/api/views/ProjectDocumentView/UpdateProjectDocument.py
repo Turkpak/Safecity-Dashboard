@@ -6,7 +6,9 @@ from api.serializers import ProjectDocumentSerializer
 
 
 class UpdateProjectDocumentView(viewsets.ViewSet):
-
+    permission_classes = [IsAuthenticated, HasSidebarPermission]
+    sidebar_label = "Project Management"
+    sub_label = "View"
     def update(self, request, pk=None):
         try:
             document = ProjectDocument.objects.get(pk=pk)

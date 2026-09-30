@@ -3,7 +3,9 @@ from ..common_imports import *
 class ListPictorialArchiveView(viewsets.ViewSet):
     queryset = PictorialArchive.objects.all()
     serializer_class = PictorialArchiveSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [HasSidebarPermission]
+    sidebar_label = "Project Management"
+    sub_label = "View"
 
     def list(self, request, *args, **kwargs):
         try:

@@ -1,6 +1,8 @@
 from ..common_imports import *
 class ActivityDelayLogUpdateView(APIView):
-
+    permission_classes = [IsAuthenticated, HasSidebarPermission]
+    sidebar_label = "Project Management"
+    sub_label = "View"
     def put(self, request, pk):
         try:
             instance = ActivityDelayLog.objects.get(pk=pk)
