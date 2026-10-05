@@ -246,8 +246,14 @@ def get_user_name_token(token):
 
 class IsAdminUserForCreate(BasePermission):
     def has_permission(self, request, view):
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return False
+
         if request.method == 'POST':
-            return request.user and request.user.is_admin  
+            return user.role == 'super_admin'
+
         return True
 
 

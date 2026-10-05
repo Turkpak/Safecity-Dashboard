@@ -5,7 +5,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from ..common_imports import *  # your common imports like ApiResponse, MyUserSerializer
 
 class UserCreateView(viewsets.ViewSet):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAdminUserForCreate]
 
     def create(self, request):
         try:
@@ -14,7 +14,7 @@ class UserCreateView(viewsets.ViewSet):
             serializer.is_valid(raise_exception=True)
 
             # Save the user
-            user = serializer.save()  # Calls serializer.create()
+            user = serializer.save()  
 
             return ApiResponse(
                 status=status.HTTP_201_CREATED,
