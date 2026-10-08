@@ -5,9 +5,6 @@ import os
 DEBUG = False
 
 ALLOWED_HOSTS = [
-    "safecity.nespakprogresscenter.com",
-    "www.safecity.nespakprogresscenter.com",
-    "10.1.10.1",
     "localhost",
     "127.0.0.1"
 ]
@@ -22,7 +19,7 @@ DATABASES = {
         "NAME": secrets.get("DB_NAME", "safecity"),
         "USER": secrets.get("DB_USER", "postgres"),
         "PASSWORD": secrets.get("DB_PASSWORD", "Postgres"),
-        "HOST": "10.1.10.1",
+        "HOST": "localhost",
         "PORT": "5432",
     }
 }
@@ -50,13 +47,15 @@ MEDIA_ROOT = BASE_DIR / "media"
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
-    "https://safecity.nespakprogresscenter.com",
+    
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://safecity.nespakprogresscenter.com",
+    
 ]
 SECURE_BROWSER_XSS_FILTER = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 X_FRAME_OPTIONS = "DENY"
+
+

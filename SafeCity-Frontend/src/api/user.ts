@@ -1,4 +1,4 @@
-import { get, post, put } from "./client";
+import { get, post, put, patch } from "./client";
 import type {
   UserCreateInput,
   UserListItem,
@@ -89,4 +89,14 @@ export async function updateUserPermission(
     body.sub_label = payload.sub_label;
   }
   return put(`${USER_PERMISSIONS}${id}/`, body);
+}
+
+
+export async function updateUserStatus(
+  id: number,
+  is_active: boolean
+): Promise<UserListItem> {
+  return patch<UserListItem>(`update-user-status/${id}/`, {
+    is_active,
+  });
 }

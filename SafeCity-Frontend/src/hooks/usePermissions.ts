@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import type { UserPermissionItem } from "@/api/types";
+import type { LoginPermission } from "@/api/types";
 
 export interface PagePermission {
   can_view: boolean;
@@ -30,7 +30,7 @@ export function usePermissions() {
   const { user } = useAuth();
   const role = (user?.role ?? "").trim().toLowerCase();
   const superAdmin = isSuperAdmin(user?.role ?? undefined);
-  const permissions: UserPermissionItem[] = user?.permissions ?? [];
+  const permissions: LoginPermission[] = user?.permissions ?? [];
 
   const getPermission = useMemo(
     () =>
@@ -84,4 +84,3 @@ return { getPermission, canView, canCreate, canUpdate, canDelete, isSuperAdmin: 
 
 
 }
-

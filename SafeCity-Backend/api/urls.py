@@ -5,7 +5,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from api.views import *
 from api.views.DashboardView import DashboardPageDataView
-
+from api.captcha import CaptchaView
 router = DefaultRouter()
 
 #--------------------------------- User View ---------------------------------
@@ -14,6 +14,7 @@ router.register(r'login-user', UserLoginDashboardCreateView, basename='login-use
 router.register(r'get-user', GetUserView, basename='get-user')
 router.register(r'update-user', UserUpdateView, basename='update-user')
 router.register(r'user-permissions', UserPermissionViewSet, basename='user-permissions')
+router.register(r'update-user-status', UserStatusUpdateView, basename='update-user-status')
 
 #--------------------------------- Province View ---------------------------------
 router.register(r'create-province', ProvinceCreateView, basename='create-province')
@@ -84,6 +85,8 @@ urlpatterns = [
     path('api/', include(router.urls)),
 
     path('', include(router.urls)),
+
+    path("captcha/", CaptchaView.as_view(), name="captcha"),
 
     # ✅ Gantt API
     path('project-gantt/<int:project_id>/', ProjectGanttView.as_view(), name='project-gantt'),

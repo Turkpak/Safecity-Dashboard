@@ -41,6 +41,7 @@ def get_secret(key, default=None):
 # SECRET_KEY — fallback if not found in env
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", secrets.get("SECRET_KEY", "dev-secret-key"))
 
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
@@ -51,7 +52,6 @@ SECRET_KEY = 'django-insecure-xfg45)2$253-9o8ts*_006iv7o%=3og$sx(@q9x9^vhv_(_7d_
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    # "sdasurvey.cloud", "www.sdasurvey.cloud", "72.61.229.127",
       "localhost", "127.0.0.1" ]
 
 AUTH_PROFILE_MODULE = "api.MyUser"
@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     'rest_framework_gis',
     'rest_framework_simplejwt.token_blacklist',
     "corsheaders",
+    "captcha",
     'api',
 ]
 
@@ -87,15 +88,27 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Vite default
+    "http://localhost:5173",  
     "http://127.0.0.1:5173",
-    "http://localhost:5000",  # Frontend dev (package.json dev port)
+    "http://localhost:5001",  
     "http://127.0.0.1:5000",
-    # "https://sdasurvey.cloud",
-    # "https://www.sdasurvey.cloud/",
+
 ]
+CORS_ALLOW_CREDENTIALS = True
+
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SAMESITE = "Lax"
+
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SAMESITE = "Lax"
 
 REST_FRAMEWORK = {
+    'DEFAULT_THROTTLE_RATES': {
+        'login': '5/minute',
+        'user_create': '30/hour',
+    },
     'DEFAULT_AUTHENTICATION_CLASSES': [
         # 'rest_framework.authentication.SessionAuthentication',
         # 'rest_framework.authentication.BasicAuthentication',

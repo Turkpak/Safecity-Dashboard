@@ -1,74 +1,113 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
     Lock,
     Mail,
-    User,
     ArrowRight,
     Eye,
     EyeOff,
     Map as MapIcon,
     TrendingUp,
     BarChart3,
-    CheckCircle2,
     ShieldCheck,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { login as apiLogin } from "@/api/auth";
+import {
+    getCaptcha,
+    getCurrentUser,
+    login as apiLogin,
+} from "@/api/auth";
+
 
 export default function AuthPage() {
     const [, setLocation] = useLocation();
-    const { setUser, startSession } = useAuth();
+    const { setUser } = useAuth();
     const { toast } = useToast();
-    const [isLogin, setIsLogin] = useState(true);
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [stakeholderType, setStakeholderType] = useState<string>("Client");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [captchaKey, setCaptchaKey] = useState("");
+    const [captchaImage, setCaptchaImage] = useState("");
+    const [captchaValue, setCaptchaValue] = useState("");
+    const [isCaptchaLoading, setIsCaptchaLoading] = useState(true);
+
+
+    const loadCaptcha = useCallback(async () => {
+        try {
+            setIsCaptchaLoading(true);
+
+            const captcha = await getCaptcha();
+
+            setCaptchaKey(captcha.key);
+            setCaptchaImage(captcha.image_url);
+            setCaptchaValue("");
+        } catch (error) {
+            toast({
+                title: "CAPTCHA error",
+                description: "Unable to load security verification.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsCaptchaLoading(false);
+        }
+    }, [toast]);
+
+    useEffect(() => {
+        loadCaptcha();
+    }, [loadCaptcha]);
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!captchaKey || !captchaValue.trim()) {
+            toast({
+                title: "CAPTCHA required",
+                description: "Please enter the characters shown in the CAPTCHA.",
+                variant: "destructive",
+            });
+            return;
+        }
+
         setIsLoading(true);
-        if (isLogin) {
-            try {
-                const data = await apiLogin({ email, password });
-                setUser(data);
-                startSession(); // 15 minutes from login
-                const roleForNav = data.role ?? (data.is_admin ? "admin" : (data.stakeholder_type?.toLowerCase() || stakeholderType?.toLowerCase() || ""));
-                localStorage.setItem("userRole", roleForNav);
-                setLocation("/");
-                toast({ title: "Welcome", description: "Login successful." });
-            } catch (err) {
-                toast({
-                    title: "Login failed",
-                    description: err instanceof Error ? err.message : "Invalid credentials",
-                    variant: "destructive",
-                });
-            } finally {
-                setIsLoading(false);
-            }
-        } else {
-            // Register: optional future wire to create-user API
-            localStorage.setItem("userRole", stakeholderType);
-            setTimeout(() => {
-                setIsLoading(false);
-                setLocation("/");
-                toast({ title: "Request submitted", description: "Registration requests are processed within 24-48 hours." });
-            }, 1500);
+
+        try {
+            await apiLogin({
+                email,
+                password,
+                captcha_key: captchaKey,
+                captcha_value: captchaValue,
+            });
+
+            const currentUser = await getCurrentUser();
+
+            setUser(currentUser);
+            setLocation("/");
+
+            toast({
+                title: "Welcome",
+                description: "Login successful.",
+            });
+        } catch (err) {
+            toast({
+                title: "Login failed",
+                description:
+                    err instanceof Error
+                        ? err.message
+                        : "Invalid credentials or CAPTCHA.",
+                variant: "destructive",
+            });
+
+            // Get a fresh CAPTCHA after every failed login
+            await loadCaptcha();
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -189,193 +228,132 @@ export default function AuthPage() {
                     <div className="mb-12">
                         <div className="space-y-2">
                             <motion.h2
-                                key={isLogin ? 'login-head' : 'signup-head'}
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 className="text-4xl font-heading font-black text-primary tracking-tight"
                             >
-                                {isLogin ? "Official Login" : "Initialize Account"}
+                                Official Login
                             </motion.h2>
                             <p className="text-muted-foreground font-semibold text-sm">
-                                {isLogin
-                                    ? "Secure entrance for authorized monitoring personnel."
-                                    : "Register your command credentials for monitoring."}
+                                Secure entrance for authorized monitoring personnel.
                             </p>
                         </div>
                     </div>
 
-                    <AnimatePresence mode="wait">
-                        {isLogin || stakeholderType === "Client" ? (
-                            <motion.form
-                                key="login"
-                                initial={{ x: 30, opacity: 0 }}
-                                animate={{ x: 0, opacity: 1 }}
-                                exit={{ x: -30, opacity: 0 }}
-                                transition={{ duration: 0.4, ease: "circOut" }}
-                                onSubmit={handleSubmit}
-                                className="space-y-7"
+                    <div className="mb-8 rounded-2xl border border-primary/10 bg-primary/5 px-4 py-3 text-sm font-medium text-primary/80">
+                        Accounts are created by authorized administrators. Contact your superadmin if you need access.
+                    </div>
+
+                    <motion.form
+                        initial={{ x: 30, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        transition={{ duration: 0.4, ease: "circOut" }}
+                        onSubmit={handleSubmit}
+                        className="space-y-7"
+                    >
+                        <div className="space-y-5">
+                            <div className="space-y-2.5">
+                                <Label htmlFor="email" className="text-[11px] font-black uppercase tracking-widest text-primary/60 ml-1">Email</Label>
+                                <div className="relative group">
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        placeholder="admin@psca.gov.pk"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="pl-12 h-14 bg-muted/5 border-2 border-muted/50 hover:border-primary/30 focus:border-primary focus:ring-4 focus:ring-primary/5 rounded-2xl transition-all font-bold text-[15px]"
+                                        required
+                                    />
+                                    <Mail className="absolute left-4.5 top-4.5 h-5 w-5 text-muted-foreground/60 transition-colors group-focus-within:text-primary" />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2.5">
+                                <Label htmlFor="password" className="text-[11px] font-black uppercase tracking-widest text-primary/60">Password</Label>
+                                <div className="relative group">
+                                    <Input
+                                        id="password"
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="••••••••"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="pl-12 pr-12 h-14 bg-muted/5 border-2 border-muted/50 hover:border-primary/30 focus:border-primary focus:ring-4 focus:ring-primary/5 rounded-2xl transition-all font-bold text-[15px]"
+                                        required
+                                    />
+                                    <Lock className="absolute left-4.5 top-4.5 h-5 w-5 text-muted-foreground/60 transition-colors group-focus-within:text-primary" />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-4.5 top-4.5 text-muted-foreground/40 hover:text-primary transition-colors"
+                                    >
+                                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2.5">
+                            <Label
+                                htmlFor="captcha"
+                                className="text-[11px] font-black uppercase tracking-widest text-primary/60 ml-1"
                             >
-                                <div className="space-y-5">
-                                    
-                                        
-                                        
+                                Security Verification
+                            </Label>
 
-                                    <div className="space-y-2.5">
-                                        <Label htmlFor="email" className="text-[11px] font-black uppercase tracking-widest text-primary/60 ml-1">Email</Label>
-                                        <div className="relative group">
-                                            <Input
-                                                id="email"
-                                                type="email"
-                                                placeholder="admin@psca.gov.pk"
-                                                value={email}
-                                                onChange={(e) => setEmail(e.target.value)}
-                                                className="pl-12 h-14 bg-muted/5 border-2 border-muted/50 hover:border-primary/30 focus:border-primary focus:ring-4 focus:ring-primary/5 rounded-2xl transition-all font-bold text-[15px]"
-                                                required
-                                            />
-                                            <Mail className="absolute left-4.5 top-4.5 h-5 w-5 text-muted-foreground/60 transition-colors group-focus-within:text-primary" />
-                                        </div>
+                            <div className="flex items-center gap-3">
+                                {isCaptchaLoading ? (
+                                    <div className="h-14 w-[180px] rounded-xl border-2 border-muted/50 flex items-center justify-center text-sm text-muted-foreground">
+                                        Loading...
                                     </div>
-
-                                    <div className="space-y-2.5">
-                                        <div className="flex items-center justify-between px-1">
-                                            <Label htmlFor="password" className="text-[11px] font-black uppercase tracking-widest text-primary/60">Password</Label>
-                                            
-                                        </div>
-                                        <div className="relative group">
-                                            <Input
-                                                id="password"
-                                                type={showPassword ? "text" : "password"}
-                                                placeholder="••••••••"
-                                                value={password}
-                                                onChange={(e) => setPassword(e.target.value)}
-                                                className="pl-12 pr-12 h-14 bg-muted/5 border-2 border-muted/50 hover:border-primary/30 focus:border-primary focus:ring-4 focus:ring-primary/5 rounded-2xl transition-all font-bold text-[15px]"
-                                                required
-                                            />
-                                            <Lock className="absolute left-4.5 top-4.5 h-5 w-5 text-muted-foreground/60 transition-colors group-focus-within:text-primary" />
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowPassword(!showPassword)}
-                                                className="absolute right-4.5 top-4.5 text-muted-foreground/40 hover:text-primary transition-colors"
-                                            >
-                                                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center justify-between px-1">
-                                    
-
-
-
-
-                                </div>
+                                ) : (
+                                    <img
+                                        src={captchaImage}
+                                        alt="CAPTCHA"
+                                        className="h-14 w-[180px] rounded-xl border-2 border-muted/50 bg-white object-contain"
+                                    />
+                                )}
 
                                 <Button
-                                    type="submit"
-                                    disabled={isLoading}
-                                    className="w-full h-15 bg-primary hover:bg-primary/95 text-white font-black text-[16px] tracking-wide rounded-[20px] shadow-[0_12px_36px_rgba(var(--color-primary-rgb),0.25)] transition-all hover:translate-y-[-2px] active:translate-y-0.5"
-                                    style={{ '--color-primary-rgb': '22, 58, 126' } as any}
+                                    type="button"
+                                    variant="outline"
+                                    onClick={loadCaptcha}
+                                    disabled={isCaptchaLoading}
+                                    className="h-14 rounded-xl px-4"
                                 >
-                                    {isLoading ? (
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-5 w-5 border-3 border-white/20 border-t-white rounded-full animate-spin" />
-                                            <span>Authenticating Profile...</span>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center justify-center gap-2">
-                                            Enter Monitoring Portal <ArrowRight className="h-5 w-5" />
-                                        </div>
-                                    )}
+                                    ↻
                                 </Button>
-                            </motion.form>
-                        ) : (
-                            <motion.form
-                                key="signup"
-                                initial={{ x: 30, opacity: 0 }}
-                                animate={{ x: 0, opacity: 1 }}
-                                exit={{ x: -30, opacity: 0 }}
-                                transition={{ duration: 0.4, ease: "circOut" }}
-                                onSubmit={handleSubmit}
-                                className="space-y-6"
-                            >
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2.5">
-                                        <Label htmlFor="fname" className="text-[11px] font-black uppercase tracking-widest text-secondary/60 ml-1">First Name</Label>
-                                        <div className="relative group">
-                                            <Input
-                                                id="fname"
-                                                placeholder="Officer"
-                                                className="pl-12 h-14 bg-muted/5 border-2 border-muted/50 hover:border-secondary/30 focus:border-secondary focus:ring-4 focus:ring-secondary/5 rounded-2xl transition-all font-bold text-[15px]"
-                                                required
-                                            />
-                                            <User className="absolute left-4.5 top-4.5 h-5 w-5 text-muted-foreground/60 transition-colors group-focus-within:text-secondary" />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2.5">
-                                        <Label htmlFor="lname" className="text-[11px] font-black uppercase tracking-widest text-secondary/60 ml-1">Last Name</Label>
-                                        <Input
-                                            id="lname"
-                                            placeholder="Name"
-                                            className="h-14 bg-muted/5 border-2 border-muted/50 hover:border-secondary/30 focus:border-secondary focus:ring-4 focus:ring-secondary/5 rounded-2xl transition-all font-bold text-[15px]"
-                                            required
-                                        />
-                                    </div>
+                            </div>
+
+                            <Input
+                                id="captcha"
+                                type="text"
+                                placeholder="Enter the characters shown above"
+                                value={captchaValue}
+                                onChange={(e) => setCaptchaValue(e.target.value)}
+                                className="h-14 bg-muted/5 border-2 border-muted/50 hover:border-primary/30 focus:border-primary focus:ring-4 focus:ring-primary/5 rounded-2xl transition-all font-bold text-[15px]"
+                                autoComplete="off"
+                                required
+                            />
+                        </div>
+
+                        <Button
+                            type="submit"
+                            disabled={isLoading || !captchaKey || !captchaValue.trim()}
+                            className="w-full h-15 bg-primary hover:bg-primary/95 text-white font-black text-[16px] tracking-wide rounded-[20px] shadow-[0_12px_36px_rgba(var(--color-primary-rgb),0.25)] transition-all hover:translate-y-[-2px] active:translate-y-0.5"
+                            style={{ '--color-primary-rgb': '22, 58, 126' } as any}
+                        >
+                            {isLoading ? (
+                                <div className="flex items-center gap-3">
+                                    <div className="h-5 w-5 border-3 border-white/20 border-t-white rounded-full animate-spin" />
+                                    <span>Authenticating Profile...</span>
                                 </div>
-
-                                <div className="space-y-2.5">
-                                    <Label htmlFor="reg-email" className="text-[11px] font-black uppercase tracking-widest text-secondary/60 ml-1">Official ID Email</Label>
-                                    <div className="relative group">
-                                        <Input
-                                            id="reg-email"
-                                            type="email"
-                                            placeholder="id@psca.gov.pk"
-                                            className="pl-12 h-14 bg-muted/5 border-2 border-muted/50 hover:border-secondary/30 focus:border-secondary focus:ring-4 focus:ring-secondary/5 rounded-2xl transition-all font-bold text-[15px]"
-                                            required
-                                        />
-                                        <Mail className="absolute left-4.5 top-4.5 h-5 w-5 text-muted-foreground/60 transition-colors group-focus-within:text-secondary" />
-                                    </div>
+                            ) : (
+                                <div className="flex items-center justify-center gap-2">
+                                    Enter Monitoring Portal <ArrowRight className="h-5 w-5" />
                                 </div>
-
-                                <div className="space-y-2.5">
-                                    <Label htmlFor="reg-pass" className="text-[11px] font-black uppercase tracking-widest text-secondary/60 ml-1">Password</Label>
-                                    <div className="relative group">
-                                        <Input
-                                            id="reg-pass"
-                                            type={showPassword ? "text" : "password"}
-                                            placeholder="••••••••"
-                                            className="pl-12 pr-12 h-14 bg-muted/5 border-2 border-muted/50 hover:border-secondary/30 focus:border-secondary focus:ring-4 focus:ring-secondary/5 rounded-2xl transition-all font-bold text-[15px]"
-                                            required
-                                        />
-                                        <Lock className="absolute left-4.5 top-4.5 h-5 w-5 text-muted-foreground/60 transition-colors group-focus-within:text-secondary" />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-4.5 top-4.5 text-muted-foreground/40 hover:text-secondary transition-colors"
-                                        >
-                                            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <Button
-                                    type="submit"
-                                    disabled={isLoading}
-                                    className="w-full h-15 bg-secondary hover:bg-secondary/95 text-white font-black text-[16px] tracking-wide rounded-[20px] shadow-[0_12px_36px_rgba(239,68,68,0.25)] transition-all hover:translate-y-[-2px] active:translate-y-0.5"
-                                >
-                                    {isLoading ? "Submitting Registration..." : (
-                                        <div className="flex items-center justify-center gap-2">
-                                            Request Portal Initiation <CheckCircle2 className="h-5 w-5" />
-                                        </div>
-                                    )}
-                                </Button>
-
-                                <p className="text-[10px] text-center text-muted-foreground font-semibold px-10 leading-relaxed">
-                                    Administrative requests are processed within 24-48 hours by the PSCA Security Wing.
-                                </p>
-                            </motion.form>
-                        )}
-                    </AnimatePresence>
+                            )}
+                        </Button>
+                    </motion.form>
 
                     <div className="mt-16 text-center">
                         <div className="flex items-center justify-center gap-4 text-muted-foreground/20">

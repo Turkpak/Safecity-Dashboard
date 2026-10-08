@@ -37,7 +37,15 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { listStakeholders, createUser, listUsers, createUserPermission, getUsersWithPermissions, updateUserPermission } from "@/api";
+import {
+  listStakeholders,
+  createUser,
+  listUsers,
+  createUserPermission,
+  getUsersWithPermissions,
+  updateUserPermission,
+  updateUserStatus,
+} from "@/api";
 import { useState, useRef, useMemo, useEffect } from "react";
 import { UserPlus, Users, ShieldAlert, ListChecks, UserCog, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import type { UserCrudPermissions, UserWithPermissions, UserPermissionItem } from "@/api/types";
@@ -87,8 +95,8 @@ export default function UserManagement() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const currentRole = (user?.role ?? localStorage.getItem("userRole") ?? "").trim().toLowerCase();
-  const isSuperAdmin = isSuperAdminRole(user?.role ?? undefined) || isSuperAdminRole(localStorage.getItem("userRole") ?? undefined);
+  const currentRole = (user?.role ?? "").trim().toLowerCase();
+  const isSuperAdmin = isSuperAdminRole(user?.role ?? undefined);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   /** Add New User dialog: 1 = user details, 2 = page permissions */
@@ -116,6 +124,14 @@ export default function UserManagement() {
     value: boolean;
     displayLabel: string;
   } | null>(null);
+
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [pendingStatusChange, setPendingStatusChange] = useState<{
+    userId: number;
+    email: string;
+    currentStatus: boolean;
+  } | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // Expand/collapse groups in permission tables
   const [expandedGroups, setExpandedGroups] = useState<{ area: boolean; projects: boolean }>({
@@ -425,6 +441,68 @@ export default function UserManagement() {
     await handlePermissionToggle(sidebar_label, sub_label, key, value);
   };
 
+  const requestStatusChange = (u: {
+  id: number;
+  email: string;
+  is_active: boolean;
+}) => {
+  // Do not allow the logged-in Super Admin to deactivate themselves
+  if (user?.id === u.id) {
+    toast({
+      title: "Action not allowed",
+      description: "You cannot change the status of your own account.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  setPendingStatusChange({
+    userId: u.id,
+    email: u.email,
+    currentStatus: u.is_active,
+  });
+
+  setStatusDialogOpen(true);
+};
+
+const executeStatusChange = async () => {
+  if (!pendingStatusChange) return;
+
+  const { userId, currentStatus } = pendingStatusChange;
+  const newStatus = !currentStatus;
+
+  setStatusDialogOpen(false);
+  setIsUpdatingStatus(true);
+
+  try {
+    await updateUserStatus(userId, newStatus);
+
+    await queryClient.invalidateQueries({
+      queryKey: ["users"],
+    });
+
+    toast({
+      title: "Status updated",
+      description: newStatus
+        ? "User has been activated successfully."
+        : "User has been deactivated successfully.",
+    });
+  } catch (err) {
+    toast({
+      title: "Error",
+      description:
+        err instanceof Error
+          ? err.message
+          : "Failed to update user status.",
+      variant: "destructive",
+    });
+  } finally {
+    setIsUpdatingStatus(false);
+    setPendingStatusChange(null);
+  }
+};
+
+
   if (!isSuperAdmin) {
     return (
       <Layout title="User Management">
@@ -475,6 +553,11 @@ export default function UserManagement() {
                 <UserPlus className="h-5 w-5" />
                 Add New User{addUserStep === 2 ? " — Step 2 of 2" : ""}
               </DialogTitle>
+              {addUserStep === 1 && (
+                <DialogDescription>
+                  Verify the person's identity and authorization before provisioning. Accounts become active immediately; no email-verification link is sent.
+                </DialogDescription>
+              )}
               {addUserStep === 2 && (
                 <DialogDescription>
                   Set page permissions for this user. Read = can view, Create = add new, Update = edit, Delete = remove.
@@ -703,15 +786,27 @@ export default function UserManagement() {
                             <TableCell className="capitalize">{formatRole(u.role)}</TableCell>
                             <TableCell>{getStakeholderLabel(u.stakeholder)}</TableCell>
                             <TableCell>
-                              <span
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                disabled={isUpdatingStatus || isSuperAdminUser}
+                                onClick={() => requestStatusChange(u)}
                                 className={
                                   u.is_active
-                                    ? "text-green-600 dark:text-green-400 font-medium"
-                                    : "text-muted-foreground"
+                                    ? "h-8 px-2 font-medium text-green-600 hover:bg-green-50 hover:text-green-700 dark:text-green-400 dark:hover:bg-green-950"
+                                    : "h-8 px-2 font-medium text-muted-foreground hover:bg-muted"
+                                }
+                                title={
+                                  isSuperAdminUser
+                                    ? "Super Admin status cannot be changed here"
+                                    : u.is_active
+                                    ? "Click to deactivate this user"
+                                    : "Click to activate this user"
                                 }
                               >
                                 {u.is_active ? "Active" : "Inactive"}
-                              </span>
+                              </Button>
                             </TableCell>
                             <TableCell className="text-right">
                               {!isSuperAdminUser && (
@@ -975,6 +1070,76 @@ export default function UserManagement() {
             )}
           </CardContent>
         </Card>
+        {/* Confirmation Dialog for user status update */}
+        <Dialog
+          open={statusDialogOpen}
+          onOpenChange={(open) => {
+            setStatusDialogOpen(open);
+
+            if (!open) {
+              setPendingStatusChange(null);
+            }
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                {pendingStatusChange?.currentStatus
+                  ? "Deactivate User"
+                  : "Activate User"}
+              </DialogTitle>
+
+              <DialogDescription>
+                Are you sure you want to{" "}
+                <strong className="text-foreground">
+                  {pendingStatusChange?.currentStatus
+                    ? "deactivate"
+                    : "activate"}
+                </strong>{" "}
+                the user{" "}
+                <strong className="text-foreground">
+                  {pendingStatusChange?.email || "this user"}
+                </strong>
+                ?
+                {pendingStatusChange?.currentStatus && (
+                  <>
+                    <br />
+                    <span className="mt-2 block">
+                      This user will no longer be able to log in while the account is
+                      inactive.
+                    </span>
+                  </>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isUpdatingStatus}
+                onClick={() => {
+                  setStatusDialogOpen(false);
+                  setPendingStatusChange(null);
+                }}
+              >
+                Cancel
+              </Button>
+
+              <Button
+                type="button"
+                disabled={isUpdatingStatus}
+                onClick={executeStatusChange}
+              >
+                {isUpdatingStatus
+                  ? "Updating..."
+                  : pendingStatusChange?.currentStatus
+                  ? "Deactivate"
+                  : "Activate"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Confirmation Dialog for permission update */}
         <Dialog

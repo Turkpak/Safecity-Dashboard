@@ -92,9 +92,7 @@ export function Sidebar() {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const { canView, isSuperAdmin } = usePermissions();
-  const userRole =
-    (user?.role ?? localStorage.getItem("userRole"))?.trim().toLowerCase() ??
-    null;
+  const userRole = user?.role?.trim().toLowerCase() ?? null;
   const {
     isCollapsed,
     toggleSidebar,

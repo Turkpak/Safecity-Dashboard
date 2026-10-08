@@ -6,14 +6,23 @@ DEBUG = True
 
 # CORS – allow your React dev server
 CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
+    "http://localhost:5001",
+    "http://127.0.0.1:5001",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
+CORS_ALLOW_CREDENTIALS = True
+
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
     "http://localhost:5000",
     "http://127.0.0.1:5000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5001",
+    "http://127.0.0.1:5001",
 ]
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
@@ -30,3 +39,5 @@ DATABASES = {
 
 GDAL_LIBRARY_PATH = get_secret("GDAL_LIBRARY_PATH", "")
 GEOS_LIBRARY_PATH = get_secret("GEOS_LIBRARY_PATH", "")
+
+

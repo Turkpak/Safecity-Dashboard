@@ -1,4 +1,3 @@
-from rest_framework_simplejwt.tokens import RefreshToken
 import jwt
 from builtins import dict
 import string
@@ -7,7 +6,6 @@ from django.http import JsonResponse
 from rest_framework.response import Response
 from rest_framework import status as http_status
 from rest_framework_simplejwt.tokens import RefreshToken
-import jwt
 import secrets
 import os 
 import uuid 
@@ -15,7 +13,6 @@ from django.utils.crypto import get_random_string
 from rest_framework.permissions import BasePermission
 from rest_framework.pagination import PageNumberPagination
 from collections import defaultdict
-from rest_framework.pagination import PageNumberPagination
 from django.utils.text import slugify
 from datetime import datetime, date
 from django.db.models import Avg, Max, Min
@@ -27,7 +24,6 @@ from rest_framework_simplejwt.settings import api_settings
 
 ACCESS_TOKEN_COOKIE = "safecity_access_token"
 REFRESH_TOKEN_COOKIE = "safecity_refresh_token"
-
 
 class CSRFCheck(CsrfViewMiddleware):
     def _reject(self, request, reason):
@@ -60,9 +56,23 @@ def set_auth_cookies(response, tokens):
         "samesite": "Strict",
         "path": "/",
     }
-    response.set_cookie(ACCESS_TOKEN_COOKIE, tokens["access"], max_age=int(api_settings.ACCESS_TOKEN_LIFETIME.total_seconds()), **cookie_options)
+
+    response.set_cookie(
+        ACCESS_TOKEN_COOKIE,
+        tokens["access"],
+        max_age=int(api_settings.ACCESS_TOKEN_LIFETIME.total_seconds()),
+        **cookie_options,
+    )
+
     if "refresh" in tokens:
-        response.set_cookie(REFRESH_TOKEN_COOKIE, tokens["refresh"], max_age=int(api_settings.REFRESH_TOKEN_LIFETIME.total_seconds()), **cookie_options)
+        response.set_cookie(
+            REFRESH_TOKEN_COOKIE,
+            tokens["refresh"],
+            max_age=int(api_settings.REFRESH_TOKEN_LIFETIME.total_seconds()),
+            **cookie_options,
+        )
+
+    return response
 
 
 def clear_auth_cookies(response):
@@ -79,10 +89,10 @@ def get_tokens_for_user(user):
 
 
 
-def get_user_name_token(token):
-    decoded_token = jwt.decode(token, algorithms=['RS256'], options={"verify_signature": False})
+# def get_user_name_token(token):
+#     decoded_token = jwt.decode(token, algorithms=['RS256'], options={"verify_signature": False})
     
-    return decoded_token['username']
+#     return decoded_token['username']
 
 
 class StandardResultsSetPagination(PageNumberPagination):
@@ -224,26 +234,6 @@ def get_error_message_list_serializer(errors):
         error_messages[field] = error_list[0] if isinstance(error_list, list) else error_list
     return error_messages
 
-
-
-def get_tokens_for_user(user):
-    refresh = RefreshToken.for_user(user)
-    print("refrest", refresh)
-    return {
-        'refresh': str(refresh),
-        'access': str(refresh.access_token),
-    }
-
-
-def get_user_name_token(token):
-    decoded_token = jwt.decode(token, algorithms=['RS256'], options={
-                               "verify_signature": False})
-
-    return decoded_token['username']
-
-
-
-
 class IsAdminUserForCreate(BasePermission):
     def has_permission(self, request, view):
         user = request.user
@@ -284,35 +274,6 @@ def parse_nested_query_dict(query_dict):
             
     return dict(data)
 
-
-
-class StandardResultsSetPagination(PageNumberPagination):
-    page_size = 10  # Default items per page
-    page_size_query_param = 'page_size'
-    max_page_size = 100
-    page_query_param = 'page'
-
-    def paginate_queryset(self, queryset, request, view=None):
-        # Handle sorting
-        sort_by = request.query_params.get('sortBy')
-        sort_dir = request.query_params.get('sortDir', 'asc')
-
-        if sort_by:
-            if sort_dir == 'desc':
-                sort_by = f'-{sort_by}'
-            queryset = queryset.order_by(sort_by)
-
-        return super().paginate_queryset(queryset, request, view)
-
-    def get_paginated_response(self, data):
-        return Response({
-            'links': {
-                'next': self.get_next_link(),
-                'previous': self.get_previous_link()
-            },
-            'count': self.page.paginator.count,
-            'results': data
-        })
 def parse_xer(file):
 
     wbs = {}

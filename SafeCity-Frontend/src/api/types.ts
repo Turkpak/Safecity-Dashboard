@@ -32,19 +32,22 @@ export interface LoginCredentials {
 }
 
 export interface LoginResponse {
-  msg?: { login: string; verified: boolean };
-  email: string;
   first_name: string;
   last_name: string;
-  id: number;
-  is_admin?: boolean;
   /** From backend: super_admin | contractor | consultant */
   role?: string;
-  stakeholder_id?: number | null;
   stakeholder_type?: string | null;
-  is_active?: boolean;
-  /** Page-level CRUD permissions from login (set by super_admin in User Management) */
-  permissions?: UserPermissionItem[];
+  /** Minimal page permissions needed to render authorized navigation. */
+  permissions?: LoginPermission[];
+}
+
+export interface LoginPermission {
+  sidebar_label: string;
+  sub_label: string | null;
+  can_view: boolean;
+  can_create: boolean;
+  can_update: boolean;
+  can_delete: boolean;
 }
 
 /** CRUD permissions assignable by Super Admin when creating a user (optional; backend can adopt later) */

@@ -1,7 +1,35 @@
 from ..common_imports import *
+from rest_framework.decorators import action
 
 class GetUserView(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=["get"], url_path="me")
+    def me(self, request, *args, **kwargs):
+        user = request.user
+        permissions = UserPermission.objects.filter(user=user)
+        data = {
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "role": user.role,
+            "permissions": list(
+                permissions.values(
+                    "sidebar_label",
+                    "sub_label",
+                    "can_view",
+                    "can_create",
+                    "can_update",
+                    "can_delete",
+                )
+            ),
+            "stakeholder_type": user.stakeholder.stakeholder_type if user.stakeholder else None,
+        }
+        return ApiResponse(
+            status=status.HTTP_200_OK,
+            message="User Found.",
+            data=data,
+            http_status=status.HTTP_200_OK,
+        ).create_response()
 
     def list(self, request, *args, **kwargs):
         try:

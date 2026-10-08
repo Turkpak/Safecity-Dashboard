@@ -24,8 +24,10 @@ import { useState, useEffect, useRef } from "react";
 
 // AuthGate: redirect to /auth when not authenticated (must be inside AuthProvider)
 function AuthGate({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const [location, setLocation] = useLocation();
+
+  if (isLoading) return null;
 
   // Redirect to /auth if not authenticated (but allow /auth itself through)
   if (!isAuthenticated && location !== "/auth") {

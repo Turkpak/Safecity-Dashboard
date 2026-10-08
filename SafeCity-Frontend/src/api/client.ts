@@ -1,6 +1,13 @@
 import { apiUrl } from "./config";
 import type { ApiEnvelope } from "./types";
 
+export class ApiError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 function getCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
   const cookie = document.cookie
@@ -61,7 +68,7 @@ async function parseResponse<T>(res: Response): Promise<T> {
   }
 
   if (res.status >= 400) {
-    throw new Error(json?.message || `Request failed: ${res.status}`);
+    throw new ApiError(json?.message || `Request failed: ${res.status}`, res.status);
   }
 
   // ✅ handle raw array

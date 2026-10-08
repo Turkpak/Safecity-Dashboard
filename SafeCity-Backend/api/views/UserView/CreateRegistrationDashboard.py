@@ -1,20 +1,33 @@
 from django.db import IntegrityError
 from rest_framework import viewsets, status, serializers
-from rest_framework.permissions import AllowAny
-from rest_framework_simplejwt.tokens import RefreshToken
-from ..common_imports import *  # your common imports like ApiResponse, MyUserSerializer
+from rest_framework.throttling import ScopedRateThrottle
+from ..common_imports import *  
 
 class UserCreateView(viewsets.ViewSet):
     permission_classes = [IsAdminUserForCreate]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "user_create"
 
     def create(self, request):
         try:
-            # Validate incoming data
-            serializer = MyUserSerializer(data=request.data)
+            role = request.data.get("role")
+            if role not in {"contractor", "consultant"}:
+                return ApiResponse(
+                    status=status.HTTP_400_BAD_REQUEST,
+                    message="A valid user role is required.",
+                    data={"role": ["Select a valid choice."]},
+                    http_status=status.HTTP_400_BAD_REQUEST,
+                ).create_response()
+
+            # Role and activation are controlled here, not by the general serializer.
+            user_data = request.data.copy()
+            user_data.pop("role", None)
+            serializer = MyUserSerializer(data=user_data)
             serializer.is_valid(raise_exception=True)
 
-            # Save the user
-            user = serializer.save()  
+            user = serializer.save()
+            user.role = role
+            user.save(update_fields=["role"])
 
             return ApiResponse(
                 status=status.HTTP_201_CREATED,
@@ -22,24 +35,6 @@ class UserCreateView(viewsets.ViewSet):
                 data={"user": MyUserSerializer(user).data},
                 http_status=status.HTTP_201_CREATED
             ).create_response()
-
-            # Generate JWT tokens
-            # refresh = RefreshToken.for_user(user)
-            # token_data = {
-            #     "refresh": str(refresh),
-            #     "access": str(refresh.access_token),
-            # }
-
-            # # Return response
-            # return ApiResponse(
-            #     status=status.HTTP_201_CREATED,
-            #     message="User created successfully.",
-            #     data={
-            #         "user": MyUserSerializer(user).data,
-            #         "tokens": token_data
-            #     },
-            #     http_status=status.HTTP_201_CREATED
-            # ).create_response()
 
         except IntegrityError:
             return ApiResponse(
