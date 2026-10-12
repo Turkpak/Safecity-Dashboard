@@ -362,10 +362,13 @@ export default function UserManagement() {
       ["Finance & Budget", "GIS Layers", "City Comparison"].includes(row.sidebar_label);
     const createProjectPage =
       row.sidebar_label === "Project Management" && row.sub_label === "Create";
+    const viewProjectsPage =
+      row.sidebar_label === "Project Management" && row.sub_label === "View";
 
     return {
       showRead: !createProjectPage,
       showCrud: !viewOnlyPage,
+      hideCreate: viewProjectsPage,
     };
   }
 
@@ -649,7 +652,7 @@ const executeStatusChange = async () => {
                         const p = getNewUserPerm(row.sidebar_label, row.sub_label);
                         const isGroup = row.kind === "group";
                         const groupId = row.groupId;
-                        const { showRead, showCrud } = permissionControlVisibility(row);
+                        const { showRead, showCrud, hideCreate } = permissionControlVisibility(row);
                         return (
                           <TableRow key={permissionRowKey(row.sidebar_label, row.sub_label)}>
                             <TableCell className="font-medium">
@@ -684,7 +687,7 @@ const executeStatusChange = async () => {
                               ) : null}
                             </TableCell>
                             <TableCell className="text-center">
-                              {!isGroup && showCrud ? (
+                              {!isGroup && showCrud && !hideCreate ? (
                                 <Checkbox
                                   checked={p.create ?? false}
                                   onCheckedChange={(c) =>
@@ -985,7 +988,7 @@ const executeStatusChange = async () => {
                       const disabled = isUpdatingPermission;
                       const isGroup = row.kind === "group";
                       const groupId = row.groupId;
-                      const { showRead, showCrud } = permissionControlVisibility(row);
+                      const { showRead, showCrud, hideCreate } = permissionControlVisibility(row);
                       return (
                         <TableRow key={`${row.sidebar_label}|${row.sub_label ?? ""}`}>
                           <TableCell className="font-medium">
@@ -1024,7 +1027,7 @@ const executeStatusChange = async () => {
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex justify-center">
-                              {!isGroup && showCrud ? (
+                              {!isGroup && showCrud && !hideCreate ? (
                                 <Checkbox
                                   checked={canCreate}
                                   disabled={disabled}
