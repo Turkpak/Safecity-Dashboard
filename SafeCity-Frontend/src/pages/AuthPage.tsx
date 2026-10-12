@@ -86,6 +86,9 @@ export default function AuthPage() {
             });
 
             const currentUser = await getCurrentUser();
+            if (!currentUser) {
+                throw new Error("Login succeeded, but the session could not be verified.");
+            }
 
             setUser(currentUser);
             setLocation("/");

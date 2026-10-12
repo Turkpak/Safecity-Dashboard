@@ -1,11 +1,33 @@
 from ..common_imports import *
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
+from api.utils import REFRESH_TOKEN_COOKIE
 
 class GetUserView(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
-    @action(detail=False, methods=["get"], url_path="me")
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="me",
+        permission_classes=[AllowAny],
+    )
     def me(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            if request.COOKIES.get(REFRESH_TOKEN_COOKIE):
+                return Response(
+                    {"message": "Authentication required."},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+            return Response(
+                {
+                    "status": status.HTTP_200_OK,
+                    "message": "No authenticated session.",
+                    "data": None,
+                },
+                status=status.HTTP_200_OK,
+            )
+
         user = request.user
         permissions = UserPermission.objects.filter(user=user)
         data = {
