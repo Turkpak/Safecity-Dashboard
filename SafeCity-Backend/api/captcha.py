@@ -4,11 +4,13 @@ from rest_framework.response import Response
 
 from captcha.models import CaptchaStore
 from captcha.helpers import captcha_image_url
-
+from rest_framework.throttling import ScopedRateThrottle
 
 class CaptchaView(APIView):
     permission_classes = [AllowAny]
-    authentication_classes = []
+    authentication_classes = []   
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "captcha"
 
     def get(self, request):
         # Generate a new CAPTCHA

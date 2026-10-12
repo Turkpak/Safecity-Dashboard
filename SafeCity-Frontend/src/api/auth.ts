@@ -49,8 +49,8 @@ export async function login(
   await post<void>(LOGIN_PATH, credentials);
 }
 
-export async function getCurrentUser(): Promise<LoginResponse> {
-  return get<LoginResponse>(CURRENT_USER_PATH);
+export async function getCurrentUser(): Promise<LoginResponse | null> {
+  return get<LoginResponse | null>(CURRENT_USER_PATH);
 }
 
 export async function logout(): Promise<void> {

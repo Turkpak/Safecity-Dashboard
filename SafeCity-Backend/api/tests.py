@@ -57,7 +57,20 @@ class CurrentUserEndpointTests(TestCase):
             role="super_admin",
         )
 
-    def test_current_user_endpoint_requires_authentication(self):
+    def test_current_user_endpoint_returns_no_user_without_authentication(self):
+        response = self.client.get("/api/get-user/me/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.data["data"])
+
+    def test_user_list_endpoint_still_requires_authentication(self):
+        response = self.client.get("/api/get-user/")
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_current_user_endpoint_allows_refresh_for_existing_session(self):
+        self.client.cookies["safecity_refresh_token"] = "present"
+
         response = self.client.get("/api/get-user/me/")
 
         self.assertEqual(response.status_code, 401)

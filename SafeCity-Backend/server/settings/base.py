@@ -108,6 +108,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'login': '5/minute',
         'user_create': '30/hour',
+        'captcha': '30/minute',
     },
     'DEFAULT_AUTHENTICATION_CLASSES': [
         # 'rest_framework.authentication.SessionAuthentication',

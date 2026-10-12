@@ -70,7 +70,13 @@ class UserLoginDashboardCreateView(viewsets.ViewSet):
                     http_status=status.HTTP_400_BAD_REQUEST,
                     status=status.HTTP_400_BAD_REQUEST,
                 ).create_response()
-
+            if captcha.expiration <= timezone.now():
+                captcha.delete()
+                return ApiResponse(
+                    message="CAPTCHA expired. Please refresh and try again.",
+                    http_status=status.HTTP_400_BAD_REQUEST,
+                    status=status.HTTP_400_BAD_REQUEST,
+                ).create_response()
             # -----------------------------------------
             # Validate CAPTCHA answer
             # -----------------------------------------
