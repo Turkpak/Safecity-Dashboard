@@ -439,10 +439,10 @@ export default function GISLayers() {
         {/* Filters — compact inline bar */}
         <Card className="border border-border/60 bg-card shadow-sm overflow-hidden">
           <CardContent className="px-4 py-3 sm:px-5 sm:py-3.5">
-            <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+            <div className="flex items-end gap-3 w-full">
 
               {/* Label */}
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 self-end pb-1">
                 <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
                   <Filter className="h-3.5 w-3.5" aria-hidden />
                 </div>
@@ -450,7 +450,7 @@ export default function GISLayers() {
               </div>
 
               {/* Division */}
-              <div className="flex flex-col gap-1 w-[calc(50%-0.5rem)] sm:w-[130px]">
+              <div className="flex flex-col gap-1 flex-1 min-w-0">
                 <label className="text-xs font-medium text-muted-foreground">Division</label>
                 <Select value={selectedDivisionId} onValueChange={handleDivisionChange}>
                   <SelectTrigger className="h-8 w-full border-border/60 bg-background rounded-lg shadow-sm text-xs">
@@ -468,7 +468,7 @@ export default function GISLayers() {
               </div>
 
               {/* District */}
-              <div className="flex flex-col gap-1 w-[calc(50%-0.5rem)] sm:w-[130px]">
+              <div className="flex flex-col gap-1 flex-1 min-w-0">
                 <label className="text-xs font-medium text-muted-foreground">District</label>
                 <Select
                   value={selectedDistrictId}
@@ -496,7 +496,7 @@ export default function GISLayers() {
               </div>
 
               {/* Tehsil */}
-              <div className="flex flex-col gap-1 w-[calc(50%-0.5rem)] sm:w-[130px]">
+              <div className="flex flex-col gap-1 flex-1 min-w-0">
                 <label className="text-xs font-medium text-muted-foreground">Tehsil</label>
                 <Select
                   value={selectedTehsilId}
@@ -526,7 +526,7 @@ export default function GISLayers() {
               </div>
 
               {/* Project */}
-              <div className="flex flex-col gap-1 w-[calc(50%-0.5rem)] sm:w-[160px]">
+              <div className="flex flex-col gap-1 flex-[2] min-w-0">
                 <label className="text-xs font-medium text-muted-foreground">Project</label>
                 <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
                   <SelectTrigger className="h-8 w-full border-border/60 bg-background rounded-lg shadow-sm text-xs">
@@ -557,7 +557,7 @@ export default function GISLayers() {
                     setSelectedTehsilId("all");
                     setSelectedProjectId("all");
                   }}
-                  className="h-8 self-end px-3 text-white bg-red-600 hover:bg-red-700 border-0 rounded-lg font-medium text-xs"
+                  className="h-8 self-end px-3 text-white bg-red-600 hover:bg-red-700 border-0 rounded-lg font-medium text-xs shrink-0"
                 >
                   Clear
                 </Button>
