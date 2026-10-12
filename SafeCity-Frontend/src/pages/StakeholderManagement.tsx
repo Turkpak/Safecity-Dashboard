@@ -44,6 +44,7 @@ export default function StakeholderManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [pageSize, setPageSize] = useState("10");
   const [statusConfirmTarget, setStatusConfirmTarget] = useState<ApiStakeholder | null>(null);
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<ApiStakeholder | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -127,10 +128,15 @@ export default function StakeholderManagement() {
     }
   };
 
-  const handleDelete = (id: number) => {
-    if (window.confirm("Are you sure you want to delete this stakeholder?")) {
-      deleteMutation.mutate(id);
-    }
+  const handleDelete = (stakeholder: ApiStakeholder) => {
+    setDeleteConfirmTarget(stakeholder);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteConfirmTarget) return;
+    deleteMutation.mutate(deleteConfirmTarget.id, {
+      onSettled: () => setDeleteConfirmTarget(null),
+    });
   };
 
   const requestToggleStatus = (s: ApiStakeholder) => {
@@ -486,7 +492,7 @@ export default function StakeholderManagement() {
                               type="button"
                               variant="outline"
                               className="w-full text-destructive border-destructive/20 hover:bg-destructive/10"
-                              onClick={() => handleDelete(stakeholder.id)}
+                              onClick={() => handleDelete(stakeholder)}
                               disabled={deleteMutation.isPending}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -583,7 +589,7 @@ export default function StakeholderManagement() {
                                   size="icon"
                                   variant="ghost"
                                   className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                                  onClick={() => handleDelete(stakeholder.id)}
+                                  onClick={() => handleDelete(stakeholder)}
                                   disabled={deleteMutation.isPending}
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -608,6 +614,73 @@ export default function StakeholderManagement() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Delete confirmation dialog */}
+      <Dialog
+        open={deleteConfirmTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteConfirmTarget(null); }}
+      >
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[400px] !p-0 !gap-0 overflow-hidden flex flex-col [&>button]:top-2.5 [&>button]:right-3 [&>button]:text-white/80 [&>button]:hover:text-white [&>button]:opacity-100">
+          {/* Header */}
+          <div className="bg-destructive px-4 py-3 shrink-0 flex items-center gap-3 pr-10">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/15">
+              <Trash2 className="h-4 w-4 text-white" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-white text-sm font-bold leading-tight">
+                Delete Stakeholder?
+              </DialogTitle>
+              <p className="text-white/65 text-[11px] leading-tight mt-0.5">
+                This action cannot be undone
+              </p>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="px-4 pt-4 pb-4 bg-background space-y-4">
+            {/* Stakeholder info card */}
+            <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2.5 space-y-1">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">To be deleted</p>
+              <p className="text-sm font-semibold text-foreground leading-tight truncate">
+                {deleteConfirmTarget?.stakeholder_title}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">
+                Type: <span className="font-medium text-foreground">{deleteConfirmTarget?.stakeholder_type}</span>
+              </p>
+            </div>
+
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Deleting this stakeholder will permanently remove them from the system. If they are linked to any projects, the deletion will be blocked.
+            </p>
+
+            {/* Action buttons */}
+            <div className="flex gap-2 pt-1 border-t border-border/50 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 px-4 text-sm font-medium"
+                onClick={() => setDeleteConfirmTarget(null)}
+                disabled={deleteMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="h-9 px-4 text-sm font-semibold text-white bg-destructive hover:bg-destructive/90 shadow-sm"
+                onClick={confirmDelete}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? "Deleting…" : (
+                  <>
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                    Yes, Delete
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Status toggle confirmation dialog */}
       <Dialog
