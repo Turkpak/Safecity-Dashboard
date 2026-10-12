@@ -14,14 +14,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit2, Trash2, Users, Save, Search, LayoutList } from "lucide-react";
+import { Plus, Edit2, Trash2, Users, Save, Search, LayoutList, ShieldCheck, ShieldOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
-  DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -45,6 +43,7 @@ export default function StakeholderManagement() {
   const [formData, setFormData] = useState({ type: "", title: "", status: "active" as StakeholderStatus });
   const [searchQuery, setSearchQuery] = useState("");
   const [pageSize, setPageSize] = useState("10");
+  const [statusConfirmTarget, setStatusConfirmTarget] = useState<ApiStakeholder | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -134,9 +133,17 @@ export default function StakeholderManagement() {
     }
   };
 
-  const toggleStatus = (s: ApiStakeholder) => {
-    const next: StakeholderStatus = s.status === "active" ? "disable" : "active";
-    updateMutation.mutate({ id: s.id, payload: { status: next } });
+  const requestToggleStatus = (s: ApiStakeholder) => {
+    setStatusConfirmTarget(s);
+  };
+
+  const confirmToggleStatus = () => {
+    if (!statusConfirmTarget) return;
+    const next: StakeholderStatus = statusConfirmTarget.status === "active" ? "disable" : "active";
+    updateMutation.mutate(
+      { id: statusConfirmTarget.id, payload: { status: next } },
+      { onSettled: () => setStatusConfirmTarget(null) }
+    );
   };
 
   const openEditDialog = (stakeholder: ApiStakeholder) => {
@@ -255,70 +262,107 @@ export default function StakeholderManagement() {
                     <Plus className="h-4 w-4 mr-2" /> Add stakeholder
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[520px] gap-0 p-0 overflow-hidden max-h-[90vh] flex flex-col sm:max-h-[85vh]">
-                  <DialogHeader className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4 bg-muted/30 border-b shrink-0">
-                    <DialogTitle>
-                      {editingStakeholder ? `Edit stakeholder` : `Add new stakeholder`}
-                    </DialogTitle>
-                    {editingStakeholder?.id && (
-                      <p className="text-sm text-muted-foreground font-normal">ID: {editingStakeholder.id}</p>
-                    )}
-                  </DialogHeader>
-                  <form onSubmit={handleCreateOrUpdate} className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1 min-h-0" noValidate>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                      <div className="space-y-2">
-                        <Label htmlFor="stakeholder-type">Type <span className="text-destructive">*</span></Label>
-                        <Input
-                          id="stakeholder-type"
-                          placeholder="e.g. Client, Consultant"
-                          value={formData.type}
-                          onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                          className="h-10"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="stakeholder-title">Title <span className="text-destructive">*</span></Label>
-                        <Input
-                          id="stakeholder-title"
-                          placeholder="e.g. Punjab Safe City Authority"
-                          value={formData.title}
-                          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                          className="h-10"
-                          required
-                        />
-                      </div>
+                <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[420px] !p-0 !gap-0 overflow-hidden flex flex-col [&>button]:top-2.5 [&>button]:right-3 [&>button]:text-white/80 [&>button]:hover:text-white [&>button]:opacity-100">
+                  {/* Accent header */}
+                  <div className="bg-primary px-4 py-3 shrink-0 flex items-center gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/15">
+                      <Users className="h-4 w-4 text-white" />
                     </div>
+                    <div className="min-w-0 flex-1">
+                      <DialogTitle className="text-white text-sm font-bold leading-tight">
+                        {editingStakeholder ? "Edit Stakeholder" : "Add New Stakeholder"}
+                      </DialogTitle>
+                      <p className="text-white/65 text-[11px] leading-tight mt-0.5">
+                        {editingStakeholder ? `ID #${editingStakeholder.id}` : "Fields marked * are required"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Form body */}
+                  <form onSubmit={handleCreateOrUpdate} className="px-4 py-3 space-y-3 bg-background" noValidate>
+
+                    {/* Type */}
+                    <div className="space-y-1">
+                      <Label htmlFor="stakeholder-type" className="text-xs font-semibold text-foreground">
+                        Type <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="stakeholder-type"
+                        placeholder="e.g. Client, Consultant, Contractor"
+                        value={formData.type}
+                        onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                        className="h-9 text-sm bg-muted/40 border-border/70 focus:bg-background transition-colors"
+                        required
+                      />
+                    </div>
+
+                    {/* Title */}
+                    <div className="space-y-1">
+                      <Label htmlFor="stakeholder-title" className="text-xs font-semibold text-foreground">
+                        Title <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="stakeholder-title"
+                        placeholder="e.g. Punjab Safe City Authority"
+                        value={formData.title}
+                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                        className="h-9 text-sm bg-muted/40 border-border/70 focus:bg-background transition-colors"
+                        required
+                      />
+                    </div>
+
+                    {/* Status — edit mode only */}
                     {editingStakeholder && (
-                      <div className="space-y-2">
-                        <Label>Status</Label>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold text-foreground">Status</Label>
                         <Select
                           value={formData.status}
                           onValueChange={(v) => setFormData({ ...formData, status: v as StakeholderStatus })}
                         >
-                          <SelectTrigger className="h-10">
+                          <SelectTrigger className="h-9 text-sm bg-muted/40 border-border/70">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="disable">Disabled</SelectItem>
+                            <SelectItem value="active">
+                              <span className="flex items-center gap-2">
+                                <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                                Active
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="disable">
+                              <span className="flex items-center gap-2">
+                                <span className="h-2 w-2 rounded-full bg-slate-400 shrink-0" />
+                                Disabled
+                              </span>
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     )}
-                    <DialogFooter className="flex flex-col-reverse gap-2 pt-4 pb-0 px-0 sm:flex-row sm:justify-end">
-                      <Button type="button" variant="outline" onClick={closeDialog} className="w-full sm:w-auto">
+
+                    {/* Footer */}
+                    <div className="flex gap-2 pt-2 border-t border-border/50 justify-end">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={closeDialog}
+                        className="h-9 px-4 text-sm font-medium"
+                      >
                         Cancel
                       </Button>
                       <Button
                         type="submit"
                         disabled={createMutation.isPending || updateMutation.isPending}
-                        className="bg-secondary hover:bg-secondary/90 text-white w-full sm:w-auto"
+                        className="h-9 px-4 text-sm bg-primary hover:bg-primary/90 text-white font-semibold shadow-sm"
                       >
-                        <Save className="h-4 w-4 mr-2" />
-                        {editingStakeholder ? "Update" : "Add"}
+                        <Save className="h-3.5 w-3.5 mr-1.5" />
+                        {createMutation.isPending || updateMutation.isPending
+                          ? "Saving…"
+                          : editingStakeholder
+                            ? "Save Changes"
+                            : "Add Stakeholder"}
                       </Button>
-                    </DialogFooter>
+                    </div>
                   </form>
                 </DialogContent>
               </Dialog>
@@ -402,7 +446,7 @@ export default function StakeholderManagement() {
                             </div>
                             <button
                               type="button"
-                              onClick={() => toggleStatus(stakeholder)}
+                              onClick={() => requestToggleStatus(stakeholder)}
                               disabled={updateMutation.isPending}
                               className={cn(
                                 "shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold border-0",
@@ -498,7 +542,7 @@ export default function StakeholderManagement() {
                         <TableCell className="text-center">
                           <button
                             type="button"
-                            onClick={() => toggleStatus(stakeholder)}
+                            onClick={() => requestToggleStatus(stakeholder)}
                             disabled={updateMutation.isPending}
                             className={cn(
                               "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-semibold transition-all hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
@@ -564,6 +608,117 @@ export default function StakeholderManagement() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Status toggle confirmation dialog */}
+      <Dialog
+        open={statusConfirmTarget !== null}
+        onOpenChange={(open) => { if (!open) setStatusConfirmTarget(null); }}
+      >
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[400px] !p-0 !gap-0 overflow-hidden flex flex-col [&>button]:top-2.5 [&>button]:right-3 [&>button]:text-white/80 [&>button]:hover:text-white [&>button]:opacity-100">
+          {/* Header */}
+          <div
+            className={cn(
+              "px-4 py-3 shrink-0 flex items-center gap-3 pr-10",
+              statusConfirmTarget?.status === "active" ? "bg-slate-600" : "bg-emerald-600"
+            )}
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/15">
+              {statusConfirmTarget?.status === "active"
+                ? <ShieldOff className="h-4 w-4 text-white" />
+                : <ShieldCheck className="h-4 w-4 text-white" />
+              }
+            </div>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-white text-sm font-bold leading-tight">
+                {statusConfirmTarget?.status === "active" ? "Disable Stakeholder?" : "Activate Stakeholder?"}
+              </DialogTitle>
+              <p className="text-white/65 text-[11px] leading-tight mt-0.5">
+                This will change the stakeholder's status
+              </p>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="px-4 pt-4 pb-4 bg-background space-y-4">
+            {/* Stakeholder info card */}
+            <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5 space-y-1">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Stakeholder</p>
+              <p className="text-sm font-semibold text-foreground leading-tight truncate">
+                {statusConfirmTarget?.stakeholder_title}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">
+                Type: <span className="font-medium text-foreground">{statusConfirmTarget?.stakeholder_type}</span>
+              </p>
+            </div>
+
+            {/* Consequence message */}
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {statusConfirmTarget?.status === "active"
+                ? "Disabling this stakeholder will mark them as inactive. They will remain in the system but won't be selectable for new projects."
+                : "Activating this stakeholder will mark them as active and allow them to be assigned to projects again."
+              }
+            </p>
+
+            {/* Current → New status indicator */}
+            <div className="flex items-center gap-2 text-xs font-medium">
+              <span className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1",
+                statusConfirmTarget?.status === "active"
+                  ? "bg-emerald-100 text-emerald-800"
+                  : "bg-slate-100 text-slate-600"
+              )}>
+                <span className={cn("h-1.5 w-1.5 rounded-full", statusConfirmTarget?.status === "active" ? "bg-emerald-500" : "bg-slate-400")} />
+                {statusConfirmTarget?.status === "active" ? "Active" : "Disabled"}
+              </span>
+              <span className="text-muted-foreground">→</span>
+              <span className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1",
+                statusConfirmTarget?.status === "active"
+                  ? "bg-slate-100 text-slate-600"
+                  : "bg-emerald-100 text-emerald-800"
+              )}>
+                <span className={cn("h-1.5 w-1.5 rounded-full", statusConfirmTarget?.status === "active" ? "bg-slate-400" : "bg-emerald-500")} />
+                {statusConfirmTarget?.status === "active" ? "Disabled" : "Active"}
+              </span>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-2 pt-1 border-t border-border/50 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 px-4 text-sm font-medium"
+                onClick={() => setStatusConfirmTarget(null)}
+                disabled={updateMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className={cn(
+                  "h-9 px-4 text-sm font-semibold text-white shadow-sm",
+                  statusConfirmTarget?.status === "active"
+                    ? "bg-slate-600 hover:bg-slate-700"
+                    : "bg-emerald-600 hover:bg-emerald-700"
+                )}
+                onClick={confirmToggleStatus}
+                disabled={updateMutation.isPending}
+              >
+                {updateMutation.isPending ? "Saving…" : (
+                  <>
+                    {statusConfirmTarget?.status === "active"
+                      ? <ShieldOff className="h-3.5 w-3.5 mr-1.5" />
+                      : <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />
+                    }
+                    {statusConfirmTarget?.status === "active" ? "Yes, Disable" : "Yes, Activate"}
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </Layout>
   );
 }
