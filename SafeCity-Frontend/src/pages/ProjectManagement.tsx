@@ -313,7 +313,7 @@ useEffect(() => {
     e.target.value = "";
   };
 
-  // Handle area file upload (GeoJSON, KML, KMZ, Shapefile)
+  // Handle area file upload (GeoJSON)
   const handleAreaFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -364,7 +364,7 @@ useEffect(() => {
       } else {
         toast({
           title: "Invalid File Format",
-          description: "Unsupported file format. Please upload GeoJSON, KML, KMZ, or Shapefile (ZIP).",
+          description: "Unsupported file format. Please upload GeoJSON.",
           variant: "destructive",
         });
         setIsLoadingGeoData(false);
@@ -527,7 +527,7 @@ useEffect(() => {
     if (!areaFile) {
       toast({
         title: "Project area file required",
-        description: "Upload a boundary file (GeoJSON, KML, KMZ, or shapefile ZIP) for the project map.",
+        description: "Upload a boundary file (GeoJSON) / Shapefile (.zip) for the project map.",
         variant: "destructive",
       });
       return false;
@@ -1350,7 +1350,7 @@ useEffect(() => {
                         <div className="flex flex-col gap-3 min-w-0 h-full">
                           <div>
                             <Label className="text-sm font-medium">
-                              Project area (GeoJSON, Shapefile, KMZ, KML){" "}
+                              Project area (GeoJSON / Shapefile(.zip)){" "}
                               {editingProject ? "(optional – upload to replace)" : "*"}
                             </Label>
                             <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
@@ -1393,7 +1393,7 @@ useEffect(() => {
                                 <Upload className="h-10 w-10 text-muted-foreground shrink-0" />
                                 <p className="text-sm font-medium">Tap to upload area file</p>
                                 <p className="text-xs text-muted-foreground max-w-md">
-                                  GeoJSON, Shapefile, KMZ, or KML
+                                  GeoJSON, Shapefile (ZIP)
                                 </p>
                               </>
                             )}
@@ -2635,7 +2635,7 @@ useEffect(() => {
                   <div className="flex flex-col gap-3 min-w-0 h-full">
                     <div>
                       <Label className="text-sm font-medium">
-                        Project area (GeoJSON, Shapefile, KMZ, KML){" "}
+                        Project area (GeoJSON / Shapefile(.zip)){" "}
                         {editingProject ? "(optional – upload to replace)" : "*"}
                       </Label>
                       <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
@@ -2678,7 +2678,7 @@ useEffect(() => {
                           <Upload className="h-10 w-10 text-muted-foreground shrink-0" />
                           <p className="text-sm font-medium">Tap to upload area file</p>
                           <p className="text-xs text-muted-foreground max-w-md">
-                            GeoJSON, Shapefile, KMZ, or KML
+                            GeoJSON
                           </p>
                         </>
                       )}

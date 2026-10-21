@@ -166,9 +166,7 @@ export function WizardXerUploadSection({
           Primavera schedule (XER){editingProject ? "" : " *"}
         </Label>
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-          Export from Primavera P6, then use <span className="font-medium">Choose file</span> or tap the area below.
-          On phone or tablet this opens your Files / Downloads app so you can pick the <code className="text-[11px]">.xer</code> from any
-          folder. The server stores the file and builds the activity list for the Gantt chart.
+          Export from Primavera P6
         </p>
       </div>
 
