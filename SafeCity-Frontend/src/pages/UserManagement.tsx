@@ -367,10 +367,9 @@ export default function UserManagement() {
   };
 
   /** Users from GET user-permissions that have a role we show in the selector (consultant/contractor) */
-  const usersForPermissionView = usersWithPermissions.filter((u) => {
-    const r = (u.role ?? "").trim().toLowerCase();
-    return r === "consultant" || r === "contractor";
-  });
+  const usersForPermissionView = usersWithPermissions.filter(
+    (u) => (u.role ?? "").trim().toLowerCase() !== "super_admin"
+  );
 
   /** Selected user's full data (derived so refetch updates the table) */
   const selectedUserWithPermissions = useMemo(

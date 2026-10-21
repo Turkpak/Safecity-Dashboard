@@ -87,8 +87,7 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
     company_name = models.CharField(max_length=255)
 
     role = models.CharField(
-        max_length=20,
-        choices=ROLE_CHOICES,
+        max_length=255,
         default='contractor'
     )
 
