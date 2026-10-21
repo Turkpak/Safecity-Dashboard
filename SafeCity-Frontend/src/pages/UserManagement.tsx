@@ -161,7 +161,11 @@ export default function UserManagement() {
     queryFn: listUsers,
   });
 
-  const { data: usersWithPermissions = [], isLoading: usersWithPermissionsLoading } = useQuery({
+  const {
+    data: usersWithPermissions = [],
+    isLoading: usersWithPermissionsLoading,
+    refetch: refetchUsersWithPermissions,
+  } = useQuery({
     queryKey: ["users-with-permissions"],
     queryFn: getUsersWithPermissions,
   });
@@ -206,7 +210,12 @@ export default function UserManagement() {
     return newUserPermissions[key] ?? { create: false, read: false, update: false, delete: false };
   }
 
-  /** Set one CRUD flag for one row in Step 2 */
+  /**
+   * Set one CRUD flag for one row in Step 2.
+   * Normal pages automatically enable Read when Create/Update/Delete is enabled.
+   * The dedicated "Create New Project" page hides Read, so its CRUD flags are
+   * allowed to work independently instead of depending on an invisible checkbox.
+   */
   function setNewUserPerm(
     sidebar_label: string,
     sub_label: string | null,
@@ -214,14 +223,29 @@ export default function UserManagement() {
     value: boolean
   ) {
     const rowKey = permissionRowKey(sidebar_label, sub_label);
+    const isCreateProjectPage =
+      sidebar_label === "Project Management" && sub_label === "Create";
+
     setNewUserPermissions((prev) => {
       const current = prev[rowKey] ?? { create: false, read: false, update: false, delete: false };
-      if (key === "read" && !value) {
-        return { ...prev, [rowKey]: { ...current, read: false, create: false, update: false, delete: false } };
+
+      // Turning Read off on a normal page also removes dependent CRUD rights.
+      if (!isCreateProjectPage && key === "read" && !value) {
+        return {
+          ...prev,
+          [rowKey]: { read: false, create: false, update: false, delete: false },
+        };
       }
-      if (key !== "read" && value && !current.read) {
-        return { ...prev, [rowKey]: { ...current, [key]: false } };
+
+      // On normal pages, enabling any CRUD action automatically enables Read.
+      if (!isCreateProjectPage && key !== "read" && value) {
+        return {
+          ...prev,
+          [rowKey]: { ...current, read: true, [key]: true },
+        };
       }
+
+      // Create New Project has no visible Read checkbox, so do not gate it by Read.
       return { ...prev, [rowKey]: { ...current, [key]: value } };
     });
   }
@@ -279,22 +303,33 @@ export default function UserManagement() {
         const p = getNewUserPerm(row.sidebar_label, row.sub_label);
         const hasAny = (p.read ?? false) || (p.create ?? false) || (p.update ?? false) || (p.delete ?? false);
         if (!hasAny) continue;
+
+        const isCreateProjectPage =
+          row.sidebar_label === "Project Management" && row.sub_label === "Create";
+
         permissionPromises.push(
           createUserPermission({
             user: userId,
             sidebar_label: row.sidebar_label,
             sub_label: row.sub_label,
-            can_view: p.read ?? false,
-            can_create: (p.read ?? false) && (p.create ?? false),
-            can_update: (p.read ?? false) && (p.update ?? false),
-            can_delete: (p.read ?? false) && (p.delete ?? false),
+            can_view: isCreateProjectPage ? false : (p.read ?? false),
+            can_create: isCreateProjectPage
+              ? (p.create ?? false)
+              : (p.read ?? false) && (p.create ?? false),
+            can_update: isCreateProjectPage
+              ? (p.update ?? false)
+              : (p.read ?? false) && (p.update ?? false),
+            can_delete: isCreateProjectPage
+              ? (p.delete ?? false)
+              : (p.read ?? false) && (p.delete ?? false),
           })
         );
       }
       await Promise.all(permissionPromises);
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["stakeholders"] });
-      queryClient.invalidateQueries({ queryKey: ["users-with-permissions"] });
+      await queryClient.invalidateQueries({ queryKey: ["users"] });
+      await queryClient.invalidateQueries({ queryKey: ["stakeholders"] });
+      await queryClient.invalidateQueries({ queryKey: ["users-with-permissions"] });
+      await refetchUsersWithPermissions();
       toast({ title: "Success", description: "User and permissions created successfully." });
       resetForm();
       setDialogOpen(false);
@@ -372,7 +407,7 @@ export default function UserManagement() {
     };
   }
 
-  /** Toggle one CRUD flag for the selected user and a page row; create or update via API */
+  /** Toggle one CRUD flag for the selected user and keep the checkbox UI in sync with the API. */
   async function handlePermissionToggle(
     sidebar_label: string,
     sub_label: string | null,
@@ -380,39 +415,75 @@ export default function UserManagement() {
     value: boolean
   ) {
     if (selectedUserWithPermissions == null) return;
+
     const perm = getPermissionForRow(
       selectedUserWithPermissions.permissions,
       sidebar_label,
       sub_label
     );
     const userId = selectedUserWithPermissions.user_id;
+    const isCreateProjectPage =
+      sidebar_label === "Project Management" && sub_label === "Create";
+
     setIsUpdatingPermission(true);
     try {
       if (perm) {
-        const nextCanView = key === "can_view" ? value : perm.can_view;
-        const crudAllowed = nextCanView;
-        const payload = {
+        let nextCanView = perm.can_view;
+        let nextCanCreate = perm.can_create;
+        let nextCanUpdate = perm.can_update;
+        let nextCanDelete = perm.can_delete;
+
+        if (key === "can_view") {
+          nextCanView = value;
+          // On normal pages, removing Read also removes dependent CRUD rights.
+          if (!isCreateProjectPage && !value) {
+            nextCanCreate = false;
+            nextCanUpdate = false;
+            nextCanDelete = false;
+          }
+        } else {
+          // Apply the exact CRUD checkbox the user changed.
+          if (key === "can_create") nextCanCreate = value;
+          if (key === "can_update") nextCanUpdate = value;
+          if (key === "can_delete") nextCanDelete = value;
+
+          // Normal pages require Read for CRUD, so turn it on automatically.
+          // Create New Project intentionally has no visible Read checkbox.
+          if (!isCreateProjectPage && value) nextCanView = true;
+        }
+
+        await updateUserPermission(perm.id, {
           user: userId,
           sidebar_label,
           sub_label: sub_label ?? undefined,
           can_view: nextCanView,
-          can_create: crudAllowed && (key === "can_create" ? value : perm.can_create),
-          can_update: crudAllowed && (key === "can_update" ? value : perm.can_update),
-          can_delete: crudAllowed && (key === "can_delete" ? value : perm.can_delete),
-        };
-        await updateUserPermission(perm.id, payload);
+          can_create: nextCanCreate,
+          can_update: nextCanUpdate,
+          can_delete: nextCanDelete,
+        });
       } else {
+        const enablingCrud =
+          value &&
+          (key === "can_create" || key === "can_update" || key === "can_delete");
+
         await createUserPermission({
           user: userId,
           sidebar_label,
           sub_label,
-          can_view: key === "can_view" ? value : false,
-          can_create: false,
-          can_update: false,
-          can_delete: false,
+          can_view: key === "can_view"
+            ? value
+            : (!isCreateProjectPage && enablingCrud),
+          can_create: key === "can_create" ? value : false,
+          can_update: key === "can_update" ? value : false,
+          can_delete: key === "can_delete" ? value : false,
         });
       }
+
+      // The app uses long-lived React Query caching. Explicitly refetch so the
+      // checkboxes immediately render the values that were just saved.
       await queryClient.invalidateQueries({ queryKey: ["users-with-permissions"] });
+      await refetchUsersWithPermissions();
+
       toast({ title: "Saved", description: "Page permission updated." });
     } catch (err) {
       toast({
