@@ -302,6 +302,7 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         stakeholders = validated_data.pop('stakeholder', [])
         xer_file = validated_data.pop('xer_file', None)
         boundary_file = validated_data.pop('boundary_file', None)
+        boundary_geom = self._parse_boundary_file(boundary_file) if boundary_file else None
 
         project = Project.objects.create(**validated_data)
         project.stakeholder.set(stakeholders)
@@ -314,9 +315,9 @@ class ProjectSerializer(GeoFeatureModelSerializer):
                 self._save_activities(project, xer_file)
             except Exception:
                 pass
-        # Handle GeoJSON
+
         if boundary_file:
-            project.geom = self._parse_boundary_file(boundary_file)
+            project.geom = boundary_geom
 
         project.save()
 
@@ -327,6 +328,7 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         stakeholders = validated_data.pop('stakeholder', None)
         xer_file = validated_data.pop('xer_file', None)
         boundary_file = validated_data.pop('boundary_file', None)
+        boundary_geom = self._parse_boundary_file(boundary_file) if boundary_file else None
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -343,9 +345,8 @@ class ProjectSerializer(GeoFeatureModelSerializer):
             except Exception:
                 pass
 
-        # Handle GeoJSON
         if boundary_file:
-            instance.geom = self._parse_boundary_file(boundary_file)
+            instance.geom = boundary_geom
 
         instance.save()
         return instance
@@ -373,22 +374,56 @@ class ProjectSerializer(GeoFeatureModelSerializer):
         try:
             boundary_file.seek(0)
             geojson_data = json.load(boundary_file)
-            geometry = (
-                geojson_data["features"][0]["geometry"]
-                if geojson_data.get("type") == "FeatureCollection"
-                else geojson_data.get("geometry")
-            )
 
-            geom_obj = GEOSGeometry(json.dumps(geometry))
+            if not isinstance(geojson_data, dict):
+                raise ValueError("GeoJSON must be an object.")
 
-            # Ensure MultiPolygon
-            if isinstance(geom_obj, Polygon):
-                geom_obj = MultiPolygon(geom_obj)
-            elif not isinstance(geom_obj, MultiPolygon):
-                raise serializers.ValidationError("Geometry must be Polygon or MultiPolygon.")
+            def get_geometries(geojson):
+                geojson_type = geojson.get("type")
+                if geojson_type == "FeatureCollection":
+                    features = geojson.get("features")
+                    if not isinstance(features, list):
+                        raise ValueError("FeatureCollection must contain a features list.")
+                    for feature in features:
+                        if not isinstance(feature, dict) or feature.get("type") != "Feature":
+                            raise ValueError("FeatureCollection contains an invalid feature.")
+                        geometry = feature.get("geometry")
+                        if geometry is not None:
+                            yield from get_geometries(geometry)
+                elif geojson_type == "Feature":
+                    geometry = geojson.get("geometry")
+                    if geometry is not None:
+                        yield from get_geometries(geometry)
+                elif geojson_type == "GeometryCollection":
+                    geometries = geojson.get("geometries")
+                    if not isinstance(geometries, list):
+                        raise ValueError("GeometryCollection must contain a geometries list.")
+                    for geometry in geometries:
+                        yield from get_geometries(geometry)
+                else:
+                    yield geojson
+
+            polygons = []
+            for geometry in get_geometries(geojson_data):
+                geom_obj = GEOSGeometry(json.dumps(geometry))
+                if isinstance(geom_obj, Polygon):
+                    polygons.append(geom_obj)
+                elif isinstance(geom_obj, MultiPolygon):
+                    polygons.extend(geom_obj)
+                else:
+                    raise ValueError(
+                        "Geometry must contain only Polygon or MultiPolygon features."
+                    )
+
+            if not polygons:
+                raise ValueError("GeoJSON does not contain any polygon features.")
+
+            geom_obj = MultiPolygon(*polygons, srid=4326)
 
             return geom_obj
 
+        except serializers.ValidationError:
+            raise
         except Exception as e:
             raise serializers.ValidationError({
                 "boundary_file": f"Invalid GeoJSON: {e}"
