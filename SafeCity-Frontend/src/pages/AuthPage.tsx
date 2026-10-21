@@ -91,7 +91,9 @@ export default function AuthPage() {
             }
 
             setUser(currentUser);
-            setLocation("/");
+            // Always enter the dashboard at the clean root Division view after login.
+            // This intentionally clears any previous hierarchy drill-down query parameters.
+            setLocation("/?view=divisions");
 
             toast({
                 title: "Welcome",

@@ -177,7 +177,7 @@ export function Sidebar() {
       >
         {!collapsed && (
           <Link
-            href="/"
+            href="/?view=divisions"
             className="flex items-center gap-3 font-heading font-bold text-2xl text-white tracking-wide"
           >
             <img
@@ -194,7 +194,7 @@ export function Sidebar() {
           </Link>
         )}
         {collapsed && (
-          <Link href="/" className="flex items-center justify-center">
+          <Link href="/?view=divisions" className="flex items-center justify-center">
             <img
               src="/Assets/psca logo.png"
               alt="PSCA Logo"
@@ -342,7 +342,7 @@ export function Sidebar() {
                   <TooltipTrigger asChild>
                     <div>
                       <Link
-                        href={item.href!}
+                        href={item.label === "Dashboard" ? "/?view=divisions" : item.href!}
                         className={cn(
                           "flex items-center rounded-lg transition-all text-sm font-medium font-sans",
                           collapsed
