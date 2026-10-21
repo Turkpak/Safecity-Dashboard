@@ -461,41 +461,31 @@ useEffect(() => {
     setTotalBudgetAllocated(p.total_budget_allocated ?? "");
     setBudgetUtilized(p.budget_utilized ?? "");
 
-    const hasAny = (...vals: Array<unknown>) =>
-      vals.some((v) => v !== null && v !== undefined && String(v).trim() !== "");
-
-    const allocationEnabled = hasAny(p.allocation_capital_cost, p.allocation_revenue_cost, p.allocation_total_cost);
-    setEnableAllocation(allocationEnabled);
+    // In edit mode, financial checkboxes act as explicit "edit this section" controls.
+    // Existing financial values are still loaded below and shown read-only until
+    // the user checks the relevant section.
+    setEnableAllocation(false);
     setAllocationCapital(p.allocation_capital_cost ?? "");
     setAllocationRevenue(p.allocation_revenue_cost ?? "");
     setAllocationTotal(p.allocation_total_cost ?? "");
 
-    const pdEnabled = hasAny(p.pd_release_capital_cost, p.pd_release_cost, p.pd_release_total_cost);
-    setEnablePdRelease(pdEnabled);
+    setEnablePdRelease(false);
     setPdReleaseCapital(p.pd_release_capital_cost ?? "");
     setPdReleaseRevenue(p.pd_release_cost ?? "");
     setPdReleaseTotal(p.pd_release_total_cost ?? "");
 
-    const spendingEnabled = hasAny(p.spending_release_capital_cost, p.spending_release_revenue_cost, p.spending_release_total_cost);
-    setEnableSpendingRelease(spendingEnabled);
+    setEnableSpendingRelease(false);
     setSpendingReleaseCapital(p.spending_release_capital_cost ?? "");
     setSpendingReleaseRevenue(p.spending_release_revenue_cost ?? "");
     setSpendingReleaseTotal(p.spending_release_total_cost ?? "");
 
-    const pifraEnabled = hasAny(
-      p.pifra_utilization_capital_cost,
-      p.pifra_utilization_revenue_cost,
-      p.pifra_utilization_total_cost,
-      p.pifra_utilization_date,
-    );
-    setEnablePifraUtilization(pifraEnabled);
+    setEnablePifraUtilization(false);
     setPifraCapital(p.pifra_utilization_capital_cost ?? "");
     setPifraRevenue(p.pifra_utilization_revenue_cost ?? "");
     setPifraTotal(p.pifra_utilization_total_cost ?? "");
     setPifraDate(p.pifra_utilization_date ? p.pifra_utilization_date.slice(0, 10) : "");
 
-    const pctEnabled = hasAny(p.percentage_utilization_capital, p.percentage_utilization_revenue, p.percentage_utilization_total);
-    setEnableUtilPct(pctEnabled);
+    setEnableUtilPct(false);
     setUtilPctCapital(p.percentage_utilization_capital ?? "");
     setUtilPctRevenue(p.percentage_utilization_revenue ?? "");
     setUtilPctTotal(p.percentage_utilization_total ?? "");
@@ -643,39 +633,48 @@ useEffect(() => {
       const remaining = Math.max(0, (totalBudget ?? 0) - (utilized ?? 0));
 
       const n = (v: string): number => Number(v);
+      // For updates, an unchecked financial checkbox means "leave this section unchanged".
+      // Existing values are sent back unchanged because updateProject currently uses PUT.
+      // For creates, the create branch below still sends only explicitly enabled sections.
       const allocationPayload = enableAllocation
         ? {
             allocation_capital_cost: n(allocationCapital),
             allocation_revenue_cost: n(allocationRevenue),
             allocation_total_cost: n(allocationTotal),
           }
-        : {
-            allocation_capital_cost: null,
-            allocation_revenue_cost: null,
-            allocation_total_cost: null,
-          };
+        : editingProject
+          ? {
+              allocation_capital_cost: editingProject.allocation_capital_cost ?? null,
+              allocation_revenue_cost: editingProject.allocation_revenue_cost ?? null,
+              allocation_total_cost: editingProject.allocation_total_cost ?? null,
+            }
+          : {};
       const pdPayload = enablePdRelease
         ? {
             pd_release_capital_cost: n(pdReleaseCapital),
             pd_release_cost: n(pdReleaseRevenue),
             pd_release_total_cost: n(pdReleaseTotal),
           }
-        : {
-            pd_release_capital_cost: null,
-            pd_release_cost: null,
-            pd_release_total_cost: null,
-          };
+        : editingProject
+          ? {
+              pd_release_capital_cost: editingProject.pd_release_capital_cost ?? null,
+              pd_release_cost: editingProject.pd_release_cost ?? null,
+              pd_release_total_cost: editingProject.pd_release_total_cost ?? null,
+            }
+          : {};
       const spendingPayload = enableSpendingRelease
         ? {
             spending_release_capital_cost: n(spendingReleaseCapital),
             spending_release_revenue_cost: n(spendingReleaseRevenue),
             spending_release_total_cost: n(spendingReleaseTotal),
           }
-        : {
-            spending_release_capital_cost: null,
-            spending_release_revenue_cost: null,
-            spending_release_total_cost: null,
-          };
+        : editingProject
+          ? {
+              spending_release_capital_cost: editingProject.spending_release_capital_cost ?? null,
+              spending_release_revenue_cost: editingProject.spending_release_revenue_cost ?? null,
+              spending_release_total_cost: editingProject.spending_release_total_cost ?? null,
+            }
+          : {};
       const pifraPayload = enablePifraUtilization
         ? {
             pifra_utilization_capital_cost: n(pifraCapital),
@@ -683,23 +682,27 @@ useEffect(() => {
             pifra_utilization_total_cost: n(pifraTotal),
             pifra_utilization_date: pifraDate,
           }
-        : {
-            pifra_utilization_capital_cost: null,
-            pifra_utilization_revenue_cost: null,
-            pifra_utilization_total_cost: null,
-            pifra_utilization_date: null,
-          };
+        : editingProject
+          ? {
+              pifra_utilization_capital_cost: editingProject.pifra_utilization_capital_cost ?? null,
+              pifra_utilization_revenue_cost: editingProject.pifra_utilization_revenue_cost ?? null,
+              pifra_utilization_total_cost: editingProject.pifra_utilization_total_cost ?? null,
+              pifra_utilization_date: editingProject.pifra_utilization_date ?? null,
+            }
+          : {};
       const pctPayload = enableUtilPct
         ? {
             percentage_utilization_capital: n(utilPctCapital),
             percentage_utilization_revenue: n(utilPctRevenue),
             percentage_utilization_total: n(utilPctTotal),
           }
-        : {
-            percentage_utilization_capital: null,
-            percentage_utilization_revenue: null,
-            percentage_utilization_total: null,
-          };
+        : editingProject
+          ? {
+              percentage_utilization_capital: editingProject.percentage_utilization_capital ?? null,
+              percentage_utilization_revenue: editingProject.percentage_utilization_revenue ?? null,
+              percentage_utilization_total: editingProject.percentage_utilization_total ?? null,
+            }
+          : {};
 
       if (editingProject) {
         updateProjectMutation.mutate({
@@ -1444,19 +1447,19 @@ useEffect(() => {
                           <Checkbox checked={enableAllocation} onCheckedChange={(v) => setEnableAllocation(Boolean(v))} />
                           Allocation (M)
                         </label>
-                        {enableAllocation && (
+                        {(enableAllocation || (!!editingProject && [allocationCapital, allocationRevenue, allocationTotal].some((v) => String(v ?? "").trim() !== ""))) && (
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-2">
                               <Label>Capital Cost (M)</Label>
-                              <Input value={allocationCapital} onChange={(e) => setAllocationCapital(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 0" />
+                              <Input value={allocationCapital} onChange={(e) => setAllocationCapital(e.target.value)} disabled={!!editingProject && !enableAllocation} type="number" min={0} step="any" placeholder="e.g. 0" />
                             </div>
                             <div className="space-y-2">
                               <Label>Revenue Cost (M)</Label>
-                              <Input value={allocationRevenue} onChange={(e) => setAllocationRevenue(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 643.615" />
+                              <Input value={allocationRevenue} onChange={(e) => setAllocationRevenue(e.target.value)} disabled={!!editingProject && !enableAllocation} type="number" min={0} step="any" placeholder="e.g. 643.615" />
                             </div>
                             <div className="space-y-2">
                               <Label>Total Cost (M)</Label>
-                              <Input value={allocationTotal} 
+                              <Input value={allocationTotal} disabled={!!editingProject && !enableAllocation} 
                               // onChange={(e) => setAllocationTotal(e.target.value)} 
                               type="number" min={0} step="any" placeholder="e.g. 643.615" />
                             </div>
@@ -1470,19 +1473,19 @@ useEffect(() => {
                           <Checkbox checked={enablePdRelease} onCheckedChange={(v) => setEnablePdRelease(Boolean(v))} />
                           P&amp;D Release (M)
                         </label>
-                        {enablePdRelease && (
+                        {(enablePdRelease || (!!editingProject && [pdReleaseCapital, pdReleaseRevenue, pdReleaseTotal].some((v) => String(v ?? "").trim() !== ""))) && (
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-2">
                               <Label>Capital Cost (M)</Label>
-                              <Input value={pdReleaseCapital} onChange={(e) => setPdReleaseCapital(e.target.value)} type="number" min={0} step="any" />
+                              <Input value={pdReleaseCapital} onChange={(e) => setPdReleaseCapital(e.target.value)} disabled={!!editingProject && !enablePdRelease} type="number" min={0} step="any" />
                             </div>
                             <div className="space-y-2">
                               <Label>Revenue Cost (M)</Label>
-                              <Input value={pdReleaseRevenue} onChange={(e) => setPdReleaseRevenue(e.target.value)} type="number" min={0} step="any" />
+                              <Input value={pdReleaseRevenue} onChange={(e) => setPdReleaseRevenue(e.target.value)} disabled={!!editingProject && !enablePdRelease} type="number" min={0} step="any" />
                             </div>
                             <div className="space-y-2">
                               <Label>Total Cost (M)</Label>
-                              <Input value={pdReleaseTotal} o
+                              <Input value={pdReleaseTotal} disabled={!!editingProject && !enablePdRelease} o
                               // nChange={(e) => setPdReleaseTotal(e.target.value)} 
                               type="number" min={0} step="any" />
                             </div>
@@ -1496,19 +1499,19 @@ useEffect(() => {
                           <Checkbox checked={enableSpendingRelease} onCheckedChange={(v) => setEnableSpendingRelease(Boolean(v))} />
                           Spending Release (M)
                         </label>
-                        {enableSpendingRelease && (
+                        {(enableSpendingRelease || (!!editingProject && [spendingReleaseCapital, spendingReleaseRevenue, spendingReleaseTotal].some((v) => String(v ?? "").trim() !== ""))) && (
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-2">
                               <Label>Capital Cost (M)</Label>
-                              <Input value={spendingReleaseCapital} onChange={(e) => setSpendingReleaseCapital(e.target.value)} type="number" min={0} step="any" />
+                              <Input value={spendingReleaseCapital} onChange={(e) => setSpendingReleaseCapital(e.target.value)} disabled={!!editingProject && !enableSpendingRelease} type="number" min={0} step="any" />
                             </div>
                             <div className="space-y-2">
                               <Label>Revenue Cost (M)</Label>
-                              <Input value={spendingReleaseRevenue} onChange={(e) => setSpendingReleaseRevenue(e.target.value)} type="number" min={0} step="any" />
+                              <Input value={spendingReleaseRevenue} onChange={(e) => setSpendingReleaseRevenue(e.target.value)} disabled={!!editingProject && !enableSpendingRelease} type="number" min={0} step="any" />
                             </div>
                             <div className="space-y-2">
                               <Label>Total Cost (M)</Label>
-                              <Input value={spendingReleaseTotal} 
+                              <Input value={spendingReleaseTotal} disabled={!!editingProject && !enableSpendingRelease} 
                               // onChange={(e) => setSpendingReleaseTotal(e.target.value)} 
                               type="number" min={0} step="any" />
                             </div>
@@ -1522,25 +1525,25 @@ useEffect(() => {
                           <Checkbox checked={enablePifraUtilization} onCheckedChange={(v) => setEnablePifraUtilization(Boolean(v))} />
                           Pifra Utilization (M)
                         </label>
-                        {enablePifraUtilization && (
+                        {(enablePifraUtilization || (!!editingProject && [pifraCapital, pifraRevenue, pifraTotal, pifraDate].some((v) => String(v ?? "").trim() !== ""))) && (
                           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div className="space-y-2">
                               <Label>Capital Cost (M)</Label>
-                              <Input value={pifraCapital} onChange={(e) => setPifraCapital(e.target.value)} type="number" min={0} step="any" />
+                              <Input value={pifraCapital} onChange={(e) => setPifraCapital(e.target.value)} disabled={!!editingProject && !enablePifraUtilization} type="number" min={0} step="any" />
                             </div>
                             <div className="space-y-2">
                               <Label>Revenue Cost (M)</Label>
-                              <Input value={pifraRevenue} onChange={(e) => setPifraRevenue(e.target.value)} type="number" min={0} step="any" />
+                              <Input value={pifraRevenue} onChange={(e) => setPifraRevenue(e.target.value)} disabled={!!editingProject && !enablePifraUtilization} type="number" min={0} step="any" />
                             </div>
                             <div className="space-y-2">
                               <Label>Total Cost (M)</Label>
-                              <Input value={pifraTotal} 
+                              <Input value={pifraTotal} disabled={!!editingProject && !enablePifraUtilization} 
                               // onChange={(e) => setPifraTotal(e.target.value)} 
                               type="number" min={0} step="any" />
                             </div>
                             <div className="space-y-2">
                               <Label>Date</Label>
-                              <Input value={pifraDate} onChange={(e) => setPifraDate(e.target.value)} type="date" />
+                              <Input value={pifraDate} onChange={(e) => setPifraDate(e.target.value)} disabled={!!editingProject && !enablePifraUtilization} type="date" />
                             </div>
                           </div>
                         )}
@@ -1552,19 +1555,19 @@ useEffect(() => {
                           <Checkbox checked={enableUtilPct} onCheckedChange={(v) => setEnableUtilPct(Boolean(v))} />
                           %age Utilization against Spending Release
                         </label>
-                        {enableUtilPct && (
+                        {(enableUtilPct || (!!editingProject && [utilPctCapital, utilPctRevenue, utilPctTotal].some((v) => String(v ?? "").trim() !== ""))) && (
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-2">
                               <Label>Capital %</Label>
-                              <Input value={utilPctCapital} onChange={(e) => setUtilPctCapital(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 0.0" />
+                              <Input value={utilPctCapital} onChange={(e) => setUtilPctCapital(e.target.value)} disabled={!!editingProject && !enableUtilPct} type="number" min={0} step="any" placeholder="e.g. 0.0" />
                             </div>
                             <div className="space-y-2">
                               <Label>Revenue %</Label>
-                              <Input value={utilPctRevenue} onChange={(e) => setUtilPctRevenue(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 38.53" />
+                              <Input value={utilPctRevenue} onChange={(e) => setUtilPctRevenue(e.target.value)} disabled={!!editingProject && !enableUtilPct} type="number" min={0} step="any" placeholder="e.g. 38.53" />
                             </div>
                             <div className="space-y-2">
                               <Label>Total Cost %</Label>
-                              <Input value={utilPctTotal} 
+                              <Input value={utilPctTotal} disabled={!!editingProject && !enableUtilPct} 
                               // onChange={(e) => setUtilPctTotal(e.target.value)} 
                               type="number" min={0} step="any" placeholder="e.g. 38.53" />
                             </div>
@@ -2729,19 +2732,19 @@ useEffect(() => {
                     <Checkbox checked={enableAllocation} onCheckedChange={(v) => setEnableAllocation(Boolean(v))} />
                     Allocation (M)
                   </label>
-                  {enableAllocation && (
+                  {(enableAllocation || (!!editingProject && [allocationCapital, allocationRevenue, allocationTotal].some((v) => String(v ?? "").trim() !== ""))) && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>Capital Cost (M)</Label>
-                        <Input value={allocationCapital} onChange={(e) => setAllocationCapital(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 0" />
+                        <Input value={allocationCapital} onChange={(e) => setAllocationCapital(e.target.value)} disabled={!!editingProject && !enableAllocation} type="number" min={0} step="any" placeholder="e.g. 0" />
                       </div>
                       <div className="space-y-2">
                         <Label>Revenue Cost (M)</Label>
-                        <Input value={allocationRevenue} onChange={(e) => setAllocationRevenue(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 643.615" />
+                        <Input value={allocationRevenue} onChange={(e) => setAllocationRevenue(e.target.value)} disabled={!!editingProject && !enableAllocation} type="number" min={0} step="any" placeholder="e.g. 643.615" />
                       </div>
                       <div className="space-y-2">
                         <Label>Total Cost (M)</Label>
-                        <Input value={allocationTotal} 
+                        <Input value={allocationTotal} disabled={!!editingProject && !enableAllocation} 
                         // onChange={(e) => setAllocationTotal(e.target.value)} 
                         type="number" min={0} step="any" placeholder="e.g. 643.615" />
                       </div>
@@ -2755,19 +2758,19 @@ useEffect(() => {
                     <Checkbox checked={enablePdRelease} onCheckedChange={(v) => setEnablePdRelease(Boolean(v))} />
                     P&amp;D Release (M)
                   </label>
-                  {enablePdRelease && (
+                  {(enablePdRelease || (!!editingProject && [pdReleaseCapital, pdReleaseRevenue, pdReleaseTotal].some((v) => String(v ?? "").trim() !== ""))) && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>Capital Cost (M)</Label>
-                        <Input value={pdReleaseCapital} onChange={(e) => setPdReleaseCapital(e.target.value)} type="number" min={0} step="any" />
+                        <Input value={pdReleaseCapital} onChange={(e) => setPdReleaseCapital(e.target.value)} disabled={!!editingProject && !enablePdRelease} type="number" min={0} step="any" />
                       </div>
                       <div className="space-y-2">
                         <Label>Revenue Cost (M)</Label>
-                        <Input value={pdReleaseRevenue} onChange={(e) => setPdReleaseRevenue(e.target.value)} type="number" min={0} step="any" />
+                        <Input value={pdReleaseRevenue} onChange={(e) => setPdReleaseRevenue(e.target.value)} disabled={!!editingProject && !enablePdRelease} type="number" min={0} step="any" />
                       </div>
                       <div className="space-y-2">
                         <Label>Total Cost (M)</Label>
-                        <Input value={pdReleaseTotal} 
+                        <Input value={pdReleaseTotal} disabled={!!editingProject && !enablePdRelease} 
                         // onChange={(e) => setPdReleaseTotal(e.target.value)} 
                         type="number" min={0} step="any" />
                       </div>
@@ -2781,19 +2784,19 @@ useEffect(() => {
                     <Checkbox checked={enableSpendingRelease} onCheckedChange={(v) => setEnableSpendingRelease(Boolean(v))} />
                     Spending Release (M)
                   </label>
-                  {enableSpendingRelease && (
+                  {(enableSpendingRelease || (!!editingProject && [spendingReleaseCapital, spendingReleaseRevenue, spendingReleaseTotal].some((v) => String(v ?? "").trim() !== ""))) && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>Capital Cost (M)</Label>
-                        <Input value={spendingReleaseCapital} onChange={(e) => setSpendingReleaseCapital(e.target.value)} type="number" min={0} step="any" />
+                        <Input value={spendingReleaseCapital} onChange={(e) => setSpendingReleaseCapital(e.target.value)} disabled={!!editingProject && !enableSpendingRelease} type="number" min={0} step="any" />
                       </div>
                       <div className="space-y-2">
                         <Label>Revenue Cost (M)</Label>
-                        <Input value={spendingReleaseRevenue} onChange={(e) => setSpendingReleaseRevenue(e.target.value)} type="number" min={0} step="any" />
+                        <Input value={spendingReleaseRevenue} onChange={(e) => setSpendingReleaseRevenue(e.target.value)} disabled={!!editingProject && !enableSpendingRelease} type="number" min={0} step="any" />
                       </div>
                       <div className="space-y-2">
                         <Label>Total Cost (M)</Label>
-                        <Input value={spendingReleaseTotal} 
+                        <Input value={spendingReleaseTotal} disabled={!!editingProject && !enableSpendingRelease} 
                         // onChange={(e) => setSpendingReleaseTotal(e.target.value)} 
                         type="number" min={0} step="any" />
                       </div>
@@ -2807,25 +2810,25 @@ useEffect(() => {
                     <Checkbox checked={enablePifraUtilization} onCheckedChange={(v) => setEnablePifraUtilization(Boolean(v))} />
                     Pifra Utilization (M)
                   </label>
-                  {enablePifraUtilization && (
+                  {(enablePifraUtilization || (!!editingProject && [pifraCapital, pifraRevenue, pifraTotal, pifraDate].some((v) => String(v ?? "").trim() !== ""))) && (
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="space-y-2">
                         <Label>Capital Cost (M)</Label>
-                        <Input value={pifraCapital} onChange={(e) => setPifraCapital(e.target.value)} type="number" min={0} step="any" />
+                        <Input value={pifraCapital} onChange={(e) => setPifraCapital(e.target.value)} disabled={!!editingProject && !enablePifraUtilization} type="number" min={0} step="any" />
                       </div>
                       <div className="space-y-2">
                         <Label>Revenue Cost (M)</Label>
-                        <Input value={pifraRevenue} onChange={(e) => setPifraRevenue(e.target.value)} type="number" min={0} step="any" />
+                        <Input value={pifraRevenue} onChange={(e) => setPifraRevenue(e.target.value)} disabled={!!editingProject && !enablePifraUtilization} type="number" min={0} step="any" />
                       </div>
                       <div className="space-y-2">
                         <Label>Total Cost (M)</Label>
-                        <Input value={pifraTotal} 
+                        <Input value={pifraTotal} disabled={!!editingProject && !enablePifraUtilization} 
                         // onChange={(e) => setPifraTotal(e.target.value)}
                          type="number" min={0} step="any" />
                       </div>
                       <div className="space-y-2">
                         <Label>Date</Label>
-                        <Input value={pifraDate} onChange={(e) => setPifraDate(e.target.value)} type="date" />
+                        <Input value={pifraDate} onChange={(e) => setPifraDate(e.target.value)} disabled={!!editingProject && !enablePifraUtilization} type="date" />
                       </div>
                     </div>
                   )}
@@ -2837,19 +2840,19 @@ useEffect(() => {
                     <Checkbox checked={enableUtilPct} onCheckedChange={(v) => setEnableUtilPct(Boolean(v))} />
                     %age Utilization against Spending Release
                   </label>
-                  {enableUtilPct && (
+                  {(enableUtilPct || (!!editingProject && [utilPctCapital, utilPctRevenue, utilPctTotal].some((v) => String(v ?? "").trim() !== ""))) && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>Capital %</Label>
-                        <Input value={utilPctCapital} onChange={(e) => setUtilPctCapital(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 0.0" />
+                        <Input value={utilPctCapital} onChange={(e) => setUtilPctCapital(e.target.value)} disabled={!!editingProject && !enableUtilPct} type="number" min={0} step="any" placeholder="e.g. 0.0" />
                       </div>
                       <div className="space-y-2">
                         <Label>Revenue %</Label>
-                        <Input value={utilPctRevenue} onChange={(e) => setUtilPctRevenue(e.target.value)} type="number" min={0} step="any" placeholder="e.g. 38.53" />
+                        <Input value={utilPctRevenue} onChange={(e) => setUtilPctRevenue(e.target.value)} disabled={!!editingProject && !enableUtilPct} type="number" min={0} step="any" placeholder="e.g. 38.53" />
                       </div>
                       <div className="space-y-2">
                         <Label>Total Cost %</Label>
-                        <Input value={utilPctTotal} 
+                        <Input value={utilPctTotal} disabled={!!editingProject && !enableUtilPct} 
                         // onChange={(e) => setUtilPctTotal(e.target.value)}
                          type="number" min={0} step="any" placeholder="e.g. 38.53" />
                       </div>
