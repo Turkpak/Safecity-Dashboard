@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
@@ -179,6 +179,29 @@ export function MilestoneDetailsPanel({
     staleTime: 30 * 1000,
   });
   const apiDelayLogs = (apiDelayLogsData?.data ?? []) as ApiDelayLog[];
+
+  /**
+   * Keep the Gantt delay marker and the Delay Logs tab in sync after a delay
+   * is created from ProjectGanttTree. The delay-list query is independent from
+   * the nested Gantt query, so both datasets must be refreshed explicitly.
+   */
+  const handleDelayLogSaved = useCallback(async () => {
+    if (ganttProjectId != null) {
+      await queryClient.invalidateQueries({
+        queryKey: ["delay-logs", ganttProjectId],
+      });
+      await queryClient.refetchQueries({
+        queryKey: ["delay-logs", ganttProjectId],
+        type: "active",
+      });
+    }
+
+    await onProjectGanttRefresh?.();
+
+    // A delay is created from the Gantt tab; move the user to Delay Logs so
+    // the newly saved record is visible immediately.
+    setTab("logs");
+  }, [ganttProjectId, onProjectGanttRefresh, queryClient]);
 
   const { data: apiProgressImagesData, isFetching: apiProgressImagesLoading } = useQuery({
     queryKey: ["progress-images", ganttProjectId],
@@ -440,7 +463,7 @@ export function MilestoneDetailsPanel({
                   projectName={milestoneTitle}
                   projectId={ganttProjectId}
                   onOpenAddDocument={canManageMedia ? openAddDocumentFromGantt : undefined}
-                  onDelayLogSaved={onProjectGanttRefresh}
+                  onDelayLogSaved={handleDelayLogSaved}
                   onProgressSaved={onProjectGanttRefresh}
                 />
               ) : (
@@ -1374,7 +1397,12 @@ export function MilestoneDetailsPanel({
                         recommended_action: updateDelayForm.recommended_action,
                       });
                       await queryClient.invalidateQueries({ queryKey: ["delay-logs", ganttProjectId] });
+                      await queryClient.refetchQueries({
+                        queryKey: ["delay-logs", ganttProjectId],
+                        type: "active",
+                      });
                       await onProjectGanttRefresh?.();
+                      setTab("logs");
                       closeUpdateDelayDialog();
                     } finally {
                       setUpdatingDelay(false);
