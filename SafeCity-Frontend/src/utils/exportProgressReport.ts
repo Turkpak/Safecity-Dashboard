@@ -628,23 +628,28 @@ function groupByProject<T>(items: T[], getId: (item: T) => number): Map<number, 
   return map;
 }
 
-async function fetchEvidenceForReport(report: ReportData): Promise<ReportEvidence> {
+async function fetchEvidenceForReport(
+  report: ReportData,
+  includeProgressImages = true,
+): Promise<ReportEvidence> {
   const ids = projectIds(report);
   if (!ids.size) return { delayLogs: [], progressImages: [] };
 
-  // Backend supports unfiltered list endpoints. Fetch once and filter client-side
-  // so all-project reports can show delay details for every project in scope.
-  const [delayRes, imageRes] = await Promise.allSettled([
-    listDelayLogs(),
-    listProgressImages(),
-  ]);
+  // Delay logs are required for project reports. Progress images are fetched
+  // only when the selected-project report needs them. The All Projects report
+  // intentionally excludes image evidence.
+  const [delayResult] = await Promise.allSettled([listDelayLogs()]);
+  const delayLogs = delayResult.status === "fulfilled"
+    ? (((delayResult.value as any).data ?? []) as DelayLogItem[])
+    : [];
 
-  const delayLogs = delayRes.status === "fulfilled"
-    ? (((delayRes.value as any).data ?? []) as DelayLogItem[])
-    : [];
-  const progressImages = imageRes.status === "fulfilled"
-    ? ((Array.isArray(imageRes.value) ? imageRes.value : []) as ProgressImage[])
-    : [];
+  let progressImages: ProgressImage[] = [];
+  if (includeProgressImages) {
+    const [imageResult] = await Promise.allSettled([listProgressImages()]);
+    progressImages = imageResult.status === "fulfilled"
+      ? ((Array.isArray(imageResult.value) ? imageResult.value : []) as ProgressImage[])
+      : [];
+  }
 
   return {
     delayLogs: delayLogs.filter((log) => ids.has(delayProjectId(log))),
@@ -732,12 +737,36 @@ async function buildProjectLevelDelayEvidencePage(
   logo: string | null,
   pageNo: number,
   totalPages: number,
+  includeProgressImages = true,
 ): Promise<void> {
   doc.addPage("a4", "portrait");
   drawPageBg(doc); drawHeader(doc, report, pageNo, totalPages, logo); drawFooter(doc, pageNo, totalPages);
 
-  let y = sectionTitle(doc, "Project-Level Delay & Evidence Register", MX, MY, "Delay log details and progress images are fetched from backend evidence APIs.");
-  y = drawDelaySummaryCards(doc, evidence, MX, y, CW);
+  let y = sectionTitle(
+    doc,
+    includeProgressImages ? "Project-Level Delay & Evidence Register" : "Project-Level Delay Register",
+    MX,
+    MY,
+    includeProgressImages
+      ? "Delay log details and progress images are fetched from backend evidence APIs."
+      : "Delay log details are fetched from the backend and summarized by project.",
+  );
+
+  if (includeProgressImages) {
+    y = drawDelaySummaryCards(doc, evidence, MX, y, CW);
+  } else {
+    const delayDays = sumDelayDays(evidence.delayLogs);
+    const gap = 3;
+    const cardW = (CW - gap) / 2;
+    const cards: Array<[string, string, string, Rgb]> = [
+      ["Delay Days", String(delayDays), "total recorded", delayDays ? RED : SLATE],
+      ["Delay Logs", String(evidence.delayLogs.length), "project/activity level", evidence.delayLogs.length ? RED : SLATE],
+    ];
+    cards.forEach(([lbl, val, sub, color], i) =>
+      kpiCard(doc, MX + i * (cardW + gap), y, cardW, 22, lbl, val, sub, color),
+    );
+    y += 27;
+  }
 
   y = sectionTitle(doc, "Delay Details by Project", MX, y, "Issue, period, delay days and responsible/action party where recorded.");
   const delayCols: Col[] = [
@@ -751,10 +780,20 @@ async function buildProjectLevelDelayEvidencePage(
   const delayRows = buildDelayDetailRows(report, evidence, 10);
   y += dataTable(doc, MX, y, CW, delayCols, delayRows, 10, 8) + 7;
 
-  if (CB - y > 67) {
-    await drawEvidenceThumbnails(doc, evidence.progressImages, MX, y, CW, Math.min(66, CB - y));
-  } else if (CB - y >= 18) {
-    drawReportNote(doc, MX, y, CW, evidence.progressImages.length ? `${evidence.progressImages.length} progress image(s) are available for this scope. Open selected project report for larger evidence view.` : "No progress image evidence is available for this scope.");
+  if (includeProgressImages) {
+    if (CB - y > 67) {
+      await drawEvidenceThumbnails(doc, evidence.progressImages, MX, y, CW, Math.min(66, CB - y));
+    } else if (CB - y >= 18) {
+      drawReportNote(
+        doc,
+        MX,
+        y,
+        CW,
+        evidence.progressImages.length
+          ? `${evidence.progressImages.length} progress image(s) are available for this scope. Open selected project report for larger evidence view.`
+          : "No progress image evidence is available for this scope.",
+      );
+    }
   }
 }
 
@@ -1000,7 +1039,7 @@ function buildAllTehsilsReport(doc: jsPDF, r: ReportData, logo: string | null): 
 }
 async function buildAllProjectsReport(doc: jsPDF, r: ReportData, logo: string | null, evidence: ReportEvidence): Promise<void> {
   buildPage1Executive(doc, r, logo, 1, 2);
-  await buildProjectLevelDelayEvidencePage(doc, r, evidence, logo, 2, 2);
+  await buildProjectLevelDelayEvidencePage(doc, r, evidence, logo, 2, 2, false);
 }
 function buildSelectedDivisionReport(doc: jsPDF, r: ReportData, logo: string | null): void {
   buildPage1Executive(doc, r, logo, 1, 5);
@@ -1123,7 +1162,10 @@ export async function exportProgressReport(
   );
 
   const logo = await imageUrlToDataUrl("/Assets/psca logo.png");
-  const evidence = await fetchEvidenceForReport(report);
+  const evidence = await fetchEvidenceForReport(
+    report,
+    scopeType === "selected-project",
+  );
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
   switch (scopeType) {
