@@ -41,3 +41,4 @@ GDAL_LIBRARY_PATH = get_secret("GDAL_LIBRARY_PATH", "")
 GEOS_LIBRARY_PATH = get_secret("GEOS_LIBRARY_PATH", "")
 
 
+ADMIN_URL_PATH = "admin/"      

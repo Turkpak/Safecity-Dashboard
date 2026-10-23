@@ -1,5 +1,5 @@
 from .base import *
-
+from django.core.exceptions import ImproperlyConfigured
 import os
 
 DEBUG = False
@@ -12,6 +12,18 @@ ALLOWED_HOSTS = [
 
 SECRET_KEY = secrets.get("SECRET_KEY", "dev-secret-key")
 
+ADMIN_URL_PATH = get_secret("ADMIN_PATH").strip("/") + "/"
+if ADMIN_URL_PATH == "admin/":
+    raise ImproperlyConfigured("ADMIN_PATH must not be the default 'admin'.")
+ADMIN_TRUST_X_REAL_IP = True
+AXES_IPWARE_META_PRECEDENCE_ORDER = ["HTTP_X_REAL_IP", "REMOTE_ADDR"]
+
+CACHES = {   # shared across gunicorn workers, so rate limits are not per-worker
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "django_cache",
+    }
+}
 
 DATABASES = {
     "default": {
@@ -27,16 +39,27 @@ DATABASES = {
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'DEBUG',
+    'handlers': {'console': {'class': 'logging.StreamHandler'}},
+    'root': {'handlers': ['console'], 'level': 'INFO'},   # was DEBUG
+    'loggers': {
+        'axes': {'level': 'WARNING'},
+        'admin.audit': {'level': 'WARNING'},
     },
 }
+
+# LOGGING = {
+#     'version': 1,
+#     'disable_existing_loggers': False,
+#     'handlers': {
+#         'console': {
+#             'class': 'logging.StreamHandler',
+#         },
+#     },
+#     'root': {
+#         'handlers': ['console'],
+#         'level': 'DEBUG',
+#     },
+# }
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
@@ -53,7 +76,8 @@ CORS_ALLOWED_ORIGINS = [
 CSRF_TRUSTED_ORIGINS = [
     
 ]
-SECURE_BROWSER_XSS_FILTER = True
+
+# SECURE_BROWSER_XSS_FILTER = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 X_FRAME_OPTIONS = "DENY"

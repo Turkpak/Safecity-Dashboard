@@ -5,7 +5,6 @@ from typing import List, Dict, Any
 from django.http import JsonResponse
 from rest_framework.response import Response
 from rest_framework import status as http_status
-from rest_framework_simplejwt.tokens import RefreshToken
 import secrets
 import os 
 import uuid 
@@ -24,6 +23,7 @@ from rest_framework_simplejwt.settings import api_settings
 
 ACCESS_TOKEN_COOKIE = "safecity_access_token"
 REFRESH_TOKEN_COOKIE = "safecity_refresh_token"
+
 
 class CSRFCheck(CsrfViewMiddleware):
     def _reject(self, request, reason):
@@ -80,7 +80,9 @@ def clear_auth_cookies(response):
     response.delete_cookie(REFRESH_TOKEN_COOKIE, path="/", samesite="Strict")
 
 def get_tokens_for_user(user):
-    refresh = RefreshToken.for_user(user)
+    from api.jwt_tokens import CookieRefreshToken
+
+    refresh = CookieRefreshToken.for_user(user)
 
     return {
         'refresh': str(refresh),

@@ -3,15 +3,20 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.decorators import action
-from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 
 from captcha.models import CaptchaStore
+from api.jwt_tokens import BlacklistableAccessToken, CookieTokenRefreshSerializer
 
 from ..common_imports import *
 from django.contrib.auth import get_user_model
 
+from django.contrib.auth import authenticate
+from axes.handlers.proxy import AxesProxyHandler
+
 from api.utils import (
+    ACCESS_TOKEN_COOKIE,
+    REFRESH_TOKEN_COOKIE,
     clear_auth_cookies,
     enforce_csrf,
     set_auth_cookies,
@@ -47,6 +52,15 @@ class UserLoginDashboardCreateView(viewsets.ViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 ).create_response()
 
+            django_request = request._request   # axes needs the plain Django request, not the DRF wrapper
+            credentials = {"username": email}
+
+            if AxesProxyHandler.is_locked(django_request, credentials):
+                return ApiResponse(
+                    message="Too many failed login attempts. Please try again later.",
+                    http_status=status.HTTP_429_TOO_MANY_REQUESTS,
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                ).create_response()
             # -----------------------------------------
             # Validate CAPTCHA fields
             # -----------------------------------------
@@ -96,16 +110,17 @@ class UserLoginDashboardCreateView(viewsets.ViewSet):
             # Delete it so it cannot be reused.
             # -----------------------------------------
             captcha.delete()
-
+            django_request.axes_username = email.strip().lower()
             # -----------------------------------------
-            # Authenticate user
+            # Authenticate user (axes records failures here)
             # -----------------------------------------
-            user = get_user_model().objects.filter(
-                email=email
-            ).first()
+            user = authenticate(
+                request=django_request,
+                username=email,
+                password=password,
+            )
 
-            if user and user.check_password(password) and user.is_active:
-
+            if user is not None:
                 auth_data = utils.get_tokens_for_user(user)
 
                 response = ApiResponse(
@@ -116,8 +131,21 @@ class UserLoginDashboardCreateView(viewsets.ViewSet):
                 ).create_response()
 
                 set_auth_cookies(response, auth_data)
-
                 return response
+
+            # The failed attempt may have just triggered the lockout
+            if AxesProxyHandler.is_locked(django_request, credentials):
+                return ApiResponse(
+                    message="Too many failed login attempts. Please try again later.",
+                    http_status=status.HTTP_429_TOO_MANY_REQUESTS,
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                ).create_response()
+
+            return ApiResponse(
+                message="Invalid Credentials",
+                http_status=status.HTTP_401_UNAUTHORIZED,
+                status=status.HTTP_401_UNAUTHORIZED,
+            ).create_response()
 
             # -----------------------------------------
             # Invalid credentials
@@ -155,9 +183,7 @@ class UserLoginDashboardCreateView(viewsets.ViewSet):
     def refresh(self, request):
         enforce_csrf(request)
 
-        refresh_token = request.COOKIES.get(
-            "safecity_refresh_token"
-        )
+        refresh_token = request.COOKIES.get(REFRESH_TOKEN_COOKIE)
 
         if not refresh_token:
             return Response(
@@ -165,7 +191,7 @@ class UserLoginDashboardCreateView(viewsets.ViewSet):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        serializer = TokenRefreshSerializer(
+        serializer = CookieTokenRefreshSerializer(
             data={"refresh": refresh_token}
         )
 
@@ -204,15 +230,20 @@ class UserLoginDashboardCreateView(viewsets.ViewSet):
     def logout(self, request):
         enforce_csrf(request)
 
-        refresh_token = request.COOKIES.get(
-            "safecity_refresh_token"
-        )
+        refresh_token = request.COOKIES.get(REFRESH_TOKEN_COOKIE)
+        access_token = request.COOKIES.get(ACCESS_TOKEN_COOKIE)
 
         if refresh_token:
 
             try:
                 RefreshToken(refresh_token).blacklist()
 
+            except TokenError:
+                pass
+
+        if access_token:
+            try:
+                BlacklistableAccessToken(access_token).blacklist()
             except TokenError:
                 pass
 

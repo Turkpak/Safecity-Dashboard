@@ -35,6 +35,7 @@ export default function AuthPage() {
     const [captchaKey, setCaptchaKey] = useState("");
     const [captchaImage, setCaptchaImage] = useState("");
     const [captchaValue, setCaptchaValue] = useState("");
+    const [captchaError, setCaptchaError] = useState("");
     const [isCaptchaLoading, setIsCaptchaLoading] = useState(true);
 
 
@@ -47,7 +48,12 @@ export default function AuthPage() {
             setCaptchaKey(captcha.key);
             setCaptchaImage(captcha.image_url);
             setCaptchaValue("");
-        } catch (error) {
+            setCaptchaError("");
+        } catch {
+            setCaptchaKey("");
+            setCaptchaImage("");
+            setCaptchaValue("");
+            setCaptchaError("Unable to load CAPTCHA. Use refresh to try again.");
             toast({
                 title: "CAPTCHA error",
                 description: "Unable to load security verification.",
@@ -310,12 +316,19 @@ export default function AuthPage() {
                                     <div className="h-14 w-[180px] rounded-xl border-2 border-muted/50 flex items-center justify-center text-sm text-muted-foreground">
                                         Loading...
                                     </div>
-                                ) : (
+                                ) : captchaImage ? (
                                     <img
                                         src={captchaImage}
                                         alt="CAPTCHA"
                                         className="h-14 w-[180px] rounded-xl border-2 border-muted/50 bg-white object-contain"
                                     />
+                                ) : (
+                                    <div
+                                        role="status"
+                                        className="h-14 w-[180px] rounded-xl border-2 border-muted/50 flex items-center justify-center px-2 text-center text-xs text-destructive"
+                                    >
+                                        {captchaError || "CAPTCHA unavailable"}
+                                    </div>
                                 )}
 
                                 <Button

@@ -73,6 +73,9 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     "corsheaders",
     "captcha",
+    'django_otp',
+    'django_otp.plugins.otp_totp',
+    'axes',
     'api',
 ]
 
@@ -81,11 +84,32 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware", 
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'api.admin_security.AdminLoginRateLimitMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django_otp.middleware.OTPMiddleware',  
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'axes.middleware.AxesMiddleware',        
 ]
+
+# --- Admin hardening ---
+ADMIN_URL_PATH = str(secrets.get("ADMIN_PATH", "admin")).strip("/") + "/"
+ADMIN_TRUST_X_REAL_IP = False   # production.py sets True (nginx must set X-Real-IP)
+SESSION_COOKIE_AGE = 60 * 60    # admin session: 1 hour
+
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesStandaloneBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = timedelta(minutes=30)
+AXES_RESET_ON_SUCCESS = True
+AXES_LOCKOUT_PARAMETERS = ["ip_address", "username"] 
+
+AXES_HTTP_RESPONSE_CODE = 429
+AXES_LOCKOUT_CALLABLE = "api.admin_security.axes_lockout_response"
+AXES_USERNAME_CALLABLE = "api.admin_security.axes_username"
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  
@@ -125,7 +149,7 @@ ROOT_URLCONF = 'server.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -197,7 +221,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=2),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
@@ -217,7 +241,8 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
     'USER_AUTHENTICATION_RULE': 'rest_framework_simplejwt.authentication.default_user_authentication_rule',
 
-    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'AUTH_TOKEN_CLASSES': ('api.jwt_tokens.BlacklistableAccessToken',),
+    'TOKEN_REFRESH_SERIALIZER': 'api.jwt_tokens.CookieTokenRefreshSerializer',
     'TOKEN_TYPE_CLAIM': 'token_type',
     'TOKEN_USER_CLASS': 'rest_framework_simplejwt.models.TokenUser',
 
@@ -228,3 +253,4 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_LIFETIME': timedelta(minutes=60),
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
 }
+
