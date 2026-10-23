@@ -20,6 +20,8 @@ from django.middleware.csrf import CsrfViewMiddleware
 from django.core.exceptions import PermissionDenied
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.settings import api_settings
+import logging
+logger = logging.getLogger(__name__)
 
 ACCESS_TOKEN_COOKIE = "safecity_access_token"
 REFRESH_TOKEN_COOKIE = "safecity_refresh_token"
@@ -174,7 +176,10 @@ passkey = get_random_string(length=8)
 def generate_random_string(length=8, allowed_chars=string.ascii_letters + string.digits):
   return ''.join(secrets.choice(allowed_chars) for i in range(length))
 
-
+def safe_error_data(exc):
+    """Log the real error on the server; send a generic message to the client."""
+    logger.error("Unhandled error in API view", exc_info=exc)
+    return "Something went wrong. Please try again."
 class ApiResponse:
     """
     A class for constructing a standardized server response.

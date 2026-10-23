@@ -1,5 +1,7 @@
 from ..common_imports import *
-
+import logging
+from api.jwt_tokens import revoke_user_tokens
+logger = logging.getLogger(__name__)
 class UserUpdateView(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
@@ -24,16 +26,28 @@ class UserUpdateView(viewsets.ViewSet):
 
         data = request.data.copy()
 
-        # Non-admins can never touch privilege fields, even on their own record
+        # Non-admins can never touch privilege or ownership fields, even on their own record
         if request.user.role != "super_admin":
-            data.pop("role", None)
-            data.pop("is_active", None)
-            data.pop("is_staff", None)
+            for field in ("role", "is_active", "is_staff", "is_superuser", "stakeholder"):
+                data.pop(field, None)
+
+        # A user changing their own password must prove they know the current one
+        if data.get("password") and request.user.id == myuser.id:
+            if not myuser.check_password(data.get("current_password") or ""):
+                return ApiResponse(
+                    status=status.HTTP_400_BAD_REQUEST,
+                    message="Current password is incorrect.",
+                    data={"current_password": ["Incorrect password."]},
+                    http_status=status.HTTP_400_BAD_REQUEST,
+                ).create_response()
+        data.pop("current_password", None)
 
         try:
             serializer = MyUserSerializer(myuser, data=data, partial=True)
             if serializer.is_valid():
                 serializer.save()
+                if "password" in data:
+                    revoke_user_tokens(myuser)
                 return ApiResponse(
                     status=status.HTTP_200_OK,
                     message="User updated successfully.",
@@ -46,10 +60,10 @@ class UserUpdateView(viewsets.ViewSet):
                 data=serializer.errors,
                 http_status=status.HTTP_400_BAD_REQUEST
             ).create_response()
-        except Exception as e:
+        except Exception:
+            logger.exception("User update failed")
             return ApiResponse(
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                message="Exception error.",
-                data=str(e),
-                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                message="Something went wrong. Please try again.",
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             ).create_response()

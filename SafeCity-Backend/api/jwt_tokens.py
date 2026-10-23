@@ -5,6 +5,10 @@ from rest_framework_simplejwt.tokens import (
     RefreshToken,
 )
 
+from rest_framework_simplejwt.token_blacklist.models import (
+    BlacklistedToken,
+    OutstandingToken,
+)
 
 class BlacklistableAccessToken(
     BlacklistMixin["BlacklistableAccessToken"],
@@ -19,3 +23,8 @@ class CookieRefreshToken(RefreshToken):
 
 class CookieTokenRefreshSerializer(TokenRefreshSerializer):
     token_class = CookieRefreshToken
+
+def revoke_user_tokens(user):
+    """Blacklist every outstanding refresh token so all sessions end."""
+    for token in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=token)

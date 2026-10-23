@@ -2,7 +2,8 @@ from ..common_imports import *
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from api.utils import REFRESH_TOKEN_COOKIE
-
+import logging
+logger = logging.getLogger(__name__)
 class GetUserView(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
@@ -61,7 +62,17 @@ class GetUserView(viewsets.ViewSet):
             is_admin = requester.role == "super_admin"
 
             if user_id or email:
-                lookup = {"id": user_id} if user_id else {"email": email}
+                if user_id:
+                    try:
+                        lookup = {"id": int(user_id)}
+                    except (TypeError, ValueError):
+                        return ApiResponse(
+                            status=status.HTTP_400_BAD_REQUEST,
+                            message="Invalid user id.",
+                            http_status=status.HTTP_400_BAD_REQUEST,
+                        ).create_response()
+                else:
+                    lookup = {"email": email}
                 target = MyUser.objects.filter(**lookup).first()
                 if not target:
                     return ApiResponse(
@@ -113,10 +124,10 @@ class GetUserView(viewsets.ViewSet):
                 data=e.detail,
                 http_status=status.HTTP_400_BAD_REQUEST
             ).create_response()
-        except Exception as e:
+        except Exception:
+            logger.exception("User update failed")
             return ApiResponse(
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                message="Server error.",
-                data=str(e),
-                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                message="Something went wrong. Please try again.",
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             ).create_response()

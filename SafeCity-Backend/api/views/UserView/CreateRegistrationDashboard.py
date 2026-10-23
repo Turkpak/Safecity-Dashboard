@@ -4,7 +4,8 @@ from rest_framework import viewsets, status, serializers
 from rest_framework.throttling import ScopedRateThrottle
 
 from ..common_imports import *
-
+import logging
+logger = logging.getLogger(__name__)
 
 class UserCreateView(viewsets.ViewSet):
     permission_classes = [IsAdminUserForCreate]
@@ -51,7 +52,14 @@ class UserCreateView(viewsets.ViewSet):
                     data={"stakeholder": ["Stakeholder type cannot be empty."]},
                     http_status=status.HTTP_400_BAD_REQUEST,
                 ).create_response()
-
+            
+            if role.replace(" ", "_") == "super_admin":
+                return ApiResponse(
+                    status=status.HTTP_400_BAD_REQUEST,
+                    message="This stakeholder type cannot be used to create a user.",
+                    http_status=status.HTTP_400_BAD_REQUEST,
+                ).create_response()
+            
             user_data = request.data.copy()
             user_data.pop("role", None)
 
@@ -85,10 +93,10 @@ class UserCreateView(viewsets.ViewSet):
                 http_status=status.HTTP_400_BAD_REQUEST,
             ).create_response()
 
-        except Exception as e:
+        except Exception:
+            logger.exception("User create failed")
             return ApiResponse(
-                status=status.HTTP_400_BAD_REQUEST,
-                message="Exception error.",
-                data=str(e),
-                http_status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message="Something went wrong. Please try again.",
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             ).create_response()

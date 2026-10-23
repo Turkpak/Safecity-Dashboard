@@ -7,6 +7,8 @@ from django.contrib.auth import get_user_model
 from .utils import parse_xer
 from datetime import datetime
 from rest_framework_gis.fields import GeometryField
+from django.contrib.auth import password_validation
+
 # --------------------------------------------------------
 # MyUser Serializer
 # --------------------------------------------------------
@@ -27,6 +29,10 @@ class MyUserSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}"
 
+    def validate_password(self, value):
+        password_validation.validate_password(value)
+        return value
+
     def create(self, validated_data):
         # role/is_active are already stripped by read_only_fields —
         # never trust validated_data for privilege, always set explicitly here
@@ -37,6 +43,7 @@ class MyUserSerializer(serializers.ModelSerializer):
         user = MyUser(**validated_data)
         user.role = "contractor"      # hardcoded lowest-privilege default
         user.is_staff = False
+        user.is_superuser = False
         user.is_active = True
         if password:
             user.set_password(password)
@@ -95,6 +102,7 @@ class UserPermissionSerializer(serializers.ModelSerializer):
             'updated_by',
             'updated_by_email',
         ]
+        read_only_fields = ['created_by', 'updated_by']        
         extra_kwargs = {
             'sub_label': {'required': False, 'allow_null': True, 'allow_blank': True},
         }

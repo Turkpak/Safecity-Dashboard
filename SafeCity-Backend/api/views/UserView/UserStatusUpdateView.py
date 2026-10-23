@@ -1,6 +1,6 @@
 from ..common_imports import *
 
-
+from api.jwt_tokens import revoke_user_tokens
 class UserStatusUpdateView(viewsets.ViewSet):
     """
     Activate or deactivate a user account.
@@ -77,7 +77,8 @@ class UserStatusUpdateView(viewsets.ViewSet):
         try:
             myuser.is_active = is_active
             myuser.save(update_fields=["is_active"])
-
+            if not is_active:
+                revoke_user_tokens(myuser)
             return ApiResponse(
                 status=status.HTTP_200_OK,
                 message=(
