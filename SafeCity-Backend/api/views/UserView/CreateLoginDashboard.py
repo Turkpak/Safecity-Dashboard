@@ -1,3 +1,4 @@
+﻿from api.utils import safe_error_data
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
@@ -170,7 +171,7 @@ class UserLoginDashboardCreateView(viewsets.ViewSet):
             return ApiResponse(
                 status=status.HTTP_400_BAD_REQUEST,
                 message="Exception error.",
-                data=str(e),
+                data=safe_error_data(e),
                 http_status=status.HTTP_400_BAD_REQUEST,
             ).create_response()
 

@@ -32,11 +32,11 @@ class ProjectGanttView(APIView):
             return Response({
                 "status": True,
                 "tasks": serializer.data,
-                "links": dep_data   # 🔥 important for arrows
-            })
+                "links": dep_data   
+            }, status=500)
 
         except Exception as e:
             return Response({
                 "status": False,
-                "message": str(e)
-            })
+                "message": safe_error_data(e)
+            }, status=500)

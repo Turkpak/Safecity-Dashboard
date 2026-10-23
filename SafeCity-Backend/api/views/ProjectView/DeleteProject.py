@@ -47,6 +47,6 @@ class ProjectDeleteView(viewsets.ViewSet):
         except Exception as e:
             return ApiResponse(
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                message=str(e),
+                message=safe_error_data(e),
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             ).create_response()

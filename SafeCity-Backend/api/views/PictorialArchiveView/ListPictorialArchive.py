@@ -1,3 +1,4 @@
+﻿from api.utils import safe_error_data
 from ..common_imports import *
 
 class ListPictorialArchiveView(viewsets.ViewSet):
@@ -53,6 +54,6 @@ class ListPictorialArchiveView(viewsets.ViewSet):
             return ApiResponse(
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 message="Server error.",
-                data=str(e),
+                data=safe_error_data(e),
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             ).create_response()

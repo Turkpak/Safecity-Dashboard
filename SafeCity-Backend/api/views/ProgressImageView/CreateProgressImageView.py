@@ -1,3 +1,4 @@
+﻿from api.utils import safe_error_data
 from ..common_imports import *
 
 
@@ -25,6 +26,6 @@ class ProgressImageCreateViewSet(viewsets.ModelViewSet):
             return ApiResponse(
                 status=status.HTTP_400_BAD_REQUEST,
                 message="Error creating activity image.",
-                data=str(e),
+                data=safe_error_data(e),
                 http_status=status.HTTP_400_BAD_REQUEST
             ).create_response()

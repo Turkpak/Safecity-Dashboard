@@ -1,3 +1,4 @@
+﻿from api.utils import safe_error_data
 from ..common_imports import *
 
 class ListStakeholderView(viewsets.ViewSet):
@@ -39,6 +40,6 @@ class ListStakeholderView(viewsets.ViewSet):
             return ApiResponse(
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 message="Exception error.",
-                data=str(e),
+                data=safe_error_data(e),
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             ).create_response()

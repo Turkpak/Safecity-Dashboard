@@ -106,14 +106,16 @@ class StandardResultsSetPagination(PageNumberPagination):
     page_query_param = 'page'
 
     def paginate_queryset(self, queryset, request, view=None):
-        # Handle sorting
+        # Sorting: only real columns on this model; no relation traversal, never password
         sort_by = request.query_params.get('sortBy')
         sort_dir = request.query_params.get('sortDir', 'asc')
 
-        if sort_by:
-            if sort_dir == 'desc':
-                sort_by = f'-{sort_by}'
-            queryset = queryset.order_by(sort_by)
+        if sort_by and hasattr(queryset, "model"):
+            sortable = {f.name for f in queryset.model._meta.concrete_fields} - {"password"}
+            if sort_by in sortable:
+                if sort_dir == 'desc':
+                    sort_by = f'-{sort_by}'
+                queryset = queryset.order_by(sort_by)
 
         return super().paginate_queryset(queryset, request, view)
 

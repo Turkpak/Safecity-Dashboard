@@ -44,6 +44,6 @@ class ListProjectActivityView(viewsets.ViewSet):
             result = get_xer_gantt_data(int(project_id))
             return Response({"status": True, "tasks": result.get("tasks", []), "message": result.get("message")})
         except ValueError as e:
-            return Response({"status": False, "message": str(e), "tasks": []}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"status": False, "message": "Invalid project id.", "tasks": []}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({"status": False, "message": str(e), "tasks": []}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"status": False, "message": safe_error_data(e), "tasks": []}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

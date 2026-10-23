@@ -1,3 +1,4 @@
+﻿from api.utils import safe_error_data
 from django.db.models import Sum
 from rest_framework.views import APIView
 from ..common_imports import *
@@ -113,6 +114,6 @@ class ProjectSummaryView(APIView):
             return ApiResponse(
                 status=500,
                 message="Error",
-                data=str(e),
+                data=safe_error_data(e),
                 http_status=500
             ).create_response()
