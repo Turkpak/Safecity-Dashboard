@@ -15,6 +15,8 @@ export function PermissionGate({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const rootPermission = getPermissionForPath("/");
   const rootDenied = location === "/" && !isSuperAdmin && rootPermission != null && !canView(rootPermission.sidebar_label, rootPermission.sub_label);
+  const requiredPermission = getPermissionForPath(location);
+  const denied = location !== "/auth" && !isSuperAdmin && requiredPermission != null && !canView(requiredPermission.sidebar_label, requiredPermission.sub_label);
 
   useEffect(() => {
     if (location === "/auth") return;
@@ -31,13 +33,13 @@ export function PermissionGate({ children }: { children: ReactNode }) {
     }
   }, [location, canView, isSuperAdmin, setLocation, toast]);
 
-  if (rootDenied) {
+  if (rootDenied || denied) {
     return (
       <Layout title="Access restricted">
         <div className="min-h-[60vh] flex items-center justify-center p-6 text-center">
           <div>
             <h1 className="text-xl font-semibold">Access restricted</h1>
-            <p className="mt-2 text-muted-foreground">You don&apos;t have permission to view the Dashboard.</p>
+            <p className="mt-2 text-muted-foreground">Your account is not permitted to view this page.</p>
           </div>
         </div>
       </Layout>

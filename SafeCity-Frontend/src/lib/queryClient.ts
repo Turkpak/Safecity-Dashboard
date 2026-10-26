@@ -1,10 +1,15 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { fetchWithSession } from "@/api/client";
+import { ApiError, fetchWithSession } from "@/api/client";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    throw new ApiError(
+      res.status === 401 ? "Your session has expired. Please sign in again." :
+      res.status === 403 ? "You do not have permission to perform this action, or your security session expired." :
+      res.status === 429 ? "Too many requests. Please try again shortly." :
+      res.status >= 500 ? "An unexpected server error occurred." :
+      `Request failed (HTTP ${res.status}).`, res.status,
+    );
   }
 }
 

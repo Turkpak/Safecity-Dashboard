@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { ApiError } from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
     getCaptcha,
@@ -108,10 +109,15 @@ export default function AuthPage() {
         } catch (err) {
             toast({
                 title: "Login failed",
-                description:
-                    err instanceof Error
-                        ? err.message
-                        : "Invalid credentials or CAPTCHA.",
+                description: err instanceof ApiError && err.status === 429
+                    ? "Too many login attempts. Please wait before trying again."
+                    : err instanceof ApiError && err.status === 403
+                    ? "Login security check failed. Refresh the page and retry."
+                    : err instanceof ApiError && err.status >= 500
+                    ? "Sign-in is temporarily unavailable. Please try again later."
+                    : err instanceof ApiError && err.status === 400
+                    ? "Please check your credentials and the CAPTCHA, then try again."
+                    : "Login failed. Check your credentials and CAPTCHA.",
                 variant: "destructive",
             });
 

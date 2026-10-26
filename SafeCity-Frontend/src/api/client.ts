@@ -17,43 +17,105 @@ function getCookie(name: string): string | null {
   return cookie ? decodeURIComponent(cookie.slice(name.length + 1)) : null;
 }
 
+// A single CSRF fetch and a single refresh request are shared across concurrent calls.
+// This prevents a burst of 401s from rotating refresh cookies against each other.
+let csrfPromise: Promise<void> | null = null;
+let refreshPromise: Promise<boolean> | null = null;
+let logoutPending = false;
+let sessionEpoch = 0;
+let refreshRevision = 0;
+
+const AUTH_PATHS = new Set(["/api/login-user/", "/api/login-user/refresh/", "/api/login-user/logout/"]);
+
+export function resetSessionAfterLogin(): void {
+  logoutPending = false;
+  sessionEpoch += 1;
+}
+
+/** Wait for an already-started refresh before invalidating the cookie server-side. */
+export async function beginSessionLogout(): Promise<void> {
+  logoutPending = true;
+  if (refreshPromise) await refreshPromise.catch(() => false);
+}
+
+/** A failed logout must not be misrepresented as server-side revocation. */
+export function endSessionLogout(confirmed: boolean): void {
+  if (confirmed) sessionEpoch += 1;
+  logoutPending = false;
+}
+
 async function ensureCsrfCookie(): Promise<void> {
-  if (!getCookie("csrftoken")) {
-    await fetch(apiUrl("csrf/"), { credentials: "include" });
+  if (getCookie("csrftoken")) return;
+  if (!csrfPromise) {
+    csrfPromise = (async () => {
+      const response = await fetch(apiUrl("csrf/"), { credentials: "include" });
+      if (!response.ok) throw new ApiError("Unable to establish the secure request session.", response.status);
+      if (!getCookie("csrftoken")) throw new ApiError("CSRF security cookie was not received. Please reload the page.", 403);
+    })().finally(() => { csrfPromise = null; });
+  }
+  await csrfPromise;
+}
+
+function announceExpiredSession(): void {
+  if (typeof window !== "undefined" && !logoutPending) {
+    window.dispatchEvent(new Event("safecity:session-expired"));
   }
 }
 
+async function refreshSession(): Promise<boolean> {
+  if (logoutPending) return false;
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      try {
+        await ensureCsrfCookie();
+        const csrf = getCookie("csrftoken");
+        const headers = new Headers();
+        if (csrf) headers.set("X-CSRFToken", csrf);
+        const res = await fetch(apiUrl("login-user/refresh/"), {
+          method: "POST", headers, credentials: "include", cache: "no-store",
+        });
+        if (res.ok) refreshRevision += 1;
+        return res.ok;
+      } catch {
+        return false;
+      }
+    })().finally(() => { refreshPromise = null; });
+  }
+  return refreshPromise;
+}
+
 export async function fetchWithSession(url: string, init: RequestInit = {}): Promise<Response> {
+  const pathname = new URL(url, typeof window === "undefined" ? "http://localhost" : window.location.href).pathname;
+  const isLogout = pathname === "/api/login-user/logout/";
+  const isAuthEndpoint = AUTH_PATHS.has(pathname);
+  if (logoutPending && !isLogout) throw new ApiError("Sign-out in progress.", 401);
+  const epoch = sessionEpoch;
+  const requestRefreshRevision = refreshRevision;
   const method = (init.method ?? "GET").toUpperCase();
-  const isUnsafe = !["GET", "HEAD", "OPTIONS", "TRACE"].includes(method);
-  if (isUnsafe) await ensureCsrfCookie();
+  const unsafe = !["GET", "HEAD", "OPTIONS", "TRACE"].includes(method);
+  if (unsafe) await ensureCsrfCookie();
 
   const headers = new Headers(init.headers);
-  const csrfToken = getCookie("csrftoken");
-  if (isUnsafe && csrfToken) headers.set("X-CSRFToken", csrfToken);
-
+  if (unsafe) {
+    const csrf = getCookie("csrftoken");
+    if (csrf) headers.set("X-CSRFToken", csrf);
+  }
   const requestInit: RequestInit = { ...init, headers, credentials: "include" };
   let response = await fetch(url, requestInit);
-  const pathname = new URL(url, window.location.href).pathname;
-  const isAuthEndpoint = pathname.includes("/login-user/");
-
-  if (response.status === 401 && !isAuthEndpoint) {
-    await ensureCsrfCookie();
-    const refreshHeaders = new Headers();
-    const currentCsrfToken = getCookie("csrftoken");
-    if (currentCsrfToken) refreshHeaders.set("X-CSRFToken", currentCsrfToken);
-    const refreshResponse = await fetch(apiUrl("login-user/refresh/"), {
-      method: "POST",
-      headers: refreshHeaders,
-      credentials: "include",
-    });
-    if (refreshResponse.ok) {
+  // Responses started before logout must not populate private UI state afterward.
+  if ((epoch !== sessionEpoch || logoutPending) && !isLogout) throw new ApiError("Session changed.", 401);
+  if (response.status === 401 && !isAuthEndpoint && !logoutPending) {
+    // A separate request may already have refreshed while this 401 was in flight.
+    const refreshed = refreshRevision !== requestRefreshRevision || await refreshSession();
+    if (epoch !== sessionEpoch || logoutPending) throw new ApiError("Session changed.", 401);
+    if (refreshed) {
+      // Refresh may rotate the CSRF cookie; send the newest token on the sole retry.
+      const latestCsrf = getCookie("csrftoken");
+      if (unsafe && latestCsrf) headers.set("X-CSRFToken", latestCsrf);
       response = await fetch(url, requestInit);
-    } else if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("safecity:session-expired"));
     }
+    if (!refreshed || response.status === 401) announceExpiredSession();
   }
-
   return response;
 }
 
@@ -82,7 +144,7 @@ async function parseResponse<T>(res: Response): Promise<T> {
   }
 
   // ✅ handle normal API (with data)
-  if ("data" in json) {
+  if (json !== null && typeof json === "object" && "data" in json) {
     return json.data as T;
   }
 
@@ -123,10 +185,13 @@ export async function requestRaw<T = unknown>(
   try {
     json = text ? JSON.parse(text) : {};
   } catch {
-    throw new Error(res.statusText || `Request failed: ${res.status}`);
+    throw new ApiError(res.ok ? "Unable to read the server response." : `Request failed (HTTP ${res.status}).`, res.status);
   }
-  if (res.status >= 400) {
-    throw new Error(json?.message || `Request failed: ${res.status}`);
+  if (!res.ok) {
+    const isEnvelope = json && typeof json === "object" && "status" in json && "data" in json;
+    const message = typeof json?.message === "string" ? json.message :
+      typeof json?.detail === "string" ? json.detail : `Request failed (HTTP ${res.status}).`;
+    throw new ApiError(message, res.status, isEnvelope ? json.data : json);
   }
   return json as T;
 }

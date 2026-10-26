@@ -59,6 +59,10 @@ const GENERIC_ERRORS = /^(serializer error\.?|validation error\.?|exception erro
 const SAFE_LIMIT = 240;
 
 function cleanMessage(raw: string): string {
+  // Do not print HTML error pages, SQL, stack traces, or internal server paths.
+  if (/<[!a-z/][^>]*>|traceback|stack trace|sqlstate|django\.|psycopg|\bselect\b.+\bfrom\b/i.test(raw)) {
+    return "An unexpected server error occurred. Please contact support if it continues.";
+  }
   const trimmed = raw.trim().replace(/\s+/g, " ");
   return trimmed.length > SAFE_LIMIT ? `${trimmed.slice(0, SAFE_LIMIT - 1)}…` : trimmed;
 }

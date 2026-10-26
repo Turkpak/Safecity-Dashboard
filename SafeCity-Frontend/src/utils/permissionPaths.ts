@@ -51,7 +51,7 @@ export function getPermissionForPath(
   };
   const exact = map[path];
   if (exact) return exact;
-  if (path.startsWith("/project/"))
+  if (/^\/project\/[^/]+\/[^/]+\/?$/.test(path))
     return { sidebar_label: "Project Management", sub_label: null };
   return null;
 }

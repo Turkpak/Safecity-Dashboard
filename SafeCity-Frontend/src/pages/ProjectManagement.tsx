@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useLocation } from "wouter";
 import {
   listProjects,
@@ -51,6 +52,11 @@ import { MapContainer, TileLayer, GeoJSON, useMap } from "react-leaflet";
 
 export default function ProjectManagement() {
   const { toast } = useToast();
+  const { canCreate, canUpdate, canDelete, isSuperAdmin } = usePermissions();
+  // These are UI affordances only. Django must independently authorize every operation.
+  const canCreateProject = isSuperAdmin || canCreate("Project Management", "Create") || canCreate("Project Management", null);
+  const canUpdateProject = isSuperAdmin || canUpdate("Project Management", "View") || canUpdate("Project Management", null);
+  const canDeleteProject = isSuperAdmin || canDelete("Project Management", "View") || canDelete("Project Management", null);
   const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
@@ -96,6 +102,7 @@ export default function ProjectManagement() {
     prevDeepLinkModeRef.current = deepLinkMode;
 
     if (deepLinkMode === "create") {
+      if (!canCreateProject) return;
       // Ensure Create New Project is never "same as view":
       // keep opening the full 3-step dialog whenever mode=create is present.
       if (!showAddProjectDialog || editingProject) {
@@ -109,7 +116,7 @@ export default function ProjectManagement() {
       // Only auto-close when we *navigate* from create -> view.
       if (prev === "create" && showAddProjectDialog) setShowAddProjectDialog(false);
     }
-  }, [deepLinkMode, showAddProjectDialog, editingProject]);
+  }, [deepLinkMode, showAddProjectDialog, editingProject, canCreateProject]);
   const { data: stakeholdersList = [] } = useQuery({
     queryKey: ["stakeholders"],
     queryFn: listStakeholders,
@@ -441,6 +448,7 @@ useEffect(() => {
 
   // Open dialog for editing a project — prefetch division/district/tehsil so dropdowns show selected values
   const openEditDialog = async (project: ApiProject) => {
+    if (!canUpdateProject) return;
     // Always refetch the full project payload for prefill (includes financials + geom).
     // If fetch fails (auth/network), still open the wizard using the card payload.
     let p: ApiProject = project;
@@ -631,6 +639,10 @@ useEffect(() => {
   // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (editingProject ? !canUpdateProject : !canCreateProject) {
+      toast({ title: "Access restricted", description: "You do not have permission to perform this project operation.", variant: "destructive" });
+      return;
+    }
     if (currentStep === 1) {
       handleNext();
       return;
@@ -800,6 +812,7 @@ useEffect(() => {
   };
 
   const handleDeleteProject = (id: number) => {
+    if (!canDeleteProject) return;
     const project = projectsData.find((p) => p.id === id);
     if (project) {
       setDeleteConfirmProject(project);
@@ -807,7 +820,7 @@ useEffect(() => {
   };
 
   const confirmDeleteProject = () => {
-    if (!deleteConfirmProject) return;
+    if (!deleteConfirmProject || !canDeleteProject) return;
     deleteProjectMutation.mutate(deleteConfirmProject.id, {
       onSettled: () => {
         setSelectedProjectForView((prev) => (prev?.id === deleteConfirmProject.id ? null : prev));
@@ -895,6 +908,9 @@ useEffect(() => {
 
   // Full-page create flow: keep all existing API/mutation/state logic intact,
   // but render the exact same wizard as a normal page (not a dialog/overlay).
+  if (isCreatePath && !canCreateProject) {
+    return <Layout title="Access restricted"><div className="p-6 text-center text-muted-foreground">You do not have permission to create projects.</div></Layout>;
+  }
   if (isCreatePath) {
     return (
       <Layout title="Create New Project">
@@ -1651,7 +1667,7 @@ useEffect(() => {
                 />
               </div>
             )}
-            {!isViewPath && (
+            {!isViewPath && canCreateProject && (
               <Button
                 onClick={() => {
                   setEditingProject(null);
@@ -1753,7 +1769,7 @@ useEffect(() => {
                     </div>
 
                     <div className="flex items-center gap-2 pt-3 border-t border-border/60">
-                      <Button
+                      {canUpdateProject && <Button
                         variant="default"
                         size="sm"
                         onClick={() => openEditDialog(project)}
@@ -1762,7 +1778,7 @@ useEffect(() => {
                       >
                         <Pencil className="h-3.5 w-3.5" />
                         Update
-                      </Button>
+                      </Button>}
                       <Button
                         variant="outline"
                         size="sm"
@@ -1773,7 +1789,7 @@ useEffect(() => {
                         <Eye className="h-3.5 w-3.5" />
                         View
                       </Button>
-                      <Button
+                      {canDeleteProject && <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleDeleteProject(project.id)}
@@ -1782,7 +1798,7 @@ useEffect(() => {
                         aria-label="Delete project"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      </Button>}
                     </div>
                   </CardContent>
                 </Card>
@@ -1912,7 +1928,7 @@ useEffect(() => {
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-muted-foreground">XER File</p>
                         <a
-                          href={selectedProjectForView.xer_file.startsWith("http") ? selectedProjectForView.xer_file : `${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"}${selectedProjectForView.xer_file.startsWith("/") ? "" : "/"}${selectedProjectForView.xer_file}`}
+                          href={mediaUrl(selectedProjectForView.xer_file)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-sm font-medium text-primary hover:underline truncate block"

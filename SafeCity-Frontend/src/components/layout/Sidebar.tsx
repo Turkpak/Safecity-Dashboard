@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
   Shield,
@@ -91,7 +92,8 @@ const NAV_ITEMS: NavItem[] = [
 export function Sidebar() {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
-  const { canView, isSuperAdmin } = usePermissions();
+  const { toast } = useToast();
+  const { canView, canCreate, isSuperAdmin } = usePermissions();
   const userRole = user?.role?.trim().toLowerCase() ?? null;
   const {
     isCollapsed,
@@ -147,6 +149,7 @@ export function Sidebar() {
           const perm = getPermissionForPath(sub.href);
           if (!perm) return true;
           if (isSuperAdmin) return true;
+          if (sub.href === "/project-management/create" && !canCreate("Project Management", "Create") && !canCreate("Project Management", null)) return false;
           return canView(perm.sidebar_label, perm.sub_label);
         });
         return visibleSubs.length > 0; // show parent only if at least one sub is visible
@@ -159,13 +162,14 @@ export function Sidebar() {
           const perm = getPermissionForPath(sub.href);
           if (!perm) return true;
           if (isSuperAdmin) return true;
+          if (sub.href === "/project-management/create" && !canCreate("Project Management", "Create") && !canCreate("Project Management", null)) return false;
           return canView(perm.sidebar_label, perm.sub_label);
         });
         return { ...item, subItems: visibleSubs };
       }
       return item;
     });
-  }, [userRole, canView, isSuperAdmin]);
+  }, [userRole, canView, canCreate, isSuperAdmin]);
 
   const NavContent = ({ collapsed }: { collapsed: boolean }) => (
     <div className="flex h-full flex-col gap-4">
@@ -383,8 +387,10 @@ export function Sidebar() {
                   href="/auth"
                   onClick={(e) => {
                     e.preventDefault();
-                    logout();
-                    setLocation("/auth");
+                    void logout().then((confirmed) => {
+                      if (confirmed) setLocation("/auth");
+                      else toast({ title: "Sign-out was not completed", description: "The server could not confirm logout. You are still signed in; please retry.", variant: "destructive" });
+                    });
                   }}
                   className={cn(
                     "flex items-center rounded-lg bg-white/5 p-3 hover:bg-white/10 transition-all group pointer-events-auto",

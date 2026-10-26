@@ -8,7 +8,8 @@ import {
   type ReactNode,
 } from "react";
 import { getCurrentUser, logout as apiLogout } from "@/api/auth";
-import { ApiError } from "@/api/client";
+import { ApiError, beginSessionLogout, endSessionLogout } from "@/api/client";
+import { queryClient } from "@/lib/queryClient";
 import type { LoginResponse } from "@/api/types";
 
 const LEGACY_AUTH_STORAGE_KEYS = [
@@ -29,7 +30,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   setUser: (user: LoginResponse | null) => void;
-  logout: () => void;
+  logout: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -39,22 +40,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const setUser = useCallback((u: LoginResponse | null) => {
+    // Login (including account switching) invalidates data cached for another identity.
+    queryClient.clear();
     setUserState(u);
   }, []);
 
-  const logout = useCallback(() => {
-    setUser(null);
+  const logout = useCallback(async (): Promise<boolean> => {
+    await beginSessionLogout();
+    let confirmed = false;
+    try {
+      await apiLogout();
+      confirmed = true;
+    } catch (error) {
+      // A 401 on the logout endpoint also means there is no active server session.
+      if (error instanceof ApiError && error.status === 401) confirmed = true;
+    } finally {
+      endSessionLogout(confirmed);
+    }
+    if (!confirmed) return false;
+    await queryClient.cancelQueries();
+    queryClient.clear();
+    setUserState(null);
     clearLegacyAuthStorage();
-    void apiLogout().catch((error: unknown) => {
-      console.error("Logout request failed.", error);
-    });
-  }, [setUser]);
+    return true;
+  }, []);
 
   useEffect(() => {
     let active = true;
     clearLegacyAuthStorage();
 
     const onSessionExpired = () => {
+      queryClient.cancelQueries();
+      queryClient.clear();
       setUserState(null);
       clearLegacyAuthStorage();
       setIsLoading(false);
@@ -69,7 +86,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!(error instanceof ApiError && error.status === 401)) {
           console.error("Could not restore the authenticated session.", error);
         }
-        if (active) setUserState(null);
+        if (active) {
+          queryClient.clear();
+          setUserState(null);
+        }
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -105,7 +125,7 @@ export function useAuth() {
       isAuthenticated: false,
       isLoading: false,
       setUser: () => {},
-      logout: () => {},
+      logout: async () => false,
     } satisfies AuthContextValue;
   }
   return ctx;

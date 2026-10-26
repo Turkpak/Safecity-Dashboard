@@ -1,0 +1,23 @@
+{
+  "source": "src/Routes.tsx",
+  "routes": [
+    "/",
+    "/auth",
+    "/comparison",
+    "/finance",
+    "/gis",
+    "/settings",
+    "/project/:tehsil/:projectId",
+    "/province-management",
+    "/division-management",
+    "/district-management",
+    "/tehsil-management",
+    "/stakeholder-management",
+    "/project-management",
+    "/project-management/create",
+    "/project-management/view",
+    "/project-activity-management",
+    "/user-management"
+  ],
+  "notes": "Only listed client routes should use SPA index.html fallback. Actual nginx location blocks and HTTP status behavior are owned by DevOps. Dynamic /project/:tehsil/:projectId requires exactly two non-empty path segments."
+}

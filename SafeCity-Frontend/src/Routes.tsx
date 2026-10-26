@@ -27,14 +27,11 @@ function AuthGate({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   const [location, setLocation] = useLocation();
 
-  if (isLoading) return null;
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && location !== "/auth") setLocation("/auth");
+  }, [isLoading, isAuthenticated, location, setLocation]);
 
-  // Redirect to /auth if not authenticated (but allow /auth itself through)
-  if (!isAuthenticated && location !== "/auth") {
-    // Use a layout effect style: schedule the redirect and render nothing
-    setTimeout(() => setLocation("/auth"), 0);
-    return null;
-  }
+  if (isLoading || (!isAuthenticated && location !== "/auth")) return null;
 
   return <>{children}</>;
 }
@@ -122,7 +119,7 @@ export function AppRoutes() {
   return (
     <>
       {/* Router is always mounted to detect route changes */}
-      <div style={{ visibility: showSplash ? "hidden" : "visible" }}>
+      <div className={showSplash ? "invisible" : "visible"}>
         <AuthProvider>
           <AuthGate>
             <SidebarProvider>
