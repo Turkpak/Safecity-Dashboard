@@ -1,3 +1,4 @@
+import { openDelayEvidenceImage } from "@/lib/openDelayEvidenceImage";
 import React, { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -779,17 +780,7 @@ export function DelayLogCards({
                         alt="Delay evidence"
                         className="w-full h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
                         onClick={() => {
-                          const newWindow = window.open();
-                          if (newWindow) {
-                            newWindow.document.write(`
-                              <html>
-                                <head><title>Delay Evidence</title></head>
-                                <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;">
-                                  <img src="${log.imageUrl}" style="max-width:100%;max-height:100vh;object-fit:contain;" />
-                                </body>
-                              </html>
-                            `);
-                          }
+                          openDelayEvidenceImage(log.imageUrl);
                         }}
                       />
                       <div className="absolute top-2 right-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded flex items-center gap-1">
@@ -1559,17 +1550,7 @@ export function GanttMini({
                                               className="w-full h-24 object-cover rounded mt-1 cursor-pointer hover:opacity-80"
                                               onClick={(e) => {
                                                 e.stopPropagation();
-                                                const newWindow = window.open();
-                                                if (newWindow) {
-                                                  newWindow.document.write(`
-                                                  <html>
-                                                    <head><title>Delay Evidence</title></head>
-                                                    <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;">
-                                                      <img src="${log.imageUrl}" style="max-width:100%;max-height:100vh;object-fit:contain;" />
-                                                    </body>
-                                                  </html>
-                                                `);
-                                                }
+                                                openDelayEvidenceImage(log.imageUrl);
                                               }}
                                             />
                                           </div>
@@ -1683,17 +1664,7 @@ export function GanttMini({
                                     className="w-full h-24 object-cover rounded mt-1 cursor-pointer hover:opacity-80"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      const newWindow = window.open();
-                                      if (newWindow) {
-                                        newWindow.document.write(`
-                                        <html>
-                                          <head><title>Delay Evidence</title></head>
-                                          <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;">
-                                            <img src="${log.imageUrl}" style="max-width:100%;max-height:100vh;object-fit:contain;" />
-                                          </body>
-                                        </html>
-                                      `);
-                                      }
+                                      openDelayEvidenceImage(log.imageUrl);
                                     }}
                                   />
                                 </div>
@@ -1808,17 +1779,7 @@ export function GanttMini({
                                                       className="w-full h-20 object-cover rounded cursor-pointer hover:opacity-80"
                                                       onClick={(e) => {
                                                         e.stopPropagation();
-                                                        const newWindow = window.open();
-                                                        if (newWindow) {
-                                                          newWindow.document.write(`
-                                                          <html>
-                                                            <head><title>Delay Evidence</title></head>
-                                                            <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;">
-                                                              <img src="${log.imageUrl}" style="max-width:100%;max-height:100vh;object-fit:contain;" />
-                                                            </body>
-                                                          </html>
-                                                        `);
-                                                        }
+                                                        openDelayEvidenceImage(log.imageUrl);
                                                       }}
                                                     />
                                                   </div>
@@ -1924,17 +1885,7 @@ export function GanttMini({
                                             className="w-full h-20 object-cover rounded cursor-pointer hover:opacity-80"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              const newWindow = window.open();
-                                              if (newWindow) {
-                                                newWindow.document.write(`
-                                                <html>
-                                                  <head><title>Delay Evidence</title></head>
-                                                  <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;">
-                                                    <img src="${log.imageUrl}" style="max-width:100%;max-height:100vh;object-fit:contain;" />
-                                                  </body>
-                                                </html>
-                                              `);
-                                              }
+                                              openDelayEvidenceImage(log.imageUrl);
                                             }}
                                           />
                                         </div>

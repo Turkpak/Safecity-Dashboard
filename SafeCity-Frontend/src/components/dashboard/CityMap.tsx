@@ -79,7 +79,6 @@ function getStatusSvg(status: ProjectStatus): string {
 }
 
 function getProjectStatusIcon(status: ProjectStatus) {
-  const cfg = PROJECT_STATUS_STYLE[status] ?? PROJECT_STATUS_STYLE.pending;
   const svg = getStatusSvg(status);
   const statusClass =
     status === "in_delay"
@@ -91,15 +90,7 @@ function getProjectStatusIcon(status: ProjectStatus) {
     className: `project-status-icon ${statusClass}`,
     html: `<div class="project-status-icon__wrap ${statusClass}">
       <span class="project-status-icon__ring" aria-hidden="true"></span>
-      <span class="project-status-icon__dot" style="
-        width: 26px; height: 26px;
-        border-radius: 9999px;
-        background: ${cfg.color};
-        border: 2px solid rgba(255,255,255,0.95);
-        box-shadow: 0 10px 25px rgba(0,0,0,0.25);
-        display: flex; align-items: center; justify-content: center;
-        color: white; font-weight: 800; font-size: 13px; line-height: 1;
-      ">${svg}</span>
+      <span class="project-status-icon__dot">${svg}</span>
     </div>`,
     iconSize: [26, 26],
     iconAnchor: [13, 13],
@@ -475,8 +466,14 @@ export function CityMap({
                     const status: ProjectStatus = feature?.properties?.status ?? "pending";
                     const statusLabel =
                       status === "in_progress" ? "In Progress" : status === "in_delay" ? "Delayed" : "Pending";
-                    if (name != null && name !== '')
-                      layer.bindPopup(`<b>${String(name)}</b><br/>${statusLabel}`);
+                    if (name != null && name !== '') {
+                      // Keep the same bold title/status layout without parsing project names as HTML.
+                      const popup = document.createElement("div");
+                      const title = document.createElement("strong");
+                      title.textContent = String(name);
+                      popup.append(title, document.createElement("br"), document.createTextNode(statusLabel));
+                      layer.bindPopup(popup);
+                    }
 
                     const rawId = feature?.properties?.id;
                     const idNum = typeof rawId === "number" ? rawId : Number(rawId);

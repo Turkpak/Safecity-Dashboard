@@ -919,14 +919,7 @@ useEffect(() => {
                       {currentStep >= 2 && (
                         <>
                           <div className="absolute inset-0 bg-primary" />
-                          <div
-                            className="absolute inset-0"
-                            style={{
-                              background: "linear-gradient(90deg, transparent 30%, #ef4444 50%, transparent 70%)",
-                              backgroundSize: "200% 100%",
-                              animation: "shimmer 1.5s linear infinite",
-                            }}
-                          />
+                          <div className="absolute inset-0 project-wizard-shimmer" />
                         </>
                       )}
                     </div>
@@ -947,14 +940,7 @@ useEffect(() => {
                       {currentStep >= 3 && (
                         <>
                           <div className="absolute inset-0 bg-primary" />
-                          <div
-                            className="absolute inset-0"
-                            style={{
-                              background: "linear-gradient(90deg, transparent 30%, #ef4444 50%, transparent 70%)",
-                              backgroundSize: "200% 100%",
-                              animation: "shimmer 1.5s linear infinite",
-                            }}
-                          />
+                          <div className="absolute inset-0 project-wizard-shimmer" />
                         </>
                       )}
                     </div>
@@ -977,16 +963,7 @@ useEffect(() => {
                   </div>
                 </div>
 
-                <style
-                  dangerouslySetInnerHTML={{
-                    __html: `
-                      @keyframes shimmer {
-                        0% { background-position: -200% 0; }
-                        100% { background-position: 200% 0; }
-                      }
-                    `,
-                  }}
-                />
+                
 
                 {/* Full wizard form (same handlers/mutations as modal) */}
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -2200,14 +2177,7 @@ useEffect(() => {
                 {currentStep >= 2 && (
                   <>
                     <div className="absolute inset-0 bg-primary" />
-                    <div 
-                      className="absolute inset-0"
-                      style={{
-                        background: 'linear-gradient(90deg, transparent 30%, #ef4444 50%, transparent 70%)',
-                        backgroundSize: '200% 100%',
-                        animation: 'shimmer 1.5s linear infinite',
-                      }}
-                    />
+                    <div className="absolute inset-0 project-wizard-shimmer" />
                   </>
                 )}
               </div>
@@ -2229,15 +2199,7 @@ useEffect(() => {
                 {currentStep >= 3 && (
                   <>
                     <div className="absolute inset-0 bg-primary" />
-                    <div
-                      className="absolute inset-0"
-                      style={{
-                        background:
-                          "linear-gradient(90deg, transparent 30%, #ef4444 50%, transparent 70%)",
-                        backgroundSize: "200% 100%",
-                        animation: "shimmer 1.5s linear infinite",
-                      }}
-                    />
+                    <div className="absolute inset-0 project-wizard-shimmer" />
                   </>
                 )}
               </div>
@@ -2264,16 +2226,7 @@ useEffect(() => {
             </div>
           </div>
 
-          <style dangerouslySetInnerHTML={{__html: `
-            @keyframes shimmer {
-              0% {
-                background-position: -200% 0;
-              }
-              100% {
-                background-position: 200% 0;
-              }
-            }
-          `}} />
+          
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Step 1: Project Details */}

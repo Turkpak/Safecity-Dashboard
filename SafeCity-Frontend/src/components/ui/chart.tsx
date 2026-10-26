@@ -3,7 +3,7 @@ import * as RechartsPrimitive from "recharts"
 
 import { cn } from "@/lib/utils"
 
-// Format: { THEME_NAME: CSS_SELECTOR }
+// Preserve light and dark chart palettes without injecting a stylesheet.
 const THEMES = { light: "", dark: ".dark" } as const
 
 export type ChartConfig = {
@@ -40,22 +40,46 @@ const ChartContainer = React.forwardRef<
       typeof RechartsPrimitive.ResponsiveContainer
     >["children"]
   }
->(({ id, className, children, config, ...props }, ref) => {
+>(({ id, className, children, config, style, ...props }, ref) => {
   const uniqueId = React.useId()
   const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`
+  const chartElement = React.useRef<HTMLDivElement | null>(null)
+  const [isDark, setIsDark] = React.useState(false)
+
+  // The old stylesheet used `.dark [data-chart]`; observe class changes on
+  // the chart's ancestors so its colors still follow the active theme.
+  const setChartRef = React.useCallback((element: HTMLDivElement | null) => {
+    chartElement.current = element
+    if (typeof ref === "function") ref(element)
+    else if (ref) ref.current = element
+  }, [ref])
+
+  React.useEffect(() => {
+    const element = chartElement.current
+    if (!element) return
+    const updateTheme = () => setIsDark(Boolean(element.closest(".dark")))
+    updateTheme()
+    const observer = new MutationObserver(updateTheme)
+    let ancestor: HTMLElement | null = element
+    while (ancestor) {
+      observer.observe(ancestor, { attributes: true, attributeFilter: ["class"] })
+      ancestor = ancestor.parentElement
+    }
+    return () => observer.disconnect()
+  }, [])
 
   return (
     <ChartContext.Provider value={{ config }}>
       <div
         data-chart={chartId}
-        ref={ref}
+        ref={setChartRef}
         className={cn(
           "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
           className
         )}
         {...props}
+        style={{ ...chartCssVars(config, isDark ? "dark" : "light"), ...style }}
       >
-        <ChartStyle id={chartId} config={config} />
         <RechartsPrimitive.ResponsiveContainer>
           {children}
         </RechartsPrimitive.ResponsiveContainer>
@@ -65,37 +89,15 @@ const ChartContainer = React.forwardRef<
 })
 ChartContainer.displayName = "Chart"
 
-const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
-  const colorConfig = Object.entries(config).filter(
-    ([, config]) => config.theme || config.color
-  )
-
-  if (!colorConfig.length) {
-    return null
+// Assign theme-aware chart variables directly through React's DOM style API.
+// This preserves component custom colors without injecting a stylesheet element.
+function chartCssVars(config: ChartConfig, theme: keyof typeof THEMES): React.CSSProperties {
+  const vars: Record<string, string> = {}
+  for (const [key, item] of Object.entries(config)) {
+    const color = item.theme?.[theme] || item.color
+    if (color) vars[`--color-${key}`] = color
   }
-
-  return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const color =
-      itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
-      itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
-  })
-  .join("\n")}
-}
-`
-          )
-          .join("\n"),
-      }}
-    />
-  )
+  return vars as React.CSSProperties
 }
 
 const ChartTooltip = RechartsPrimitive.Tooltip

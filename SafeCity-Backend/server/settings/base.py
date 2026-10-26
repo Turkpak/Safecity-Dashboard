@@ -45,9 +45,6 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", secrets.get("SECRET_KEY", "dev-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-xfg45)2$253-9o8ts*_006iv7o%=3og$sx(@q9x9^vhv_(_7d_'
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 

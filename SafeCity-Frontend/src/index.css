@@ -360,3 +360,52 @@ body {
     @apply font-heading tracking-tight;
   }
 }
+
+/* CSP: preserve project-creation wizard shimmer without injected <style> blocks.
+   Kept separate from the existing transform-based `.animate-shimmer`. */
+@keyframes project-wizard-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.project-wizard-shimmer {
+  background: linear-gradient(90deg, transparent 30%, #ef4444 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: project-wizard-shimmer 1.5s linear infinite;
+}
+
+/* CSP: match the original Leaflet marker styles without literal HTML style attributes. */
+.project-status-icon__dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 9999px;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1;
+}
+.project-status-icon--delay .project-status-icon__dot { background: #e11d48; }
+.project-status-icon--pending .project-status-icon__dot { background: #d97706; }
+.project-status-icon--progress .project-status-icon__dot { background: #2563eb; }
+
+.installation-marker__dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 3px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 10px;
+}
+.installation-marker__dot--green { background: #10b981; }
+.installation-marker__dot--blue { background: #3b82f6; }
+.installation-marker__dot--amber { background: #f59e0b; }
+.installation-marker__dot--red { background: #ef4444; }

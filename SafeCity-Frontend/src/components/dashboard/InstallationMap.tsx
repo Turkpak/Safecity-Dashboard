@@ -49,29 +49,18 @@ const getProgressColor = (percentage: number): string => {
 };
 
 const getProgressIcon = (percentage: number) => {
-  const color = getProgressColor(percentage);
+  const colorClass = percentage >= 80
+    ? "installation-marker__dot--green"
+    : percentage >= 60
+      ? "installation-marker__dot--blue"
+      : percentage >= 40
+        ? "installation-marker__dot--amber"
+        : "installation-marker__dot--red";
   return L.divIcon({
-    className: 'installation-marker',
-    html: `
-      <div style="
-        background: ${color};
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        border: 3px solid white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: bold;
-        font-size: 10px;
-      ">
-        ${percentage}%
-      </div>
-    `,
+    className: "installation-marker",
+    html: `<div class="installation-marker__dot ${colorClass}">${percentage}%</div>`,
     iconSize: [32, 32],
-    iconAnchor: [16, 16]
+    iconAnchor: [16, 16],
   });
 };
 
