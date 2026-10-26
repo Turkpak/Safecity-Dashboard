@@ -43,6 +43,9 @@ import {
   getProjectAccent,
 } from "@/features/projects/projectManagementParts";
 import { mediaUrl } from "@/api/config";
+import { getFormApiError, projectErrorStep } from "@/lib/formApiErrors";
+import type { FormErrorInfo } from "@/lib/formApiErrors";
+import { FormErrorNotice } from "@/components/forms/FormErrorNotice";
 import { MapContainer, TileLayer, GeoJSON, useMap } from "react-leaflet";
 
 
@@ -51,6 +54,7 @@ export default function ProjectManagement() {
   const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
+  const [projectSubmitError, setProjectSubmitError] = useState<FormErrorInfo | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [editingProject, setEditingProject] = useState<ApiProject | null>(null);
   const [selectedProjectForView, setSelectedProjectForView] = useState<ApiProject | null>(null);
@@ -149,7 +153,11 @@ const createProjectMutation = useMutation({
     setShowAddProjectDialog(false);
   },
   onError: (e: Error) => {
-    toast({ title: "Error", description: e.message || "Failed to create project", variant: "destructive" });
+    const error = getFormApiError(e, "Could not create the project. Please check the entered details.");
+    setProjectSubmitError(error);
+    const step = projectErrorStep(error.fields);
+    if (step) setCurrentStep(step);
+    toast({ title: "Project not created", description: error.summary, variant: "destructive", duration: 8000 });
   },
 });
 const updateProjectMutation = useMutation({
@@ -166,7 +174,11 @@ const updateProjectMutation = useMutation({
     setShowAddProjectDialog(false);
   },
   onError: (e: Error) => {
-    toast({ title: "Error", description: e.message || "Failed to update project", variant: "destructive" });
+    const error = getFormApiError(e, "Could not update the project. Please review the entered details.");
+    setProjectSubmitError(error);
+    const step = projectErrorStep(error.fields);
+    if (step) setCurrentStep(step);
+    toast({ title: "Project not updated", description: error.summary, variant: "destructive", duration: 8000 });
   },
 });
 const deleteProjectMutation = useMutation({
@@ -179,7 +191,8 @@ const deleteProjectMutation = useMutation({
     toast({ title: "Project Deleted", description: "Project has been deleted successfully." });
   },
   onError: (e: Error) => {
-    toast({ title: "Error", description: e.message || "Failed to delete project", variant: "destructive" });
+    const error = getFormApiError(e, "Failed to delete the project.");
+    toast({ title: "Project not deleted", description: error.summary, variant: "destructive", duration: 8000 });
   },
 });
   // Form state
@@ -382,6 +395,7 @@ useEffect(() => {
 
   // Reset form
   const resetForm = () => {
+    setProjectSubmitError(null);
     setProjectName("");
     setProjectDescription("");
     setStartingDate("");
@@ -627,6 +641,7 @@ useEffect(() => {
     }
     if (currentStep === 3) {
       if (!validateStep3()) return;
+      setProjectSubmitError(null);
       const totalBudget = totalBudgetAllocated.trim() ? Number(totalBudgetAllocated) : null;
       const utilized = budgetUtilized.trim() ? Number(budgetUtilized) : null;
       const variance = (totalBudget ?? 0) - (utilized ?? 0);
@@ -967,6 +982,7 @@ useEffect(() => {
 
                 {/* Full wizard form (same handlers/mutations as modal) */}
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  {projectSubmitError && <FormErrorNotice error={projectSubmitError} />}
                   {/* Step 1: Project Details */}
                   {currentStep === 1 && (
                     <div className="space-y-6">
@@ -2229,6 +2245,7 @@ useEffect(() => {
           
 
           <form onSubmit={handleSubmit} className="space-y-6">
+                  {projectSubmitError && <FormErrorNotice error={projectSubmitError} />}
             {/* Step 1: Project Details */}
             {currentStep === 1 && (
               <div className="space-y-6">

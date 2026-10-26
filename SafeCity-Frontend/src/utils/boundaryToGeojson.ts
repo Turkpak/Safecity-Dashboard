@@ -42,12 +42,17 @@ export async function boundaryFileToGeojson(file: File): Promise<File> {
 
   if (ext === "kmz") {
     const buf = await file.arrayBuffer();
-    const zip = await JSZip.loadAsync(buf);
+    let zip: JSZip;
+    try {
+      zip = await JSZip.loadAsync(buf);
+    } catch {
+      throw new Error("Project boundary file: The KMZ could not be opened. Upload a valid KMZ containing a KML file.");
+    }
     const kmlEntry = Object.keys(zip.files).find(
       (k) => k.toLowerCase().endsWith(".kml")
     );
     if (!kmlEntry) {
-      throw new Error("KMZ archive does not contain a .kml file");
+      throw new Error("Project boundary file: This KMZ does not contain a .kml file. Export the boundary again as KML/KMZ.");
     }
     const kmlText = await zip.files[kmlEntry].async("string");
     const parser = new DOMParser();
@@ -61,7 +66,12 @@ export async function boundaryFileToGeojson(file: File): Promise<File> {
 
   if (ext === "zip" || ext === "shp") {
     const buf = await file.arrayBuffer();
-    const geojson = await shp(buf);
+    let geojson: Awaited<ReturnType<typeof shp>>;
+    try {
+      geojson = await shp(buf);
+    } catch {
+      throw new Error("Project boundary file: The Shapefile ZIP could not be read. Check that the archive contains matching .shp and .dbf files and is not corrupted.");
+    }
     // shpjs returns GeoJSON or array of { fileName, features } for multiple layers
     const data = Array.isArray(geojson)
       ? { type: "FeatureCollection" as const, features: (geojson as { features?: unknown[] }[]).flatMap((l) => l.features ?? []) }

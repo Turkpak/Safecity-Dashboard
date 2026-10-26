@@ -54,6 +54,18 @@ export default defineConfig({
         target: "http://127.0.0.1:8000",
         changeOrigin: true,
       },
+      // Download progress photos from Django through the frontend origin.
+      "/media": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+      },
+    },
+  },
+  preview: {
+    port: 5000,
+    proxy: {
+      "/api": { target: "http://127.0.0.1:8000", changeOrigin: true },
+      "/media": { target: "http://127.0.0.1:8000", changeOrigin: true },
     },
   },
 });

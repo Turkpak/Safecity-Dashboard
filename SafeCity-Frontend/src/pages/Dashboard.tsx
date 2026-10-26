@@ -2839,9 +2839,7 @@ export default function Dashboard() {
                     {tehsilProjects.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {tehsilProjects.map((project, index) => {
-                          const progress = Math.round(
-                            ganttProgressByProjectId.get(project.id) ?? 0,
-                          );
+                          const progress = ganttProgressByProjectId.get(project.id) ?? 0;
                           return (
                             <HierarchyCard
                               key={project.id}
@@ -3504,9 +3502,7 @@ export default function Dashboard() {
                   }
 
                   return pageProjects.map((project, index) => {
-                    const progress = Math.round(
-                      ganttProgressByProjectId.get(project.id) ?? 0,
-                    );
+                    const progress = ganttProgressByProjectId.get(project.id) ?? 0;
                     return (
                       <HierarchyCard
                         key={project.id}

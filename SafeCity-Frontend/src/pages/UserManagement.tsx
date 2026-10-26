@@ -36,6 +36,9 @@ import {
 } from "@/components/ui/command";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { FormErrorNotice } from "@/components/forms/FormErrorNotice";
+import { getFormApiError } from "@/lib/formApiErrors";
+import type { FormErrorInfo } from "@/lib/formApiErrors";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   listStakeholders,
@@ -99,6 +102,8 @@ export default function UserManagement() {
   const isSuperAdmin = isSuperAdminRole(user?.role ?? undefined);
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [userCreationError, setUserCreationError] = useState<FormErrorInfo | null>(null);
+  const [provisioningWarning, setProvisioningWarning] = useState<FormErrorInfo | null>(null);
   /** Add New User dialog: 1 = user details, 2 = page permissions */
   const [addUserStep, setAddUserStep] = useState<1 | 2>(1);
   const [email, setEmail] = useState("");
@@ -195,6 +200,7 @@ export default function UserManagement() {
   }
 
   function resetForm() {
+    setUserCreationError(null);
     setEmail("");
     setFirstName("");
     setLastName("");
@@ -275,6 +281,7 @@ export default function UserManagement() {
       toast({ title: "Validation Error", description: "Please select a role.", variant: "destructive" });
       return;
     }
+    setUserCreationError(null);
     setAddUserStep(2);
   };
 
@@ -288,6 +295,8 @@ export default function UserManagement() {
     const selectedStakeholder = roleStakeholders.find((s) => String(s.id) === stakeholderId);
     const role = selectedStakeholder ? selectedStakeholder.stakeholder_type.toLowerCase() : "";
     setIsCreatingWithPermissions(true);
+    setUserCreationError(null);
+    let createdUserId: number | null = null;
     try {
       const res = await createUser({
         email: trimmedEmail,
@@ -298,6 +307,7 @@ export default function UserManagement() {
         stakeholder: Number(stakeholderId),
       });
       const userId = res.user.id;
+      createdUserId = userId;
       const permissionPromises: Promise<unknown>[] = [];
       for (const row of ADD_USER_PERMISSION_ROWS) {
         const p = getNewUserPerm(row.sidebar_label, row.sub_label);
@@ -331,14 +341,34 @@ export default function UserManagement() {
       await queryClient.invalidateQueries({ queryKey: ["users-with-permissions"] });
       await refetchUsersWithPermissions();
       toast({ title: "Success", description: "User and permissions created successfully." });
+      setProvisioningWarning(null);
       resetForm();
       setDialogOpen(false);
     } catch (err) {
-      toast({
-        title: "Error",
-        description: err instanceof Error ? err.message : "Failed to create user or permissions",
-        variant: "destructive",
-      });
+      const error = getFormApiError(err, "Unable to create the user. Check the details and try again.");
+      if (createdUserId !== null) {
+        // The account POST succeeded. Do NOT invite a retry that would create a duplicate account.
+        const warning: FormErrorInfo = {
+          summary: "The user account was created, but some page permissions were not saved. Select this user in Page Permissions to finish setup.",
+          details: [error.summary, ...error.details],
+          fields: error.fields,
+        };
+        setProvisioningWarning(warning);
+        await Promise.allSettled([
+          queryClient.invalidateQueries({ queryKey: ["users"] }),
+          queryClient.invalidateQueries({ queryKey: ["users-with-permissions"] }),
+          refetchUsersWithPermissions(),
+        ]);
+        resetForm();
+        setDialogOpen(false);
+        toast({ title: "User created — permissions incomplete", description: warning.summary, variant: "destructive", duration: 9000 });
+      } else {
+        setUserCreationError(error);
+        if (error.fields.some((field) => ["email", "password", "first_name", "last_name", "stakeholder", "role"].includes(field))) {
+          setAddUserStep(1);
+        }
+        toast({ title: "User not created", description: error.summary, variant: "destructive", duration: 8000 });
+      }
     } finally {
       setIsCreatingWithPermissions(false);
     }
@@ -487,7 +517,7 @@ export default function UserManagement() {
     } catch (err) {
       toast({
         title: "Error",
-        description: err instanceof Error ? err.message : "Failed to update permission",
+        description: getFormApiError(err, "Failed to update page permission.").summary,
         variant: "destructive",
       });
     } finally {
@@ -563,10 +593,7 @@ const executeStatusChange = async () => {
   } catch (err) {
     toast({
       title: "Error",
-      description:
-        err instanceof Error
-          ? err.message
-          : "Failed to update user status.",
+      description: getFormApiError(err, "Failed to update user status.").summary,
       variant: "destructive",
     });
   } finally {
@@ -638,6 +665,7 @@ const executeStatusChange = async () => {
               )}
             </DialogHeader>
             <form onSubmit={handleAddUserSubmit} className="space-y-6">
+              {userCreationError && <FormErrorNotice error={userCreationError} />}
               {addUserStep === 1 && (
                 <>
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -812,6 +840,13 @@ const executeStatusChange = async () => {
             </form>
           </DialogContent>
         </Dialog>
+
+        {provisioningWarning && (
+          <div className="mb-4">
+            <FormErrorNotice error={provisioningWarning} />
+            <Button size="sm" variant="outline" onClick={() => setProvisioningWarning(null)}>Dismiss</Button>
+          </div>
+        )}
 
         {/* Users table */}
         <Card>

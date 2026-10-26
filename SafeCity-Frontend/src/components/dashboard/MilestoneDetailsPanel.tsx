@@ -27,6 +27,7 @@ import { listDelayLogs, updateDelayLog } from "@/api/delayLog";
 import { listProgressImages, updateProgressImage } from "@/api/progressImage";
 import { createProjectDocument, listProjectDocuments, updateProjectDocument } from "@/api/projectDocument";
 import { mediaUrl } from "@/api/config";
+import { downloadProgressImage } from "@/lib/downloadProgressImage";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -84,6 +85,7 @@ export function MilestoneDetailsPanel({
   const dashboardPermission = usePermissions().getPermission("Citywise Progress", null);
   const canManageMedia = dashboardPermission.can_create || dashboardPermission.can_update;
   const canUpdateMedia = dashboardPermission.can_update;
+  const [downloadingPhotoId, setDownloadingPhotoId] = useState<number | null>(null);
 
   // Dialogs opened from Gantt activity options (three dots)
   const [addPhotoDialogOpen, setAddPhotoDialogOpen] = useState(false);
@@ -631,12 +633,24 @@ export function MilestoneDetailsPanel({
                                   size="icon"
                                   variant="secondary"
                                   className="h-7 w-7"
-                                  onClick={() => {
-                                    const a = document.createElement("a");
-                                    a.href = src;
-                                    a.download = `progress-${item.image_date || item.id}.png`;
-                                    a.click();
+                                  onClick={async () => {
+                                    if (downloadingPhotoId !== null) return;
+                                    setDownloadingPhotoId(item.id);
+                                    try {
+                                      await downloadProgressImage(src, item.image_date, item.id);
+                                    } catch (error) {
+                                      console.error("Progress photo download failed:", error);
+                                      toast({
+                                        variant: "destructive",
+                                        title: "Photo download failed",
+                                        description: error instanceof Error ? error.message : "Unable to download this photo.",
+                                      });
+                                    } finally {
+                                      setDownloadingPhotoId(null);
+                                    }
                                   }}
+                                  disabled={downloadingPhotoId !== null}
+                                  aria-label="Download progress photo"
                                   title="Download"
                                 >
                                   <Download className="h-3.5 w-3.5" />

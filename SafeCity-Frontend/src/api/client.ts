@@ -2,7 +2,7 @@ import { apiUrl } from "./config";
 import type { ApiEnvelope } from "./types";
 
 export class ApiError extends Error {
-  constructor(message: string, public readonly status: number) {
+  constructor(message: string, public readonly status: number, public readonly details?: unknown) {
     super(message);
     this.name = "ApiError";
   }
@@ -64,11 +64,16 @@ async function parseResponse<T>(res: Response): Promise<T> {
   try {
     json = text ? JSON.parse(text) : {};
   } catch {
-    throw new Error(res.statusText || `Request failed: ${res.status}`);
+    throw new ApiError(res.ok ? "Unable to read the server response." : `Request failed (HTTP ${res.status}).`, res.status);
   }
 
   if (res.status >= 400) {
-    throw new ApiError(json?.message || `Request failed: ${res.status}`, res.status);
+    // The backend sends {status, message: "Serializer error.", data: {field: [errors]}}.
+    // Preserve the field errors for the form rather than displaying that generic message.
+    const isEnvelope = json && typeof json === "object" && "data" in json && "status" in json;
+    const message = typeof json?.message === "string" ? json.message
+      : typeof json?.detail === "string" ? json.detail : `Request failed (HTTP ${res.status}).`;
+    throw new ApiError(message, res.status, isEnvelope ? json.data : json);
   }
 
   // ✅ handle raw array
