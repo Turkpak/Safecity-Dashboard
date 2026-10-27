@@ -11,7 +11,7 @@ class ProjectDeleteView(viewsets.ViewSet):
 
         try:
             myproject = Project.objects.get(id=project_id)
-        except Province.DoesNotExist:
+        except Project.DoesNotExist:
             return ApiResponse(
                 status=status.HTTP_404_NOT_FOUND,
                 message="Project not found.",
