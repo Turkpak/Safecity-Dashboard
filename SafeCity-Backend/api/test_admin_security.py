@@ -16,7 +16,12 @@ from api.jwt_tokens import (
     CookieTokenRefreshSerializer,
 )
 from rest_framework_simplejwt.exceptions import TokenError
+from django.contrib.auth import get_user_model
+from rest_framework.test import APIClient
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 
+from django.middleware.csrf import get_token
+from django.test import RequestFactory
 
 class AdminLoginSecurityTests(TestCase):
     def setUp(self):
@@ -97,3 +102,48 @@ class AuthCookieSecurityTests(TestCase):
 
         self.assertTrue(serializer.is_valid(), serializer.errors)
         BlacklistableAccessToken(serializer.validated_data["access"])
+
+    def test_logout_endpoint_clears_cookies_and_blacklists_tokens(self):
+        User = get_user_model()
+        user = User.objects.create_user(
+            email="logout-test@example.com",
+            password="TestPassword123!Secure",
+            company_name="Test Company",
+        )
+
+        client = APIClient(enforce_csrf_checks=False)
+
+        refresh = CookieRefreshToken.for_user(user)
+        access = refresh.access_token
+
+        client.cookies[ACCESS_TOKEN_COOKIE] = str(access)
+        client.cookies[REFRESH_TOKEN_COOKIE] = str(refresh)
+
+        # Generate a CSRF token for the test request.
+        request = RequestFactory().get("/")
+        csrf_token = get_token(request)
+        client.cookies["csrftoken"] = csrf_token
+
+        response = client.post(
+            "/api/login-user/logout/",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.cookies[ACCESS_TOKEN_COOKIE]["max-age"], 0
+        )
+        self.assertEqual(
+            response.cookies[REFRESH_TOKEN_COOKIE]["max-age"], 0
+        )
+
+        self.assertTrue(
+            BlacklistedToken.objects.filter(
+                token__jti=refresh["jti"]
+            ).exists()
+        )
+        self.assertTrue(
+            BlacklistedToken.objects.filter(
+                token__jti=access["jti"]
+            ).exists()
+        )
