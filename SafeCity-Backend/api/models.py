@@ -424,6 +424,8 @@ class ProjectActivity(models.Model):
     duration = models.FloatField(null=True, blank=True)
 
     task_type = models.CharField(max_length=20, default="task")
+    total_quantity = models.FloatField(null=True, blank=True)
+    completed_quantity = models.FloatField(null=True, blank=True)
 
     class Meta:
         ordering = []
@@ -449,6 +451,10 @@ class ProjectActivity(models.Model):
 # -----------------------------
 @receiver(pre_save, sender=ProjectActivity)
 def update_activity_fields(sender, instance, **kwargs):
+    # Take the unit count from names like "Fixed Cameras (53)" when the activity is first created
+    if instance._state.adding and instance.total_quantity is None:
+        from api.quantity import extract_quantity_from_name
+        instance.total_quantity = extract_quantity_from_name(instance.activity_name)
     # Calculate duration
     if instance.start_date and instance.end_date:
         instance.duration = (instance.end_date - instance.start_date).days + 1

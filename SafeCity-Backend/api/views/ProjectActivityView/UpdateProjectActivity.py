@@ -4,7 +4,7 @@ from rest_framework import status
 from api.models import ProjectActivity
 from api.serializers import ProjectActivitySerializer
 from api.permissions import HasSidebarPermission
-
+from api.quantity import QuantityError, apply_quantity_and_progress
 class ProjectActivityUpdateView(viewsets.ViewSet):
     permission_classes = [HasSidebarPermission]
     sidebar_label = "Citywise Progress"
@@ -18,7 +18,12 @@ class ProjectActivityUpdateView(viewsets.ViewSet):
             return Response({"error": "Not found"}, status=404)
 
         # ✅ manually assign values
-        obj.progress = request.data.get("progress", obj.progress)
+        try:
+            apply_quantity_and_progress(obj, request.data)
+        except QuantityError as e: return Response(
+                {"status": False, "message": str(e), "detail": str(e), "error": str(e), "field": e.field},
+                status=400,
+            )
 
         if request.data.get("actual_start"):
             obj.actual_start = request.data.get("actual_start")

@@ -52,6 +52,10 @@ type FlatGanttRow = {
   progress_date?: string | null;
   has_delay?: boolean;
   delay_info?: unknown;
+
+  total_quantity?: number | null;
+  completed_quantity?: number | null;
+  remaining_quantity?: number | null;
 };
 
 /**
@@ -174,6 +178,7 @@ export function ProjectGanttTree({
   const [progressOpen, setProgressOpen] = useState(false);
   const [activeRow, setActiveRow] = useState<FlatGanttRow | null>(null);
   const [progressValue, setProgressValue] = useState<number>(0);
+  const [completedQuantity, setCompletedQuantity] = useState("");
   const [progressDate, setProgressDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [progressImages, setProgressImages] = useState<File[]>([]);
   const [progressCaption, setProgressCaption] = useState<string>("");
@@ -366,7 +371,22 @@ export function ProjectGanttTree({
   }, []);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
+const totalQuantity = activeRow?.total_quantity ?? null;
 
+const completedQuantityNumber =
+  completedQuantity.trim() === ""
+    ? 0
+    : Number(completedQuantity);
+
+const remainingQuantity =
+  totalQuantity !== null
+    ? Math.max(0, totalQuantity - completedQuantityNumber)
+    : null;
+
+const quantityProgress =
+  totalQuantity !== null && totalQuantity > 0
+    ? (completedQuantityNumber / totalQuantity) * 100
+    : progressValue;
   return (
     <div
       ref={scrollRef}
@@ -519,6 +539,28 @@ export function ProjectGanttTree({
                         return <span className={cls}>• {label}</span>;
                       })()}
                     </div>
+                    {!t.hasChildren && t.total_quantity != null && (
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+                      <span>
+                        Total: <strong>{t.total_quantity}</strong>
+                      </span>
+
+                      <span>
+                        Completed: <strong>{t.completed_quantity ?? 0}</strong>
+                      </span>
+
+                      <span>
+                        Remaining: <strong>
+                          {t.remaining_quantity ??
+                            Math.max(0, t.total_quantity - (t.completed_quantity ?? 0))}
+                        </strong>
+                      </span>
+
+                      <span>
+                        Progress: <strong>{Number(t.progress ?? 0).toFixed(2)}%</strong>
+                      </span>
+                    </div>
+                  )}
                   </div>
                 </div>
 
@@ -653,17 +695,33 @@ export function ProjectGanttTree({
                           {(canCreate || canUpdate) && (
                             <DropdownMenuItem
                               onSelect={(e) => {
-                                e.preventDefault();
-                                setActiveRow(t);
-                                setProgressValue(
-                                  typeof t.progress === "number" && Number.isFinite(t.progress)
-                                    ? t.progress
-                                    : 0,
-                                );
-                                setProgressDate(new Date().toISOString().slice(0, 10));
-                                setProgressImages([]);
-                                setProgressOpen(true);
-                              }}
+                              e.preventDefault();
+
+                              const currentProgress =
+                                typeof t.progress === "number" && Number.isFinite(t.progress)
+                                  ? clamp(t.progress, 0, 100)
+                                  : 0;
+
+                              setActiveRow(t);
+                              setProgressValue(currentProgress);
+
+                              setCompletedQuantity(
+                                t.completed_quantity != null
+                                  ? String(t.completed_quantity)
+                                  : t.total_quantity != null
+                                    ? String(
+                                        Number(
+                                          ((t.total_quantity * currentProgress) / 100).toFixed(2)
+                                        )
+                                      )
+                                    : ""
+                              );
+
+                              setProgressDate(new Date().toISOString().slice(0, 10));
+                              setProgressImages([]);
+                              setProgressCaption("");
+                              setProgressOpen(true);
+                            }}
                             >
                               <Plus className="h-4 w-4 mr-2" />
                               Add progress
@@ -950,7 +1008,76 @@ export function ProjectGanttTree({
                 <Input value={activeRow?.label ?? ""} readOnly />
               </div>
             </div>
+            {activeRow?.total_quantity != null && (
+              <div className="rounded-lg border border-border p-4 space-y-4">
+                <h3 className="font-semibold text-sm">Physical Quantity</h3>
 
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Total Quantity</Label>
+                    <Input
+                      value={activeRow.total_quantity}
+                      readOnly
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Completed Quantity</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={activeRow.total_quantity}
+                      step="any"
+                      value={completedQuantity}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setCompletedQuantity(value);
+
+                        if (value.trim() === "") {
+                          setProgressValue(0);
+                          return;
+                        }
+
+                        const completed = Number(value);
+
+                        if (
+                          Number.isFinite(completed) &&
+                          activeRow.total_quantity! > 0
+                        ) {
+                          setProgressValue(
+                            clamp(
+                              (completed / activeRow.total_quantity!) * 100,
+                              0,
+                              100
+                            )
+                          );
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Remaining Quantity</Label>
+                    <Input
+                      value={
+                        remainingQuantity !== null
+                          ? Number(remainingQuantity.toFixed(2))
+                          : ""
+                      }
+                      readOnly
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Quantity Progress</Label>
+                    <Input
+                      value={`${quantityProgress.toFixed(2)}%`}
+                      readOnly
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <Label>Progress</Label>
@@ -961,7 +1088,19 @@ export function ProjectGanttTree({
                 min={0}
                 max={100}
                 step={1}
-                onValueChange={(v) => setProgressValue(v?.[0] ?? 0)}
+                onValueChange={(v) => {
+                const value = v?.[0] ?? 0;
+                setProgressValue(value);
+
+                if (activeRow?.total_quantity != null) {
+                  const completed =
+                    (activeRow.total_quantity * value) / 100;
+
+                  setCompletedQuantity(
+                    String(Number(completed.toFixed(2)))
+                  );
+                }
+              }}
               />
               <div className="flex justify-between text-[11px] text-muted-foreground">
                 {[0, 20, 40, 60, 80, 100].map((m) => (
@@ -1128,33 +1267,76 @@ export function ProjectGanttTree({
                   return;
                 }
                 try {
+                  const hasQuantity =
+                    activeRow.total_quantity != null &&
+                    Number.isFinite(activeRow.total_quantity) &&
+                    activeRow.total_quantity > 0;
+
+                  const completed = Number(completedQuantity);
+
+                  if (hasQuantity) {
+                    if (
+                      completedQuantity.trim() === "" ||
+                      !Number.isFinite(completed) ||
+                      completed < 0 ||
+                      completed > activeRow.total_quantity!
+                    ) {
+                      toast({
+                        title: "Invalid completed quantity",
+                        description: `Enter a quantity between 0 and ${activeRow.total_quantity}.`,
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                  }
+
+                  const finalProgress = hasQuantity
+                    ? (completed / activeRow.total_quantity!) * 100
+                    : clamp(Number(progressValue), 0, 100);
+
                   setSavingProgress(true);
+
                   await updateTaskActual(activeRow.db_id, {
-                    progress: Math.max(0, Math.min(100, Number(progressValue))),
+                    progress: finalProgress,
+
+                    ...(hasQuantity
+                      ? {
+                          total_quantity: activeRow.total_quantity,
+                          completed_quantity: completed,
+                        }
+                      : {}),
 
                     actual_start:
-                      progressValue > 0 && !activeRow.actual_start
+                      finalProgress > 0 && !activeRow.actual_start
                         ? progressDate
                         : undefined,
 
                     actual_end:
-                      progressValue === 100
-                        ? (progressDate || new Date().toISOString().slice(0,10))
+                      finalProgress === 100
+                        ? progressDate || new Date().toISOString().slice(0, 10)
                         : undefined,
 
-                    // ✅ ADD THIS
                     progress_date: progressDate,
                   });
 
                   toast({
                     title: "Progress saved",
                     description:
-                      progressImages.length > 0 ? "Progress updated. (Images upload when you select them.)" : "Progress updated successfully.",
+                      progressImages.length > 0
+                        ? "Progress updated. (Images upload when you select them.)"
+                        : "Progress updated successfully.",
                   });
+
                   setProgressOpen(false);
                   await onProgressSaved?.();
-                  await queryClient.invalidateQueries({ queryKey: ["progress-images", projectId] });
-                  await queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
+
+                  await queryClient.invalidateQueries({
+                    queryKey: ["progress-images", projectId],
+                  });
+
+                  await queryClient.invalidateQueries({
+                    queryKey: ["project-documents", projectId],
+                  });
                 } catch (err) {
                   toast({
                     title: "Failed to save progress",
@@ -1163,7 +1345,7 @@ export function ProjectGanttTree({
                   });
                 } finally {
                   setSavingProgress(false);
-                }
+                } 
               }}
             >
               {savingProgress ? "Saving..." : "Save progress"}

@@ -4,6 +4,7 @@ from django.shortcuts import get_object_or_404
 from api.models import Project, ProjectActivity, ActivityDelayLog, ProgressImage, ProjectDocument
 from datetime import datetime
 from ..common_imports import *
+from api.quantity import quantity_payload
 def get_activity_images(activity):
     images = ProgressImage.objects.filter(activity=activity)
     image_list = []
@@ -182,6 +183,9 @@ class ProjectGanttNestedView(APIView):
 
                 activity_images = get_activity_images(act)
                 activity_docs = get_activity_documents(act)
+
+                qty = ({"total_quantity": None, "completed_quantity": None, "remaining_quantity": None}
+                       if subtasks else quantity_payload(act))
                 # -----------------------------
                 # NODE
                 # -----------------------------
@@ -200,6 +204,7 @@ class ProjectGanttNestedView(APIView):
                         else "Completed" if avg_progress >= 100
                         else "In Progress"
                     ),
+                    **qty,
                     "actual_start": act.actual_start.isoformat() if act.actual_start else None,
                     "actual_end": act.actual_end.isoformat() if act.actual_end else None,
                     "progress_date": act.progress_date.isoformat() if act.progress_date else None,

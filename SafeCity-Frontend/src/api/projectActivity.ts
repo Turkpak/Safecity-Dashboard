@@ -62,6 +62,9 @@ export interface GanttTask {
   /** Progress date emitted in nested Gantt payloads. */
   progress_date?: string | null;
   progress: number;
+  total_quantity?: number | null;
+  completed_quantity?: number | null;
+  remaining_quantity?: number | null;
   parent?: string;
   /** Stable ordering index to preserve API/XER sibling order. */
   order?: number;
@@ -85,6 +88,9 @@ export type GanttNestedNode = {
   start_date?: string | null;
   end_date?: string | null;
   progress?: number;
+  total_quantity?: number | null;
+  completed_quantity?: number | null;
+  remaining_quantity?: number | null;
   progress_status?: string | null;
   actual_start?: string | null;
   actual_end?: string | null;
@@ -185,6 +191,9 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
       actual_end: asDate(node?.actual_end),
       progress_date: asDate(node?.progress_date),
       progress: typeof node?.progress === "number" && Number.isFinite(node.progress) ? node.progress : 0,
+      total_quantity: node?.total_quantity ?? null,
+      completed_quantity: node?.completed_quantity ?? null,
+      remaining_quantity: node?.remaining_quantity ?? null,
       parent,
       order: orderCounter++,
       has_delay: Boolean(node?.has_delay),
@@ -216,6 +225,9 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
     actual_start: act.actual_start ?? null,
     actual_end: act.actual_end ?? null,
     progress: act.progress ?? 0,
+    total_quantity: act.total_quantity ?? null,
+    completed_quantity: act.completed_quantity ?? null,
+    remaining_quantity: act.remaining_quantity ?? null,
     parent: act.parent_id ? String(act.parent_id) : undefined,
     order: idx,
     has_delay: Boolean(act.has_delay),
@@ -225,9 +237,9 @@ export async function getProjectGanttData(projectId: number): Promise<GanttTask[
 
 export type UpdateTaskActualInput = {
   progress: number;
-  /** ISO date (YYYY-MM-DD) */
+  total_quantity?: number | null;
+  completed_quantity?: number | null;
   actual_start?: string | null;
-  /** ISO date (YYYY-MM-DD) */
   actual_end?: string | null;
   progress_date?: string | null;
   remarks?: string | null;
